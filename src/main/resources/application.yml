@@ -1,0 +1,69 @@
+spring:
+  application:
+    name: cadeteria-backend
+  datasource:
+    url: jdbc:mysql://localhost:3306/cadeteria?createDatabaseIfNotExist=true&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:root}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    # OSIV activado (default de Spring Boot): permite mapear entidades a DTO en el
+    # controller sin LazyInitializationException. A futuro: proyecciones DTO en el
+    # service y desactivar esto (mismo criterio que el backend del ecommerce).
+    open-in-view: true
+    properties:
+      hibernate:
+        format_sql: false
+        globally_quoted_identifiers: true
+
+server:
+  port: ${SERVER_PORT:8080}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+app:
+  jwt:
+    # En produccion: definir JWT_SECRET (>= 32 chars). El default es solo para desarrollo local.
+    secret: ${JWT_SECRET:dev-secret-cadeteria-cambiar-en-produccion-1234567890}
+    expiration-minutes: ${JWT_EXPIRATION_MINUTES:720}
+  # Admin inicial: se siembra en la tabla admin (hasheado) si no hay ninguno.
+  admin:
+    username: ${ADMIN_USER:admin}
+    password: ${ADMIN_PASSWORD:cambiar123}
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:4200}
+  seed:
+    enabled: ${SEED_ENABLED:true}
+  demo:
+    enabled: ${DEMO_ENABLED:true}
+  front-base-url: ${FRONT_BASE_URL:http://localhost:4200}
+  sms:
+    enabled: ${SMS_ENABLED:false}
+    gateway-url: ${SMS_GATEWAY_URL:}
+    gateway-user: ${SMS_GATEWAY_USER:}
+    gateway-password: ${SMS_GATEWAY_PASSWORD:}
+  whatsapp:
+    # Token compartido que el gateway (Node/Baileys en la PC local) manda en el CONNECT
+    # de STOMP. En produccion: definir WHATSAPP_GATEWAY_TOKEN. El default es solo para
+    # desarrollo local.
+    gateway-token: ${WHATSAPP_GATEWAY_TOKEN:dev-token-whatsapp-cambiar-en-produccion}
+  maps:
+    nominatim-url: ${NOMINATIM_URL:https://nominatim.openstreetmap.org}
+    open-route-service-url: ${ORS_URL:https://api.openrouteservice.org}
+    open-route-service-key: ${ORS_KEY:}
+  fcm:
+    credenciales-path: ${FCM_CREDENTIALS_PATH:}
+  # SMTP para el mail de alta de cadete (ronda 7) — host vacio = deshabilitado, se loguea y no rompe el alta.
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    from: ${MAIL_FROM:no-reply@cadeteria.local}
+
+logging:
+  level:
+    org.hibernate.SQL: warn

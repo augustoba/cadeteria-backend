@@ -1,0 +1,22 @@
+# Copia este archivo a `application-local.yml` (esta gitignored) y poné tus
+# credenciales reales de MySQL. Spring lo toma automaticamente si corres con
+# el perfil `local`: ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+# o seteá las variables de entorno DB_USER / DB_PASSWORD y no hace falta este archivo.
+
+spring:
+  datasource:
+    username: root
+    password: root
+
+app:
+  jwt:
+    secret: pon-aca-un-secreto-largo-de-al-menos-32-caracteres-para-dev
+  sms:
+    enabled: false
+    gateway-url: http://192.168.0.50:8080
+    gateway-user: sms
+    gateway-password: cambiar
+  maps:
+    open-route-service-key: pon-aca-tu-api-key-gratuita-de-openrouteservice
+  fcm:
+    credenciales-path: C:/ruta/a/tu/firebase-service-account.json
