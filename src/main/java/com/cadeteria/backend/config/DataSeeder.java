@@ -73,6 +73,7 @@ public class DataSeeder implements CommandLineRunner {
         seedResultadoOferta();
         seedAutorMensaje();
         seedAdminInicial();
+        backfillRolAdmins();
         seedConfiguracion();
     }
 
@@ -83,8 +84,24 @@ public class DataSeeder implements CommandLineRunner {
         admin.setUsername(props.getAdmin().getUsername());
         admin.setPasswordHash(passwordEncoder.encode(props.getAdmin().getPassword()));
         admin.setEnabled(true);
+        admin.setRol("DUENO");
         adminRepo.save(admin);
         log.info("Seed: admin inicial '{}' creado.", admin.getUsername());
+    }
+
+    /**
+     * Columna "rol" nueva (roles de admin, 2026-09-16) — en una base ya existente, los
+     * admins cargados antes de este cambio quedan con NULL al agregar la columna
+     * (`ddl-auto: update` no forzó un default). Sin este backfill, {@link Admin#isDueno()}
+     * ya trata NULL como DUENO, pero conviene dejarlo explícito en la base.
+     */
+    private void backfillRolAdmins() {
+        adminRepo.findAll().stream()
+                .filter(a -> a.getRol() == null)
+                .forEach(a -> {
+                    a.setRol("DUENO");
+                    adminRepo.save(a);
+                });
     }
 
     /** Valores por defecto de diseno-tecnico.md sección 7 — editables despues desde el panel. */

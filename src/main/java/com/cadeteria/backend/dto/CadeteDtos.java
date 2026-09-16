@@ -143,4 +143,11 @@ public final class CadeteDtos {
             return new AvisoGeneralResponse(a.getId(), a.getMensaje(), a.getEnviadoEn(), a.getTotalDestinatarios(), totalLeido);
         }
     }
+
+    /** Pantalla "Avisos" con historial de la app (mejora 2026-09-16) — a diferencia de {@link AvisoGeneralResponse}, incluye los ya leídos y de quién los mandó no hace falta (siempre es el admin). */
+    public record AvisoGeneralHistorialResponse(String id, String mensaje, Instant enviadoEn, boolean leidoPorMi) {
+        public static AvisoGeneralHistorialResponse from(com.cadeteria.backend.model.AvisoGeneral a, boolean leidoPorMi) {
+            return new AvisoGeneralHistorialResponse(a.getId(), a.getMensaje(), a.getEnviadoEn(), leidoPorMi);
+        }
+    }
 }

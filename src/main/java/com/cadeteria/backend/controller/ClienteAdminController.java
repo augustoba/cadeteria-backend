@@ -4,12 +4,11 @@ import com.cadeteria.backend.dto.ClienteDtos.ClienteAvisoResponse;
 import com.cadeteria.backend.dto.ClienteDtos.ClienteFichaResponse;
 import com.cadeteria.backend.dto.ClienteDtos.ClienteRequest;
 import com.cadeteria.backend.dto.ClienteDtos.ClienteResponse;
+import com.cadeteria.backend.dto.ClienteDtos.ClientesPaginaResponse;
 import com.cadeteria.backend.dto.ClienteDtos.LiquidarCuentaCorrienteResponse;
 import com.cadeteria.backend.service.ClienteService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 /** Vista de Clientes ABM + ficha/historial por teléfono (ronda 4, puntos 44, 58, 67). */
 @RestController
@@ -23,8 +22,12 @@ public class ClienteAdminController {
     }
 
     @GetMapping
-    public List<ClienteResponse> listar(@RequestParam(required = false) String q) {
-        return service.listar(q);
+    public ClientesPaginaResponse listar(
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "0") int pagina,
+            @RequestParam(defaultValue = "20") int tamano) {
+        var r = service.listarPaginado(q, pagina, tamano);
+        return new ClientesPaginaResponse(r.items(), r.total(), r.pagina(), r.totalPaginas());
     }
 
     /** Aviso rápido al cargar un pedido nuevo — si el teléfono es problemático o tiene tarifa especial. */

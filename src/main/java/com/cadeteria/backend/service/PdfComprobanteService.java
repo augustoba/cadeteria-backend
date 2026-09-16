@@ -2,54 +2,186 @@ package com.cadeteria.backend.service;
 
 import com.cadeteria.backend.model.Pedido;
 import org.openpdf.text.Document;
+import org.openpdf.text.Element;
 import org.openpdf.text.Font;
 import org.openpdf.text.FontFactory;
+import org.openpdf.text.Image;
 import org.openpdf.text.Paragraph;
+import org.openpdf.text.Phrase;
+import org.openpdf.text.Rectangle;
+import org.openpdf.text.pdf.PdfPCell;
+import org.openpdf.text.pdf.PdfPTable;
 import org.openpdf.text.pdf.PdfWriter;
 import org.springframework.stereotype.Service;
 
+import java.awt.Color;
 import java.io.ByteArrayOutputStream;
+import java.math.BigDecimal;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
-/** Comprobante descargable de la pagina publica de seguimiento (spec 5.7/6, diseno sección 8). */
+/**
+ * Comprobante descargable de la pagina publica de seguimiento (spec 5.7/6, diseno sección 8).
+ * Formato de cupón único (antes se manejaban 3 talones en papel: recepción, CADEM e interesado;
+ * acá se consolida todo en un solo comprobante con los mismos datos).
+ */
 @Service
 public class PdfComprobanteService {
 
     private static final DateTimeFormatter FORMATO_FECHA =
-            DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneId.of("America/Argentina/Buenos_Aires"));
+            DateTimeFormatter.ofPattern("dd/MM/yyyy").withZone(ZoneId.of("America/Argentina/Buenos_Aires"));
+    private static final DateTimeFormatter FORMATO_HORA =
+            DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.of("America/Argentina/Buenos_Aires"));
+
+    private static final Color NARANJA = new Color(0xFC, 0x69, 0x00);
+    private static final Color OSCURO = new Color(0x1E, 0x1E, 0x1E);
+
+    private static final String TELEFONO_CADETERIA = "0381 - 4210846";
 
     public byte[] generar(Pedido p) {
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Document doc = new Document();
+            doc.setMargins(48, 48, 40, 40);
             PdfWriter.getInstance(doc, out);
             doc.open();
 
-            Font titulo = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18);
-            Font normal = FontFactory.getFont(FontFactory.HELVETICA, 12);
+            Font tituloFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 15, OSCURO);
+            Font cuponFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, NARANJA);
+            Font telefonoFont = FontFactory.getFont(FontFactory.HELVETICA, 10, OSCURO);
+            Font labelFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, OSCURO);
+            Font valueFont = FontFactory.getFont(FontFactory.HELVETICA, 10, OSCURO);
+            Font footerFont = FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 8, Color.GRAY);
 
-            doc.add(new Paragraph("Comprobante de entrega", titulo));
-            doc.add(new Paragraph(" "));
-            doc.add(new Paragraph("Pedido Nº " + p.getNumero(), normal));
-            doc.add(new Paragraph("Cliente: " + p.getClienteNombre() + " (" + p.getClienteTelefono() + ")", normal));
-            doc.add(new Paragraph("Origen: " + p.getOrigenDireccion(), normal));
-            doc.add(new Paragraph("Destino: " + p.getDestinoDireccion(), normal));
-            doc.add(new Paragraph("Precio: $" + p.getPrecio(), normal));
-            if (p.getCadeteAsignado() != null) {
-                doc.add(new Paragraph("Cadete: " + p.getCadeteAsignado().getNombre()
-                        + " " + p.getCadeteAsignado().getApellido(), normal));
+            PdfPTable tarjeta = new PdfPTable(1);
+            tarjeta.setWidthPercentage(100);
+
+            PdfPCell contenedor = new PdfPCell();
+            contenedor.setPadding(18);
+            contenedor.setBorderColor(NARANJA);
+            contenedor.setBorderWidth(1.5f);
+
+            // Encabezado: logo a la izquierda, cupón/teléfono a la derecha
+            PdfPTable encabezado = new PdfPTable(2);
+            encabezado.setWidthPercentage(100);
+            encabezado.setWidths(new float[]{1f, 2f});
+
+            PdfPCell celdaLogo = new PdfPCell();
+            celdaLogo.setBorder(Rectangle.NO_BORDER);
+            celdaLogo.setVerticalAlignment(Element.ALIGN_MIDDLE);
+            try {
+                Image logo = Image.getInstance(getClass().getResource("/branding/logo-cadem.png"));
+                logo.scaleToFit(64, 64);
+                celdaLogo.addElement(logo);
+            } catch (Exception ignored) {
+                celdaLogo.addElement(new Paragraph("CADEM", cuponFont));
             }
-            if (p.getEntregaReceptorNombre() != null) {
-                doc.add(new Paragraph("Recibio: " + p.getEntregaReceptorNombre(), normal));
+            encabezado.addCell(celdaLogo);
+
+            PdfPCell celdaCupon = new PdfPCell();
+            celdaCupon.setBorder(Rectangle.NO_BORDER);
+            celdaCupon.setVerticalAlignment(Element.ALIGN_MIDDLE);
+            celdaCupon.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            Paragraph tituloPar = new Paragraph("Comprobante de envío", tituloFont);
+            tituloPar.setAlignment(Element.ALIGN_RIGHT);
+            Paragraph cuponPar = new Paragraph("Cupón Nº " + p.getNumero(), cuponFont);
+            cuponPar.setAlignment(Element.ALIGN_RIGHT);
+            Paragraph telPar = new Paragraph(TELEFONO_CADETERIA, telefonoFont);
+            telPar.setAlignment(Element.ALIGN_RIGHT);
+            celdaCupon.addElement(tituloPar);
+            celdaCupon.addElement(cuponPar);
+            celdaCupon.addElement(telPar);
+            encabezado.addCell(celdaCupon);
+
+            contenedor.addElement(encabezado);
+            contenedor.addElement(lineaDivisoria());
+
+            PdfPTable datos = new PdfPTable(2);
+            datos.setWidthPercentage(100);
+            datos.setWidths(new float[]{1f, 2f});
+            datos.setSpacingBefore(8);
+
+            agregarFila(datos, "Fecha:", FORMATO_FECHA.format(p.getCreadoEn()), labelFont, valueFont);
+            agregarFila(datos, "Hora:", FORMATO_HORA.format(p.getCreadoEn()), labelFont, valueFont);
+            agregarFila(datos, "Cliente:", p.getClienteNombre(), labelFont, valueFont);
+            agregarFila(datos, "Solicita:", p.getClienteTelefono(), labelFont, valueFont);
+            agregarFila(datos, "Origen:", p.getOrigenDireccion(), labelFont, valueFont);
+            agregarFila(datos, "Destino:", p.getDestinoDireccion(), labelFont, valueFont);
+            agregarFila(datos, "Efectivo:", formatoMoneda(p.getMontoDeclarado()), labelFont, valueFont);
+            agregarFila(datos, "Valor trámite:", formatoMoneda(p.getPrecio()), labelFont, valueFont);
+            if (p.getCadeteAsignado() != null) {
+                String movil = p.getCadeteAsignado().getNombre() + " " + p.getCadeteAsignado().getApellido();
+                if (p.getCadeteAsignado().getDni() != null && !p.getCadeteAsignado().getDni().isBlank()) {
+                    movil += " - DNI " + p.getCadeteAsignado().getDni();
+                }
+                agregarFila(datos, "Móvil:", movil, labelFont, valueFont);
+            }
+            if (p.getEntregaReceptorNombre() != null && !p.getEntregaReceptorNombre().isBlank()) {
+                agregarFila(datos, "Recibió:", p.getEntregaReceptorNombre(), labelFont, valueFont);
             }
             if (p.getFinalizadoEn() != null) {
-                doc.add(new Paragraph("Entregado: " + FORMATO_FECHA.format(p.getFinalizadoEn()), normal));
+                agregarFila(datos, "Entregado:",
+                        FORMATO_FECHA.format(p.getFinalizadoEn()) + " " + FORMATO_HORA.format(p.getFinalizadoEn()),
+                        labelFont, valueFont);
             }
+
+            contenedor.addElement(datos);
+            contenedor.addElement(lineaDivisoria());
+
+            Paragraph firmaLinea = new Paragraph(" ");
+            firmaLinea.setSpacingBefore(28);
+            contenedor.addElement(firmaLinea);
+
+            PdfPTable firma = new PdfPTable(1);
+            firma.setWidthPercentage(60);
+            firma.setHorizontalAlignment(Element.ALIGN_LEFT);
+            PdfPCell celdaFirma = new PdfPCell(new Phrase("Firma de conformidad", labelFont));
+            celdaFirma.setBorder(Rectangle.TOP);
+            celdaFirma.setBorderColor(OSCURO);
+            celdaFirma.setPaddingTop(4);
+            firma.addCell(celdaFirma);
+            contenedor.addElement(firma);
+
+            Paragraph piePar = new Paragraph("Gracias por confiar en CADEM cadetería.", footerFont);
+            piePar.setSpacingBefore(16);
+            contenedor.addElement(piePar);
+
+            tarjeta.addCell(contenedor);
+            doc.add(tarjeta);
 
             doc.close();
             return out.toByteArray();
         } catch (Exception e) {
             throw new IllegalStateException("No se pudo generar el comprobante PDF", e);
         }
+    }
+
+    private void agregarFila(PdfPTable tabla, String label, String value, Font labelFont, Font valueFont) {
+        PdfPCell celdaLabel = new PdfPCell(new Phrase(label, labelFont));
+        celdaLabel.setBorder(Rectangle.NO_BORDER);
+        celdaLabel.setPaddingBottom(4);
+        tabla.addCell(celdaLabel);
+
+        PdfPCell celdaValue = new PdfPCell(new Phrase(value == null ? "" : value, valueFont));
+        celdaValue.setBorder(Rectangle.NO_BORDER);
+        celdaValue.setPaddingBottom(4);
+        tabla.addCell(celdaValue);
+    }
+
+    private PdfPTable lineaDivisoria() {
+        PdfPTable linea = new PdfPTable(1);
+        linea.setWidthPercentage(100);
+        linea.setSpacingBefore(6);
+        linea.setSpacingAfter(6);
+        PdfPCell celda = new PdfPCell();
+        celda.setFixedHeight(2f);
+        celda.setBackgroundColor(NARANJA);
+        celda.setBorder(Rectangle.NO_BORDER);
+        linea.addCell(celda);
+        return linea;
+    }
+
+    private String formatoMoneda(BigDecimal valor) {
+        BigDecimal v = valor == null ? BigDecimal.ZERO : valor;
+        return "$ " + v.setScale(2, java.math.RoundingMode.HALF_UP);
     }
 }

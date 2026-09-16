@@ -31,19 +31,31 @@ public class GeocodingService {
         this.zonaRepo = zonaRepo;
     }
 
+    /**
+     * Si el punto cae dentro de varias zonas a la vez (ej. zonas concéntricas — "4
+     * avenidas" adentro de una zona más grande que las rodea), gana la de área más chica,
+     * no la primera que encuentre ni la de centro más cercano (con centros iguales o
+     * parecidos, "más cercano" queda indefinido entre zonas concéntricas).
+     */
     public Optional<Zona> resolverZona(double lat, double lng) {
         List<Zona> zonas = zonaRepo.findAll();
         Zona mejor = null;
-        double mejorDistancia = Double.MAX_VALUE;
+        double mejorArea = Double.MAX_VALUE;
         for (Zona z : zonas) {
             if (!z.isActivo()) continue;
             double distancia = distanciaMetros(lat, lng, z.getCentroLat(), z.getCentroLng());
-            if (z.contienePunto(lat, lng, distancia) && distancia < mejorDistancia) {
+            if (!z.contienePunto(lat, lng, distancia)) continue;
+            double area = z.aproxArea();
+            if (mejor == null || area < mejorArea) {
                 mejor = z;
-                mejorDistancia = distancia;
+                mejorArea = area;
             }
         }
         return Optional.ofNullable(mejor);
+    }
+
+    public static double distanciaKm(double lat1, double lng1, double lat2, double lng2) {
+        return distanciaMetros(lat1, lng1, lat2, lng2) / 1000.0;
     }
 
     private static double distanciaMetros(double lat1, double lng1, double lat2, double lng2) {

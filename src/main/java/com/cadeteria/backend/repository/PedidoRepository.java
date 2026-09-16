@@ -1,7 +1,11 @@
 package com.cadeteria.backend.repository;
 
 import com.cadeteria.backend.model.Pedido;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
 import java.util.List;
@@ -13,6 +17,8 @@ public interface PedidoRepository extends JpaRepository<Pedido, String> {
     List<Pedido> findByEstadoIdInOrderByCreadoEnDesc(List<String> estadoIds);
 
     List<Pedido> findByCadeteAsignadoIdAndEstadoIdIn(String cadeteId, List<String> estadoIds);
+
+    long countByCadeteAsignadoIdAndEstadoIdIn(String cadeteId, List<String> estadoIds);
 
     List<Pedido> findByCadeteAsignadoIdAndEstadoIdOrderByFinalizadoEnDesc(String cadeteId, String estadoId);
 
@@ -39,4 +45,26 @@ public interface PedidoRepository extends JpaRepository<Pedido, String> {
 
     /** Latido de vida del sistema para el panel de salud (mejora 48) — último pedido creado, sin importar el estado. */
     Optional<Pedido> findFirstByOrderByCreadoEnDesc();
+
+    /**
+     * "Pedidos finalizados" paginado de verdad (mejora 2026-09-16) — antes traía TODO el
+     * historial finalizado/cancelado de la cadetería entero a memoria de una sola vez
+     * (`findByEstadoIdInOrderByCreadoEnDesc`), y el panel lo recortaba de a 15 en el
+     * navegador. Con volumen real (100+ viajes/día) eso iba a envejecer mal — ahora filtra
+     * y pagina en la base. `desde`/`hasta` null = sin ese límite (rango "Todo", explícito,
+     * no accidental). `cadeteId` null = todos los cadetes.
+     */
+    @Query("""
+            SELECT p FROM Pedido p
+            WHERE p.estado.id IN :estadoIds
+              AND (:desde IS NULL OR p.creadoEn >= :desde)
+              AND (:hasta IS NULL OR p.creadoEn <= :hasta)
+              AND (:cadeteId IS NULL OR p.cadeteAsignado.id = :cadeteId)
+            ORDER BY p.creadoEn DESC
+            """)
+    Page<Pedido> paginaFinalizados(@Param("estadoIds") List<String> estadoIds, @Param("desde") Instant desde,
+            @Param("hasta") Instant hasta, @Param("cadeteId") String cadeteId, Pageable pageable);
+
+    /** Página del historial de un cliente (antes traía todo y recortaba en Java a 30, ver ClienteService.ficha). */
+    List<Pedido> findByClienteTelefonoOrderByCreadoEnDesc(String clienteTelefono, Pageable pageable);
 }

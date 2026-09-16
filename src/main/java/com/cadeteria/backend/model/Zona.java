@@ -167,4 +167,26 @@ public class Zona {
         }
         return dentro;
     }
+
+    /**
+     * Área aproximada (en grados² — no metros², pero alcanza para comparar entre zonas de
+     * esta misma cadetería, todas en una zona geográfica chica donde la distorsión de
+     * latitud es despreciable). Sirve para {@link GeocodingService#resolverZona} cuando un
+     * punto cae dentro de varias zonas a la vez (ej. zonas concéntricas tipo "4 avenidas"
+     * dentro de una zona más grande que las rodea): gana la más chica, no una zona
+     * arbitraria por orden de lista.
+     */
+    public double aproxArea() {
+        List<double[]> puntos = getPuntosPoligono();
+        if (puntos.size() >= 3) {
+            double shoelace = 0;
+            int n = puntos.size();
+            for (int i = 0, j = n - 1; i < n; j = i++) {
+                shoelace += puntos.get(j)[1] * puntos.get(i)[0] - puntos.get(i)[1] * puntos.get(j)[0];
+            }
+            return Math.abs(shoelace) / 2.0;
+        }
+        double radioGrados = (radioM != null ? radioM : 0) / 111_000.0;
+        return Math.PI * radioGrados * radioGrados;
+    }
 }

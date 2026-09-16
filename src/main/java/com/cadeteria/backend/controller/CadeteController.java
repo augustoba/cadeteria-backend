@@ -206,7 +206,15 @@ public class CadeteController {
                 configuracionService.getBigDecimal("pago_semanal_monto", java.math.BigDecimal.valueOf(5000)),
                 configuracionService.getBigDecimal("comision_porcentaje", java.math.BigDecimal.TEN),
                 configuracionService.getBigDecimal("credito_bajo_alerta_umbral", java.math.BigDecimal.valueOf(500)),
-                configuracionService.getInt("tiempo_limite_aceptacion_seg", 120)
+                configuracionService.getInt("tiempo_limite_aceptacion_seg", 120),
+                valores.getOrDefault("telefono_soporte", ""),
+                configuracionService.getBoolean("checklist_documentacion_obligatorio", false)
         );
+    }
+
+    /** Historial de avisos generales, con si este cadete ya lo vio (mejora 2026-09-16) — a diferencia de "pendientes", incluye los ya leídos. */
+    @GetMapping("/api/cadetes/me/avisos/historial")
+    public List<com.cadeteria.backend.dto.CadeteDtos.AvisoGeneralHistorialResponse> historialAvisos(Authentication auth) {
+        return service.historialAvisosDe(auth.getName());
     }
 }

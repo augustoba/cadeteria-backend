@@ -50,18 +50,26 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 String username = claims.getSubject();
                 String tipo = claims.get("tipo", String.class);
                 String sid = claims.get("sid", String.class);
-                boolean valido = JwtService.TIPO_ADMIN.equals(tipo)
+                Admin adminValido = JwtService.TIPO_ADMIN.equals(tipo)
                         ? admins.findByUsername(username).filter(Admin::isEnabled)
                                 .filter(a -> sid != null && sid.equals(a.getSessionToken()))
-                                .isPresent()
-                        : JwtService.TIPO_CADETE.equals(tipo)
-                        ? cadetes.findByUsername(username).filter(Cadete::isActivo)
-                                .filter(c -> sid != null && sid.equals(c.getSessionToken()))
-                                .isPresent()
-                        : false;
+                                .orElse(null)
+                        : null;
+                boolean valido = adminValido != null
+                        || (JwtService.TIPO_CADETE.equals(tipo)
+                                && cadetes.findByUsername(username).filter(Cadete::isActivo)
+                                        .filter(c -> sid != null && sid.equals(c.getSessionToken()))
+                                        .isPresent());
                 if (valido) {
-                    var auth = new UsernamePasswordAuthenticationToken(username, null,
-                            List.of(new SimpleGrantedAuthority("ROLE_" + tipo)));
+                    // El rol de ADMIN se revalida contra la base en cada request (no contra el
+                    // claim del token) para que un cambio de rol a mitad de sesión aplique al
+                    // toque, no recién cuando expire el JWT viejo.
+                    List<SimpleGrantedAuthority> authorities = adminValido != null
+                            ? (adminValido.isDueno()
+                                    ? List.of(new SimpleGrantedAuthority("ROLE_ADMIN"), new SimpleGrantedAuthority("ROLE_ADMIN_DUENO"))
+                                    : List.of(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                            : List.of(new SimpleGrantedAuthority("ROLE_" + tipo));
+                    var auth = new UsernamePasswordAuthenticationToken(username, null, authorities);
                     auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(auth);
                 }

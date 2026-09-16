@@ -37,6 +37,16 @@ public class Admin {
      */
     private String sessionToken;
 
+    /**
+     * "DUENO" (acceso total) u "OPERADOR" (sin Configuración/Métricas/Pagos/Seguridad ni
+     * gestión de usuarios — pensado para alguien que atiende el teléfono sin ver plata ni
+     * tocar ajustes sensibles). Mismo patrón de String plano que {@code Cadete.modalidadPago}.
+     * Los admins ya existentes en la base (columna nueva, quedan en NULL) se migran a
+     * "DUENO" en {@code DataSeeder} al arrancar, para no perder acceso a nada.
+     */
+    @Column(length = 20)
+    private String rol = "DUENO";
+
     public String getId() {
         return id;
     }
@@ -99,5 +109,17 @@ public class Admin {
 
     public void setSessionToken(String sessionToken) {
         this.sessionToken = sessionToken;
+    }
+
+    public String getRol() {
+        return rol;
+    }
+
+    public void setRol(String rol) {
+        this.rol = rol;
+    }
+
+    public boolean isDueno() {
+        return rol == null || "DUENO".equals(rol);
     }
 }

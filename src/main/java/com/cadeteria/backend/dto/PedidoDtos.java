@@ -59,7 +59,10 @@ public final class PedidoDtos {
             LookupResponse zona, LookupResponse tipoVehiculoRequerido, LookupResponse estado,
             CadeteResumen cadeteAsignado,
             boolean programado, Instant fechaProgramada,
-            Instant creadoEn, Instant asignadoEn, Instant aceptadoEn, Instant retiradoEn, Instant finalizadoEn,
+            Instant creadoEn, Instant asignadoEn,
+            /** Cuándo el cadete abrió la pantalla del viaje por primera vez estando la oferta PENDIENTE — null si todavía no la abrió. */
+            Instant vistoEn,
+            Instant aceptadoEn, Instant retiradoEn, Instant finalizadoEn,
             Instant canceladoEn,
             String fotoRecepcionUrl, String entregaReceptorNombre, String entregaFotoUrl, String firmaReceptorUrl,
             Double retiroLat, Double retiroLng, Double entregaLat, Double entregaLng,
@@ -86,7 +89,8 @@ public final class PedidoDtos {
                     LookupResponse.from(p.getEstado()),
                     CadeteResumen.from(p.getCadeteAsignado()),
                     p.isProgramado(), p.getFechaProgramada(),
-                    p.getCreadoEn(), p.getAsignadoEn(), p.getAceptadoEn(), p.getRetiradoEn(), p.getFinalizadoEn(),
+                    p.getCreadoEn(), p.getAsignadoEn(), p.getVistoEn(),
+                    p.getAceptadoEn(), p.getRetiradoEn(), p.getFinalizadoEn(),
                     p.getCanceladoEn(),
                     p.getFotoRecepcionUrl(), p.getEntregaReceptorNombre(), p.getEntregaFotoUrl(), p.getFirmaReceptorUrl(),
                     p.getRetiroLat(), p.getRetiroLng(), p.getEntregaLat(), p.getEntregaLng(),
@@ -167,6 +171,9 @@ public final class PedidoDtos {
             return new PrecioLogResponse(l.getId(), l.getPrecioAnterior(), l.getPrecioNuevo(), l.getCambiadoPorUsername(), l.getCambiadoEn());
         }
     }
+
+    /** "Pedidos finalizados" paginado (mejora 2026-09-16) — ver {@link com.cadeteria.backend.service.PedidoService#paginaFinalizados}. */
+    public record PaginaPedidosResponse(java.util.List<PedidoResponse> items, long total, int pagina, int totalPaginas) {}
 
     public record ComentarioResponse(String id, String texto, String cadeteNombre, boolean esAdmin, Instant creadoEn) {
         public static ComentarioResponse from(com.cadeteria.backend.model.PedidoComentario c) {

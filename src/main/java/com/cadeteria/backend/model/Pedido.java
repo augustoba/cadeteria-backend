@@ -86,6 +86,15 @@ public class Pedido {
     @Column(nullable = false)
     private Instant creadoEn = Instant.now();
     private Instant asignadoEn;
+    /**
+     * Cuándo el cadete abrió la pantalla del viaje por primera vez estando la oferta
+     * todavía PENDIENTE (antes no había forma de saber si el cadete ya lo había visto y
+     * estaba esperando a que se le venza el tiempo para que se reasigne solo, o
+     * directamente no lo había abierto). Se limpia cada vez que el pedido se vuelve a
+     * ofertar (ver PedidoService.ofertar) para no arrastrar la marca de una oferta
+     * anterior a otro cadete.
+     */
+    private Instant vistoEn;
     private Instant aceptadoEn;
     /** Cuando el cadete toco "Retirado" (paso por lo del cliente a buscar el pedido). */
     private Instant retiradoEn;
@@ -347,6 +356,14 @@ public class Pedido {
 
     public void setAsignadoEn(Instant asignadoEn) {
         this.asignadoEn = asignadoEn;
+    }
+
+    public Instant getVistoEn() {
+        return vistoEn;
+    }
+
+    public void setVistoEn(Instant vistoEn) {
+        this.vistoEn = vistoEn;
     }
 
     public Instant getAceptadoEn() {

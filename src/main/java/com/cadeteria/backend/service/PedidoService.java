@@ -43,6 +43,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -240,9 +241,23 @@ public class PedidoService {
         return repo.findByEstadoIdInOrderByCreadoEnDesc(List.of("PROGRAMADO"));
     }
 
+    public record PaginaPedidos(List<Pedido> items, long total, int pagina, int totalPaginas) {}
+
+    /**
+     * "Pedidos finalizados" paginado (mejora 2026-09-16) — reemplaza a la vieja
+     * `listarFinalizados()` sin filtro, que traía el historial completo de la cadetería a
+     * memoria en cada carga de esa pestaña. `desde`/`hasta` null = sin ese límite (el
+     * front lo manda explícito según el chip Hoy/Semana/Todo, default "Hoy"). `tipoEstado`
+     * null/blank = FINALIZADO y CANCELADO juntos, como antes.
+     */
     @Transactional(readOnly = true)
-    public List<Pedido> listarFinalizados() {
-        return repo.findByEstadoIdInOrderByCreadoEnDesc(ESTADOS_FINALES);
+    public PaginaPedidos paginaFinalizados(Instant desde, Instant hasta, String cadeteId, String tipoEstado, int pagina, int tamano) {
+        List<String> estadoIds = (tipoEstado == null || tipoEstado.isBlank()) ? ESTADOS_FINALES : List.of(tipoEstado);
+        int paginaSegura = Math.max(0, pagina);
+        int tamanoSeguro = Math.min(Math.max(1, tamano), 100);
+        var page = repo.paginaFinalizados(estadoIds, desde, hasta, cadeteId,
+                org.springframework.data.domain.PageRequest.of(paginaSegura, tamanoSeguro));
+        return new PaginaPedidos(page.getContent(), page.getTotalElements(), paginaSegura, page.getTotalPages());
     }
 
     /** El viaje que el cadete tiene asignado ahora mismo (pantalla principal de la app), si hay. */
@@ -264,13 +279,33 @@ public class PedidoService {
         return repo.findByCadeteAsignadoIdAndEstadoIdIn(cadete.getId(), ESTADOS_OCUPAN_CADETE);
     }
 
-    /** Detalle de un pedido puntual del cadete (incluye finalizados) — sección "Finalizados" de la app. */
-    @Transactional(readOnly = true)
+    /**
+     * Detalle de un pedido puntual del cadete (incluye finalizados) — sección "Finalizados"
+     * de la app. También es el momento en que se marca `vistoEn` (ver
+     * marcarVistoSiCorresponde): la app pide este mismo endpoint al abrir la pantalla del
+     * viaje, así que si todavía está PENDIENTE es porque el cadete recién lo está mirando.
+     */
+    @Transactional
     public Pedido getDeCadete(String pedidoId, String cadeteUsername) {
         Pedido pedido = get(pedidoId);
         Cadete cadete = cadeteDelUsername(cadeteUsername);
         validarPertenencia(pedido, cadete);
+        marcarVistoSiCorresponde(pedido);
         return pedido;
+    }
+
+    /**
+     * El admin quería poder ver si el cadete ya abrió la pantalla del viaje aunque todavía
+     * no lo haya aceptado (para distinguir "no lo vio" de "lo vio y está esperando a que se
+     * le venza el tiempo para que se reasigne solo"). Solo tiene sentido mientras la oferta
+     * sigue PENDIENTE — una vez aceptado/rechazado/vencido ya no aporta nada nuevo.
+     */
+    private void marcarVistoSiCorresponde(Pedido pedido) {
+        if (pedido.getVistoEn() == null && "PENDIENTE".equals(pedido.getEstado().getId())) {
+            pedido.setVistoEn(Instant.now());
+            repo.save(pedido);
+            publisher.publicarPedido(PedidoResponse.from(pedido));
+        }
     }
 
     /**
@@ -419,7 +454,17 @@ public class PedidoService {
                 .filter(c -> dentroDeTopes(c, pedido))
                 .filter(this::dentroDeTurno)
                 .filter(c -> !incidenciaRepo.existsByCadeteIdAndPrioridadAndEstado(c.getId(), "GRAVE", "ABIERTA"))
-                .min((a, b) -> a.getOrdenColaEspera().compareTo(b.getOrdenColaEspera()));
+                .min(Comparator.comparing(this::tienePedidosPendientes).thenComparing(Cadete::getOrdenColaEspera));
+    }
+
+    /**
+     * Un cadete puede quedar LIBRE con viajes sin terminar todavía encima (si su tope de
+     * viajes simultáneos lo permite). En la cola FIFO de asignación, a igualdad de "libre"
+     * priorizamos a quien no tiene nada pendiente sobre quien ya tiene uno o más viajes en
+     * curso, aunque este último se haya puesto libre antes (mejora pedida por el dueño).
+     */
+    private boolean tienePedidosPendientes(Cadete cadete) {
+        return repo.countByCadeteAsignadoIdAndEstadoIdIn(cadete.getId(), ESTADOS_OCUPAN_CADETE) > 0;
     }
 
     /**
@@ -613,6 +658,8 @@ public class PedidoService {
         pedido.setCadeteAsignado(cadete);
         pedido.setEstado(estado("PENDIENTE"));
         pedido.setAsignadoEn(ahora);
+        // Nueva oferta, nueva marca — que no quede "visto" de una oferta anterior a otro cadete.
+        pedido.setVistoEn(null);
         repo.save(pedido);
 
         // OJO: antes acá se forzaba cadete.estado = OCUPADO, lo que le impedía recibir más

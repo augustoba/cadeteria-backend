@@ -45,6 +45,17 @@ public class JwtService {
      * ser valido aunque la firma y la expiracion sigan siendo correctas.
      */
     public TokenData generate(String username, String tipo, String sessionId) {
+        return generate(username, tipo, sessionId, null);
+    }
+
+    /**
+     * rol (claim "rol"): solo para ADMIN ("DUENO"/"OPERADOR") — el front lo decodifica
+     * para mostrar/ocultar pantallas, pero la autorización real de {@code /api/admin/**}
+     * en {@link SecurityConfig} y {@link JwtAuthFilter} siempre revalida contra la base,
+     * no confía ciegamente en este claim (un cambio de rol a mitad de sesión aplica en la
+     * siguiente request, no hace falta esperar a que expire el token viejo).
+     */
+    public TokenData generate(String username, String tipo, String sessionId, String rol) {
         Instant now = Instant.now();
         Instant exp = now.plusSeconds(expirationMinutes * 60);
         var builder = Jwts.builder()
@@ -54,6 +65,9 @@ public class JwtService {
                 .expiration(Date.from(exp));
         if (sessionId != null) {
             builder.claim("sid", sessionId);
+        }
+        if (rol != null) {
+            builder.claim("rol", rol);
         }
         String token = builder.signWith(key).compact();
         return new TokenData(token, exp, tipo);

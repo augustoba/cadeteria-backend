@@ -35,15 +35,33 @@ public class PedidoAdminController {
         this.pdfService = pdfService;
     }
 
-    /** tipo=activos (default) | programados | finalizados — coincide con las pestañas del panel actual. */
+    /** tipo=activos (default) | programados — "finalizados" tiene su propio endpoint paginado, ver abajo. */
     @GetMapping
     public List<PedidoResponse> list(@RequestParam(defaultValue = "activos") String tipo) {
         List<Pedido> pedidos = switch (tipo) {
             case "programados" -> service.listarProgramados();
-            case "finalizados" -> service.listarFinalizados();
             default -> service.listarActivos();
         };
         return pedidos.stream().map(PedidoResponse::from).toList();
+    }
+
+    /**
+     * "Pedidos finalizados" paginado en la base, no en memoria (mejora 2026-09-16, ver
+     * {@link PedidoService#paginaFinalizados}) — desde/hasta en ISO-8601
+     * (`2026-09-16T00:00:00Z`); sin ninguno de los dos = sin límite de fecha (el front lo
+     * manda siempre explícito, default "Hoy").
+     */
+    @GetMapping("/finalizados-pagina")
+    public com.cadeteria.backend.dto.PedidoDtos.PaginaPedidosResponse finalizadosPagina(
+            @RequestParam(required = false) java.time.Instant desde,
+            @RequestParam(required = false) java.time.Instant hasta,
+            @RequestParam(required = false) String cadeteId,
+            @RequestParam(required = false) String tipoEstado,
+            @RequestParam(defaultValue = "0") int pagina,
+            @RequestParam(defaultValue = "15") int tamano) {
+        var r = service.paginaFinalizados(desde, hasta, cadeteId, tipoEstado, pagina, tamano);
+        return new com.cadeteria.backend.dto.PedidoDtos.PaginaPedidosResponse(
+                r.items().stream().map(PedidoResponse::from).toList(), r.total(), r.pagina(), r.totalPaginas());
     }
 
     /** Para el ícono de alertas centralizado del panel (ronda 4, punto 18). */

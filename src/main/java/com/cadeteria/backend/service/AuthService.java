@@ -67,7 +67,7 @@ public class AuthService {
         log.setIngresoEn(Instant.now());
         log.setIp(ip);
         accesoLogRepo.save(log);
-        return jwtService.generate(admin.getUsername(), JwtService.TIPO_ADMIN, sessionId);
+        return jwtService.generate(admin.getUsername(), JwtService.TIPO_ADMIN, sessionId, admin.getRol());
     }
 
     @Transactional(readOnly = true)

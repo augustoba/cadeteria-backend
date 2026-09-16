@@ -14,11 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 /**
@@ -38,49 +35,66 @@ public class ClienteService {
         this.pedidoRepo = pedidoRepo;
     }
 
+    public record ClientesPagina(List<ClienteResponse> items, long total, int pagina, int totalPaginas) {}
+
+    /**
+     * Listado de "Clientes" paginado (mejora 2026-09-16) — reemplaza al viejo
+     * {@code listar(q)} que traía TODA la tabla `pedido` a memoria en cada apertura de
+     * la pantalla. El agregado (cantidad/monto/último pedido) se calcula en SQL
+     * ({@link ClienteRepository#paginaResumen}); acá solo se completan nombre/empresa/etc.
+     * para las filas de la página actual, no para todas — si el teléfono no tiene una
+     * ficha de {@link Cliente} guardada, el nombre se resuelve con una única consulta
+     * puntual (indexada) al último pedido de ESE teléfono, no a toda la tabla.
+     */
     @Transactional(readOnly = true)
-    public List<ClienteResponse> listar(String q) {
-        Map<String, List<Pedido>> porTelefono = pedidoRepo.findAll().stream()
-                .filter(p -> p.getClienteTelefono() != null && !p.getClienteTelefono().isBlank())
-                .collect(Collectors.groupingBy(Pedido::getClienteTelefono));
-        Map<String, Cliente> guardados = repo.findAll().stream()
+    public ClientesPagina listarPaginado(String q, int pagina, int tamano) {
+        String qNormalizado = (q == null || q.isBlank()) ? null : q.trim();
+        int paginaSegura = Math.max(0, pagina);
+        int tamanoSeguro = Math.min(Math.max(1, tamano), 100);
+        var page = repo.paginaResumen(qNormalizado,
+                org.springframework.data.domain.PageRequest.of(paginaSegura, tamanoSeguro));
+
+        List<String> telefonos = page.getContent().stream().map(ClienteRepository.ClienteResumenRow::getTelefono).toList();
+        Map<String, Cliente> guardados = repo.findAllById(telefonos).stream()
                 .collect(Collectors.toMap(Cliente::getTelefono, c -> c));
 
-        TreeSet<String> telefonos = new TreeSet<>();
-        telefonos.addAll(porTelefono.keySet());
-        telefonos.addAll(guardados.keySet());
-
-        List<ClienteResponse> resultado = new ArrayList<>();
-        for (String telefono : telefonos) {
-            List<Pedido> pedidos = porTelefono.getOrDefault(telefono, List.of()).stream()
-                    .sorted(Comparator.comparing(Pedido::getCreadoEn).reversed())
-                    .toList();
-            resultado.add(construirResumen(telefono, pedidos, guardados.get(telefono)));
-        }
-
-        if (q == null || q.isBlank()) {
-            return resultado.stream().sorted(Comparator.comparing(
-                    ClienteResponse::ultimoPedidoEn, Comparator.nullsLast(Comparator.reverseOrder()))).toList();
-        }
-        String needle = q.trim().toLowerCase();
-        return resultado.stream()
-                .filter(c -> contiene(c.telefono(), needle) || contiene(c.nombreContacto(), needle) || contiene(c.empresa(), needle))
-                .sorted(Comparator.comparing(
-                        ClienteResponse::ultimoPedidoEn, Comparator.nullsLast(Comparator.reverseOrder())))
+        List<ClienteResponse> items = page.getContent().stream()
+                .map(fila -> construirResumenDesdeFila(fila, guardados.get(fila.getTelefono())))
                 .toList();
+        return new ClientesPagina(items, page.getTotalElements(), paginaSegura, page.getTotalPages());
     }
 
-    private boolean contiene(String valor, String needle) {
-        return valor != null && valor.toLowerCase().contains(needle);
+    private ClienteResponse construirResumenDesdeFila(ClienteRepository.ClienteResumenRow fila, Cliente guardado) {
+        String telefono = fila.getTelefono();
+        String nombreManual = guardado != null ? guardado.getNombreContacto() : null;
+        String nombre = (nombreManual != null && !nombreManual.isBlank())
+                ? nombreManual
+                : pedidoRepo.findFirstByClienteTelefonoOrderByCreadoEnDesc(telefono).map(Pedido::getClienteNombre).orElse(null);
+        return new ClienteResponse(
+                telefono, nombre,
+                guardado != null ? guardado.getEmpresa() : null,
+                guardado != null ? guardado.getTarifaEspecial() : null,
+                guardado != null && guardado.isProblematico(),
+                guardado != null ? guardado.getNotasProblematico() : null,
+                guardado == null || guardado.isActivo(),
+                fila.getCantidadPedidos() != null ? fila.getCantidadPedidos() : 0,
+                fila.getMontoTotal() != null ? fila.getMontoTotal() : BigDecimal.ZERO,
+                fila.getUltimoPedidoEn(),
+                guardado != null ? guardado.getModalidadFacturacion() : "CONTADO",
+                saldoPendiente(telefono, guardado));
     }
 
     @Transactional(readOnly = true)
     public ClienteFichaResponse ficha(String telefono) {
-        List<Pedido> pedidos = pedidoRepo.findByClienteTelefonoOrderByCreadoEnDesc(telefono);
+        // El resumen (cantidad/monto total/último pedido) sí necesita el historial completo para sumar bien —
+        // pero los "recientes" que se muestran en pantalla se piden ya recortados a 30 en la base, no en Java
+        // (antes traía TODO el historial del cliente para descartar el resto acá con .limit(30)).
+        List<Pedido> pedidosCompletos = pedidoRepo.findByClienteTelefonoOrderByCreadoEnDesc(telefono);
         Cliente guardado = repo.findById(telefono).orElse(null);
-        ClienteResponse resumen = construirResumen(telefono, pedidos, guardado);
-        List<PedidoResumenResponse> recientes = pedidos.stream()
-                .limit(30)
+        ClienteResponse resumen = construirResumen(telefono, pedidosCompletos, guardado);
+        List<Pedido> recientesPedidos = pedidoRepo.findByClienteTelefonoOrderByCreadoEnDesc(
+                telefono, org.springframework.data.domain.PageRequest.of(0, 30));
+        List<PedidoResumenResponse> recientes = recientesPedidos.stream()
                 .map(p -> new PedidoResumenResponse(p.getId(), p.getNumero(), p.getCreadoEn(), p.getPrecio(), p.getEstado().getId()))
                 .toList();
         return new ClienteFichaResponse(resumen, recientes);

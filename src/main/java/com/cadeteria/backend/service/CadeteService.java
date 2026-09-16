@@ -171,6 +171,9 @@ public class CadeteService {
         String anterior = c.getEstado().getId();
         EstadoCadete estado = estadoCadeteRepo.findById(estadoId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Estado de cadete", estadoId));
+        if ("LIBRE".equals(estadoId) && "DESCONECTADO".equals(anterior)) {
+            validarDocumentacionCompleta(c);
+        }
         c.setEstado(estado);
         if ("LIBRE".equals(estadoId)) {
             c.setOrdenColaEspera(Instant.now());
@@ -182,6 +185,29 @@ public class CadeteService {
         if (pasaADesconectado) sesionService.cerrar(guardado);
         if (saleDeDesconectado) sesionService.abrir(guardado);
         return guardado;
+    }
+
+    /**
+     * Checklist de documentación obligatoria antes de activarse (mejora pedida por el
+     * dueño 2026-09-16) — antes se podía activar sin nada cargado (carnet, tarjeta verde,
+     * foto del vehículo). Solo se exige al pasar de DESCONECTADO a LIBRE (el gesto real de
+     * "activarme" al arrancar un turno), no en cada transición de estado. Apagado por
+     * default (`checklist_documentacion_obligatorio`), igual que `firma_receptor_obligatoria`.
+     */
+    private void validarDocumentacionCompleta(Cadete c) {
+        if (!configuracionService.getBoolean("checklist_documentacion_obligatorio", false)) return;
+        List<String> faltantes = new java.util.ArrayList<>();
+        if (blank(c.getFotoCarnetUrl())) faltantes.add("carnet de conducir");
+        if (blank(c.getFotoTarjetaVerdeUrl())) faltantes.add("tarjeta verde");
+        if (blank(c.getFotoVehiculoUrl())) faltantes.add("foto del vehículo");
+        if (!faltantes.isEmpty()) {
+            throw new BadRequestException(
+                    "Te falta cargar: " + String.join(", ", faltantes) + ". Pedile al admin que te ayude a completarlo antes de activarte.");
+        }
+    }
+
+    private boolean blank(String s) {
+        return s == null || s.isBlank();
     }
 
     public Cadete actualizarUbicacion(String username, double lat, double lng) {
@@ -304,6 +330,21 @@ public class CadeteService {
         return avisoRepo.findTop20ByOrderByEnviadoEnDesc().stream()
                 .filter(a -> !yaVistos.contains(a.getId()))
                 .map(a -> AvisoGeneralResponse.from(a, avisoLecturaRepo.countByAvisoId(a.getId())))
+                .toList();
+    }
+
+    /**
+     * Pantalla "Avisos" de la app con historial (mejora 2026-09-16) — a diferencia de
+     * {@link #avisosPendientesDe}, trae los últimos 20 avisos generales SIN filtrar los
+     * ya leídos, marcando cuáles ya vio este cadete, para que pueda volver a leer uno
+     * viejo (antes, un aviso que ya se marcó leído desaparecía para siempre).
+     */
+    @Transactional(readOnly = true)
+    public List<com.cadeteria.backend.dto.CadeteDtos.AvisoGeneralHistorialResponse> historialAvisosDe(String cadeteUsername) {
+        Cadete cadete = getByUsername(cadeteUsername);
+        java.util.Set<String> vistos = new java.util.HashSet<>(avisoLecturaRepo.avisoIdsVistosPor(cadete.getId()));
+        return avisoRepo.findTop20ByOrderByEnviadoEnDesc().stream()
+                .map(a -> com.cadeteria.backend.dto.CadeteDtos.AvisoGeneralHistorialResponse.from(a, vistos.contains(a.getId())))
                 .toList();
     }
 

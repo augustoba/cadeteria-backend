@@ -25,6 +25,10 @@ public final class ConfiguracionDtos {
             java.math.BigDecimal comisionPorcentaje,
             java.math.BigDecimal creditoBajoAlertaUmbral,
             /** Para la cuenta regresiva real al ofrecer un viaje nuevo (auditoría UX 2026-09-13). */
-            int tiempoLimiteAceptacionSeg
+            int tiempoLimiteAceptacionSeg,
+            /** Teléfono de contacto de la cadetería para la pantalla de Ayuda de la app (mejora 2026-09-16). */
+            String telefonoSoporte,
+            /** Si hace falta tener carnet/tarjeta verde/foto del vehículo cargados para poder activarse (mejora 2026-09-16). */
+            boolean checklistDocumentacionObligatorio
     ) {}
 }

@@ -38,6 +38,9 @@ public final class ClienteDtos {
 
     public record ClienteFichaResponse(ClienteResponse cliente, List<PedidoResumenResponse> pedidosRecientes) {}
 
+    /** Listado paginado (mejora 2026-09-16) — ver {@link com.cadeteria.backend.service.ClienteService#listarPaginado}. */
+    public record ClientesPaginaResponse(List<ClienteResponse> items, long total, int pagina, int totalPaginas) {}
+
     /** Aviso rápido al cargar un pedido nuevo — si el teléfono es problemático o tiene tarifa especial. */
     public record ClienteAvisoResponse(boolean problematico, String notasProblematico, BigDecimal tarifaEspecial) {}
 }

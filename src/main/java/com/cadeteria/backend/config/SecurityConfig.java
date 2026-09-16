@@ -47,6 +47,17 @@ public class SecurityConfig {
                                 "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**",
                                 "/error"
                         ).permitAll()
+                        // Rutas de plata/config sensible/seguridad — solo el rol DUENO (ronda 5,
+                        // punto 11 — "operador" no debe ver ni tocar esto). Tienen que ir ANTES del
+                        // matcher general de /api/admin/** para que Spring Security las evalúe primero.
+                        .requestMatchers(
+                                "/api/admin/configuracion/**",
+                                "/api/admin/metricas/**",
+                                "/api/admin/pagos/**",
+                                "/api/admin/cadetes/*/pagos/**",
+                                "/api/admin/seguridad/**",
+                                "/api/admin/usuarios/**"
+                        ).hasRole("ADMIN_DUENO")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/cadetes/me/**").hasRole("CADETE")
                         .requestMatchers("/api/pedidos/me/**").hasRole("CADETE")
