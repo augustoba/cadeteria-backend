@@ -3,6 +3,7 @@ package com.cadeteria.backend.service;
 import com.cadeteria.backend.common.BadRequestException;
 import com.cadeteria.backend.common.ResourceNotFoundException;
 import com.cadeteria.backend.dto.CadeteDtos.AvisoGeneralResponse;
+import com.cadeteria.backend.dto.CadeteDtos.CadeteFichaResponse;
 import com.cadeteria.backend.dto.CadeteDtos.CadeteRequest;
 import com.cadeteria.backend.dto.CadeteDtos.CadeteResponse;
 import com.cadeteria.backend.model.AvisoGeneral;
@@ -52,6 +53,8 @@ public class CadeteService {
     private final ConfiguracionService configuracionService;
     private final CadeteEstadoLogRepository estadoLogRepo;
     private final MovimientoCreditoRepository movimientoCreditoRepo;
+    private final MetricasService metricasService;
+    private final IncidenciaService incidenciaService;
 
     public CadeteService(CadeteRepository repo, TipoVehiculoRepository tipoVehiculoRepo,
                           EstadoCadeteRepository estadoCadeteRepo, PasswordEncoder passwordEncoder,
@@ -60,7 +63,8 @@ public class CadeteService {
                           PedidoRepository pedidoRepo, PedidoUbicacionRepository pedidoUbicacionRepo,
                           AvisoGeneralRepository avisoRepo, AvisoGeneralLecturaRepository avisoLecturaRepo,
                           ConfiguracionService configuracionService, CadeteEstadoLogRepository estadoLogRepo,
-                          MovimientoCreditoRepository movimientoCreditoRepo) {
+                          MovimientoCreditoRepository movimientoCreditoRepo, MetricasService metricasService,
+                          IncidenciaService incidenciaService) {
         this.repo = repo;
         this.tipoVehiculoRepo = tipoVehiculoRepo;
         this.estadoCadeteRepo = estadoCadeteRepo;
@@ -76,6 +80,33 @@ public class CadeteService {
         this.configuracionService = configuracionService;
         this.estadoLogRepo = estadoLogRepo;
         this.movimientoCreditoRepo = movimientoCreditoRepo;
+        this.metricasService = metricasService;
+        this.incidenciaService = incidenciaService;
+    }
+
+    /**
+     * Panorama completo del cadete para su ficha en el panel: viajes
+     * finalizados/rechazados/no-aceptados en [desde, hasta) (estos dos últimos son los
+     * que se le reasignaron a otro cadete — filtrable por día/semana/mes/todo desde el
+     * front), sus incidencias (con link al pedido si corresponde) y el historial
+     * completo de altas/bajas — estos dos últimos son siempre de todo el historial, no
+     * del rango elegido.
+     */
+    @Transactional(readOnly = true)
+    public CadeteFichaResponse ficha(String id, Instant desde, Instant hasta) {
+        Cadete c = get(id);
+        var estadisticas = metricasService.metricasCadetes(desde, hasta).stream()
+                .filter(m -> m.cadeteId().equals(id))
+                .findFirst()
+                .orElseThrow();
+        var incidencias = incidenciaService.porCadete(id).stream()
+                .map(com.cadeteria.backend.dto.IncidenciaDtos.IncidenciaResponse::from)
+                .toList();
+        var historial = estadoLogRepo.findByCadeteIdOrderByCambiadoEnDesc(id).stream()
+                .map(l -> new com.cadeteria.backend.dto.CadeteDtos.CadeteEstadoLogResponse(
+                        l.getId(), l.isActivo(), l.getMotivo(), l.getCambiadoEn(), l.getCambiadoPorUsername()))
+                .toList();
+        return new CadeteFichaResponse(toResponse(c), estadisticas, incidencias, historial);
     }
 
     /** Cadete + calificación histórica (todo el registro) — para la lista/detalle del panel admin. */

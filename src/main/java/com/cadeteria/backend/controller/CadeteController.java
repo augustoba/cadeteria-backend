@@ -27,11 +27,16 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 
 @RestController
 public class CadeteController {
+
+    private static final ZoneId ZONA = ZoneId.of("America/Argentina/Buenos_Aires");
 
     private final CadeteService service;
     private final WebSocketPublisher publisher;
@@ -56,6 +61,19 @@ public class CadeteController {
     @GetMapping("/api/admin/cadetes/{id}")
     public CadeteResponse get(@PathVariable String id) {
         return service.toResponse(service.get(id));
+    }
+
+    /** `desde`/`hasta` en formato yyyy-MM-dd, ambos inclusive — sin parámetros, todo el historial. */
+    @GetMapping("/api/admin/cadetes/{id}/ficha")
+    public com.cadeteria.backend.dto.CadeteDtos.CadeteFichaResponse ficha(
+            @PathVariable String id,
+            @RequestParam(required = false) String desde,
+            @RequestParam(required = false) String hasta) {
+        Instant desdeInstant = desde != null && !desde.isBlank()
+                ? LocalDate.parse(desde).atStartOfDay(ZONA).toInstant() : Instant.EPOCH;
+        Instant hastaInstant = hasta != null && !hasta.isBlank()
+                ? LocalDate.parse(hasta).plusDays(1).atStartOfDay(ZONA).toInstant() : Instant.now();
+        return service.ficha(id, desdeInstant, hastaInstant);
     }
 
     @PostMapping("/api/admin/cadetes")

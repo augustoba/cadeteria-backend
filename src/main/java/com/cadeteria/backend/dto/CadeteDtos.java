@@ -114,6 +114,19 @@ public final class CadeteDtos {
 
     public record CadeteEstadoLogResponse(String id, boolean activo, String motivo, Instant cambiadoEn, String cambiadoPorUsername) {}
 
+    /**
+     * Panorama completo del cadete para su ficha en el panel: datos + estadísticas
+     * históricas (todo el registro, no acotadas a un rango como en Métricas), sus
+     * incidencias (con link al pedido si están ligadas a uno) y el historial de
+     * altas/bajas.
+     */
+    public record CadeteFichaResponse(
+            CadeteResponse cadete,
+            MetricasDtos.CadeteMetricaResponse estadisticas,
+            java.util.List<IncidenciaDtos.IncidenciaResponse> incidencias,
+            java.util.List<CadeteEstadoLogResponse> historialEstado
+    ) {}
+
     public record MovimientoCreditoResponse(
             String id, String tipo, BigDecimal monto, BigDecimal saldoResultante,
             Long pedidoNumero, Instant creadoEn, String creadoPorUsername
