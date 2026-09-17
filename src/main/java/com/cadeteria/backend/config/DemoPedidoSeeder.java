@@ -44,11 +44,11 @@ import java.util.Optional;
  * dashboard y Métricas siempre tienen algo del día para mostrar, sin acumular
  * duplicados en reinicios sucesivos ni tocar los pedidos cargados a mano por el
  * cadete/admin real. Requiere que ya exista al menos un cadete y una zona dados de
- * alta (no se inventan cuentas de cadete) — en una base recién creada, no hace nada
- * hasta que el admin cargue eso a mano.
+ * alta — en una base recién creada los siembra {@link DemoCadeteZonaSeeder}, que corre
+ * antes (Order 2) para que este seeder siempre tenga a quién asignarle los pedidos.
  */
 @Component
-@Order(2)
+@Order(3)
 public class DemoPedidoSeeder implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DemoPedidoSeeder.class);

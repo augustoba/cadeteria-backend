@@ -52,8 +52,7 @@ app:
     gateway-token: ${WHATSAPP_GATEWAY_TOKEN:dev-token-whatsapp-cambiar-en-produccion}
   maps:
     nominatim-url: ${NOMINATIM_URL:https://nominatim.openstreetmap.org}
-    open-route-service-url: ${ORS_URL:https://api.openrouteservice.org}
-    open-route-service-key: ${ORS_KEY:}
+    open-route-service-url: ${ORS_URL:https://api.heigit.org/openrouteservice}
   fcm:
     credenciales-path: ${FCM_CREDENTIALS_PATH:}
   # SMTP para el mail de alta de cadete (ronda 7) — host vacio = deshabilitado, se loguea y no rompe el alta.

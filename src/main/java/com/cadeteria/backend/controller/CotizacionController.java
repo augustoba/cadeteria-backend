@@ -32,8 +32,9 @@ public class CotizacionController {
     @GetMapping
     public CotizacionResponse cotizar(
             @RequestParam double origenLat, @RequestParam double origenLng,
-            @RequestParam(required = false) Double destinoLat, @RequestParam(required = false) Double destinoLng) {
-        return service.cotizar(origenLat, origenLng, destinoLat, destinoLng)
+            @RequestParam(required = false) Double destinoLat, @RequestParam(required = false) Double destinoLng,
+            @RequestParam(required = false) BigDecimal montoDeclarado) {
+        return service.cotizar(origenLat, origenLng, destinoLat, destinoLng, montoDeclarado)
                 .map(c -> new CotizacionResponse(c.precioSugerido(), c.metodo(), c.zonaId(), c.zonaNombre(), c.distanciaKm()))
                 .orElseGet(CotizacionResponse::vacia);
     }

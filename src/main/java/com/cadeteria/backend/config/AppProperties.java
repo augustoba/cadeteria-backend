@@ -246,11 +246,15 @@ public class AppProperties {
         }
     }
 
-    /** Nominatim (reverse geocoding) y OpenRouteService (ruta), ambos gratuitos (spec 5.1/5.7). */
+    /**
+     * Nominatim (reverse geocoding) y OpenRouteService (ruta), ambos gratuitos (spec 5.1/5.7).
+     * Solo las URLs (genéricas, no cambian por instalación) — las API keys de ruteo
+     * (OpenRouteService, GraphHopper) se cargan desde Configuración/el panel, no acá, porque
+     * cada cliente tiene las suyas (ver RutaService).
+     */
     public static class Maps {
         private String nominatimUrl = "https://nominatim.openstreetmap.org";
-        private String openRouteServiceUrl = "https://api.openrouteservice.org";
-        private String openRouteServiceKey = "";
+        private String openRouteServiceUrl = "https://api.heigit.org/openrouteservice";
 
         public String getNominatimUrl() {
             return nominatimUrl;
@@ -266,14 +270,6 @@ public class AppProperties {
 
         public void setOpenRouteServiceUrl(String openRouteServiceUrl) {
             this.openRouteServiceUrl = openRouteServiceUrl;
-        }
-
-        public String getOpenRouteServiceKey() {
-            return openRouteServiceKey;
-        }
-
-        public void setOpenRouteServiceKey(String openRouteServiceKey) {
-            this.openRouteServiceKey = openRouteServiceKey;
         }
     }
 
