@@ -151,7 +151,8 @@ degradan solos si quedan sin configurar, no rompen nada:
 - **SMS gateway** (`SMS_GATEWAY_URL`/`_USER`/`_PASSWORD`, `SMS_ENABLED`): usa el proyecto
   android-sms-gateway corriendo en un celular con chip.
 - **WhatsApp gateway** (`WHATSAPP_GATEWAY_TOKEN`): gateway propio (Baileys + chip descartable)
-  corriendo en una PC, se conecta al backend por WebSocket con este token.
+  corriendo en una PC, se conecta al backend por WebSocket con este token — ver
+  [`whatsapp-gateway.md`](./whatsapp-gateway.md) para instalarlo y emparejar un chip.
 - **Firebase / push a la app** (`FCM_CREDENTIALS_PATH`): ruta al JSON de una cuenta de
   servicio de Firebase, se genera desde la consola de Firebase del proyecto de la app de
   cadetes.

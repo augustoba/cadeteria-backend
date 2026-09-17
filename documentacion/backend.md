@@ -84,3 +84,4 @@ tokens revocados.
   sacar cada API key.
 - [`frontend.md`](./frontend.md) — panel admin (Angular).
 - [`apk.md`](./apk.md) — app de cadetes (Android).
+- [`whatsapp-gateway.md`](./whatsapp-gateway.md) — gateway de WhatsApp (Baileys + chips).
