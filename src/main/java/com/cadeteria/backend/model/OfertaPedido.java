@@ -38,6 +38,17 @@ public class OfertaPedido {
     @Column(length = 300)
     private String motivoRechazo;
 
+    /** Cuándo el cadete aceptó/rechazó (null si expiró sin respuesta) — mejora 2026-09-17, tiempo de respuesta. */
+    private Instant respondidoEn;
+
+    public Instant getRespondidoEn() {
+        return respondidoEn;
+    }
+
+    public void setRespondidoEn(Instant respondidoEn) {
+        this.respondidoEn = respondidoEn;
+    }
+
     public String getId() {
         return id;
     }

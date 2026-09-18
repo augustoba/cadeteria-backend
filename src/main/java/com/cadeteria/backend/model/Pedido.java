@@ -1,5 +1,6 @@
 package com.cadeteria.backend.model;
 
+import com.cadeteria.backend.util.TelefonoUtils;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
@@ -212,6 +213,12 @@ public class Pedido {
 
     public void setClienteTelefono(String clienteTelefono) {
         this.clienteTelefono = clienteTelefono;
+    }
+
+    @PrePersist
+    @PreUpdate
+    private void normalizarTelefono() {
+        this.clienteTelefono = TelefonoUtils.normalizar(this.clienteTelefono);
     }
 
     public String getClienteNombre() {

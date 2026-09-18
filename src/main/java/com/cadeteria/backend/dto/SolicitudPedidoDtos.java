@@ -18,7 +18,9 @@ public final class SolicitudPedidoDtos {
             boolean llevaDinero, BigDecimal montoDeclarado,
             boolean retornaAlOrigen,
             @NotBlank String clienteNombre, @NotBlank String clienteTelefono,
-            String detalle
+            String detalle,
+            /** Token de VerificacionTelefonoService.verificarCodigo — confirma que el teléfono es real (mejora 2026-09-17). */
+            @NotBlank String verificacionToken
     ) {}
 
     public record SolicitudPedidoResponse(

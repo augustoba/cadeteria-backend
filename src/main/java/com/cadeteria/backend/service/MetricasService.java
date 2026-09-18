@@ -12,6 +12,7 @@ import com.cadeteria.backend.model.Pedido;
 import com.cadeteria.backend.model.PedidoUbicacion;
 import com.cadeteria.backend.model.Zona;
 import com.cadeteria.backend.repository.CadeteRepository;
+import com.cadeteria.backend.repository.IncidenciaRepository;
 import com.cadeteria.backend.repository.OfertaPedidoRepository;
 import com.cadeteria.backend.repository.PedidoRepository;
 import com.cadeteria.backend.repository.PedidoUbicacionRepository;
@@ -43,15 +44,17 @@ public class MetricasService {
     private final CadeteRepository cadeteRepo;
     private final CadeteSesionService sesionService;
     private final PedidoUbicacionRepository pedidoUbicacionRepo;
+    private final IncidenciaRepository incidenciaRepo;
 
     public MetricasService(PedidoRepository pedidoRepo, OfertaPedidoRepository ofertaRepo,
                             CadeteRepository cadeteRepo, CadeteSesionService sesionService,
-                            PedidoUbicacionRepository pedidoUbicacionRepo) {
+                            PedidoUbicacionRepository pedidoUbicacionRepo, IncidenciaRepository incidenciaRepo) {
         this.pedidoRepo = pedidoRepo;
         this.ofertaRepo = ofertaRepo;
         this.cadeteRepo = cadeteRepo;
         this.sesionService = sesionService;
         this.pedidoUbicacionRepo = pedidoUbicacionRepo;
+        this.incidenciaRepo = incidenciaRepo;
     }
 
     public ResumenDiaResponse resumenDia(Instant desde, Instant hasta) {
@@ -100,11 +103,20 @@ public class MetricasService {
             Double promedioCalificacion = calificaciones.isEmpty() ? null
                     : calificaciones.stream().mapToInt(Integer::intValue).average().orElse(0);
 
+            long incidenciasAbiertas = incidenciaRepo.countByCadeteIdAndEstado(c.getId(), "ABIERTA");
+
+            List<Long> segundosRespuesta = ofertaRepo.findByCadeteIdAndRespondidoEnIsNotNullAndOfrecidoEnBetween(c.getId(), desde, hasta)
+                    .stream()
+                    .map(o -> java.time.Duration.between(o.getOfrecidoEn(), o.getRespondidoEn()).getSeconds())
+                    .toList();
+            Double promedioSegundosRespuesta = segundosRespuesta.isEmpty() ? null
+                    : segundosRespuesta.stream().mapToLong(Long::longValue).average().orElse(0);
+
             out.add(new CadeteMetricaResponse(
                     c.getId(), c.getNombre(), c.getApellido(), LookupResponse.from(c.getTipoVehiculo()),
                     horas, aceptados, rechazados, noAceptados, finalizados.size(),
                     montoTransportado, montoCobrado, km, promedioViajesPorHora, promedioPrecioPorHora,
-                    promedioCalificacion, calificaciones.size()));
+                    promedioCalificacion, calificaciones.size(), incidenciasAbiertas, promedioSegundosRespuesta));
         }
         return out;
     }

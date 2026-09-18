@@ -16,6 +16,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -38,11 +40,17 @@ public class SolicitudPedidoService {
     private final PedidoService pedidoService;
     private final SmsGatewayService smsGatewayService;
     private final WebSocketPublisher publisher;
+    private final VerificacionTelefonoService verificacionTelefonoService;
+    private final ConfiguracionService configuracionService;
     private final String frontBaseUrl;
+
+    private static final ZoneId ZONA_ART = ZoneId.of("America/Argentina/Buenos_Aires");
 
     public SolicitudPedidoService(SolicitudPedidoRepository repo, ZonaRepository zonaRepo,
                                    TipoVehiculoRepository tipoVehiculoRepo, PedidoService pedidoService,
                                    SmsGatewayService smsGatewayService, WebSocketPublisher publisher,
+                                   VerificacionTelefonoService verificacionTelefonoService,
+                                   ConfiguracionService configuracionService,
                                    AppProperties props) {
         this.repo = repo;
         this.zonaRepo = zonaRepo;
@@ -50,10 +58,48 @@ public class SolicitudPedidoService {
         this.pedidoService = pedidoService;
         this.smsGatewayService = smsGatewayService;
         this.publisher = publisher;
+        this.verificacionTelefonoService = verificacionTelefonoService;
+        this.configuracionService = configuracionService;
         this.frontBaseUrl = props.getFrontBaseUrl();
     }
 
+    public record EstadoDisponibilidad(boolean disponible, String mensaje) {}
+
+    /**
+     * "Pausar pedidos" y "horario de atención" (mejora 2026-09-17) — el dueño pidió poder
+     * cortar la toma de pedidos nuevos desde "/pedir" ya sea a mano (falta de cadetes,
+     * cualquier motivo puntual) o por franja horaria fija. La pausa manual gana siempre,
+     * sin importar el horario configurado.
+     */
+    @Transactional(readOnly = true)
+    public EstadoDisponibilidad estadoDisponibilidad() {
+        if (configuracionService.getBoolean("pedidos_pausados", false)) {
+            return new EstadoDisponibilidad(false,
+                    configuracionService.getString("pedidos_pausados_mensaje", "Estamos pausados temporalmente, disculpá las molestias."));
+        }
+        if (configuracionService.getBoolean("horario_atencion_activo", false)) {
+            String desdeStr = configuracionService.getString("horario_atencion_desde", "08:00");
+            String hastaStr = configuracionService.getString("horario_atencion_hasta", "22:00");
+            LocalTime desde = LocalTime.parse(desdeStr);
+            LocalTime hasta = LocalTime.parse(hastaStr);
+            LocalTime ahora = LocalTime.now(ZONA_ART);
+            boolean dentro = desde.isBefore(hasta)
+                    ? (!ahora.isBefore(desde) && ahora.isBefore(hasta))
+                    : (!ahora.isBefore(desde) || ahora.isBefore(hasta));
+            if (!dentro) {
+                return new EstadoDisponibilidad(false, "Fuera de nuestro horario de atención (" + desdeStr + " a " + hastaStr + ").");
+            }
+        }
+        return new EstadoDisponibilidad(true, null);
+    }
+
+    /** Exige que el teléfono ya haya pasado por VerificacionTelefonoService (mejora 2026-09-17). */
     public SolicitudPedido crear(SolicitudPedidoRequest req) {
+        EstadoDisponibilidad estado = estadoDisponibilidad();
+        if (!estado.disponible()) {
+            throw new BadRequestException(estado.mensaje());
+        }
+        verificacionTelefonoService.consumirToken(req.verificacionToken(), req.clienteTelefono());
         SolicitudPedido s = new SolicitudPedido();
         s.setId(UUID.randomUUID().toString());
         s.setOrigenDireccion(req.origenDireccion().trim());

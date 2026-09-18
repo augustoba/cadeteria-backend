@@ -4,8 +4,10 @@ import com.cadeteria.backend.config.AppProperties;
 import com.cadeteria.backend.repository.PedidoRepository;
 import com.cadeteria.backend.service.EmailService;
 import com.cadeteria.backend.service.FcmService;
+import com.cadeteria.backend.service.GeocodingProxyService;
 import com.cadeteria.backend.service.PedidoService;
 import com.cadeteria.backend.service.WebPushService;
+import com.cadeteria.backend.service.WhatsappGatewayService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -13,8 +15,11 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.Instant;
 
 /**
- * Panel de salud del sistema (mejora 48) — para que el admin vea de un vistazo si algo
- * dejó de funcionar (SMS, push, mail, base) sin tener que mirar los logs del servidor.
+ * Panel de salud del sistema (mejora 48, extendido 2026-09-17 a las APIs externas) —
+ * para que el admin vea de un vistazo si algo dejó de funcionar sin tener que mirar los
+ * logs del servidor. Los chequeos de APIs externas (Nominatim, gateway de WhatsApp) son
+ * "último resultado conocido" de uso real, no un ping aparte en cada consulta — evita
+ * pegarle a Nominatim de más y que este endpoint quede lento.
  */
 @RestController
 @RequestMapping("/api/admin/salud")
@@ -25,15 +30,21 @@ public class SaludController {
     private final FcmService fcmService;
     private final EmailService emailService;
     private final WebPushService webPushService;
+    private final GeocodingProxyService geocodingProxyService;
+    private final WhatsappGatewayService whatsappGatewayService;
     private final AppProperties props;
 
     public SaludController(PedidoRepository pedidoRepo, PedidoService pedidoService, FcmService fcmService,
-                            EmailService emailService, WebPushService webPushService, AppProperties props) {
+                            EmailService emailService, WebPushService webPushService,
+                            GeocodingProxyService geocodingProxyService, WhatsappGatewayService whatsappGatewayService,
+                            AppProperties props) {
         this.pedidoRepo = pedidoRepo;
         this.pedidoService = pedidoService;
         this.fcmService = fcmService;
         this.emailService = emailService;
         this.webPushService = webPushService;
+        this.geocodingProxyService = geocodingProxyService;
+        this.whatsappGatewayService = whatsappGatewayService;
         this.props = props;
     }
 
@@ -43,6 +54,8 @@ public class SaludController {
             boolean pushConfigurado,
             boolean emailConfigurado,
             boolean webPushConfigurado,
+            boolean geocodingOk,
+            boolean whatsappGatewayConectado,
             long smsFallidosPendientes,
             long pedidosActivos,
             Instant ultimoPedidoCreadoEn,
@@ -71,6 +84,8 @@ public class SaludController {
                 fcmService.isHabilitado(),
                 emailService.isHabilitado(),
                 webPushService.isHabilitado(),
+                geocodingProxyService.isNominatimOk(),
+                whatsappGatewayService.estado().conectado(),
                 dbOk ? pedidoService.contarSmsFallidos() : 0,
                 pedidosActivos,
                 ultimoPedido,

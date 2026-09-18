@@ -26,6 +26,12 @@ public class SolicitudPedidoPublicoController {
         return new SolicitudCreadaResponse(service.crear(req).getId());
     }
 
+    /** Para que "/pedir" sepa si mostrar el formulario o un aviso (pausa manual u horario) antes de que el cliente cargue nada. */
+    @GetMapping("/estado")
+    public SolicitudPedidoService.EstadoDisponibilidad estado() {
+        return service.estadoDisponibilidad();
+    }
+
     /** Para que la página de confirmación muestre la cotización antes de que el cliente toque "Confirmar". */
     @GetMapping("/confirmar/{token}")
     public ConfirmacionPublicaResponse verCotizacion(@PathVariable String token) {

@@ -442,8 +442,27 @@ public class PedidoService {
                 .toList();
     }
 
+    /**
+     * Orden de prioridad (mejora 2026-09-17, pedida por el dueño): primero cadetes SIN
+     * pedidos pendientes y CERCA del origen (dentro de {@code asignacion_radio_km}),
+     * después sin pedidos pero lejos, después con pedidos y cerca, y por último con
+     * pedidos y lejos — dentro de cada uno de esos 4 grupos, FIFO de siempre
+     * ({@link Cadete#getOrdenColaEspera()}). Un cadete lejos NUNCA queda excluido del
+     * todo, solo pospuesto — así un pedido no se queda sin nadie solo porque todos
+     * están un poco lejos.
+     * <p>
+     * Si el pedido requiere BICI y el viaje (origen→destino) supera
+     * {@code distancia_maxima_bici_km}, no se ofrece a nadie automáticamente — una bici
+     * no puede cubrir esa distancia. Es un límite de la ASIGNACIÓN AUTOMÁTICA nomás; el
+     * admin puede seguir asignando a mano si le parece razonable en el caso puntual
+     * (spec: número todavía no definido, se ajusta en Configuración).
+     */
     private Optional<Cadete> buscarCandidato(Pedido pedido, Set<String> excluirCadeteIds) {
+        if (viajeSuperaTopeDeBici(pedido)) {
+            return Optional.empty();
+        }
         Set<String> zonasCompatibles = zonasCompatibles(pedido.getZona());
+        BigDecimal radioKm = configuracionService.getBigDecimal("asignacion_radio_km", BigDecimal.valueOf(5));
         return cadeteRepo.findAll().stream()
                 .filter(Cadete::isActivo)
                 .filter(c -> "LIBRE".equals(c.getEstado().getId()))
@@ -454,7 +473,25 @@ public class PedidoService {
                 .filter(c -> dentroDeTopes(c, pedido))
                 .filter(this::dentroDeTurno)
                 .filter(c -> !incidenciaRepo.existsByCadeteIdAndPrioridadAndEstado(c.getId(), "GRAVE", "ABIERTA"))
-                .min(Comparator.comparing(this::tienePedidosPendientes).thenComparing(Cadete::getOrdenColaEspera));
+                .min(Comparator.comparing(this::tienePedidosPendientes)
+                        .thenComparing((Cadete c) -> lejosDelOrigen(c, pedido, radioKm))
+                        .thenComparing(Cadete::getOrdenColaEspera));
+    }
+
+    /** true si el cadete no mandó ubicación todavía, o si está a más del radio configurado del origen del pedido. */
+    private boolean lejosDelOrigen(Cadete cadete, Pedido pedido, BigDecimal radioKm) {
+        if (cadete.getLat() == null || cadete.getLng() == null) return true;
+        double distancia = GeocodingService.distanciaKm(cadete.getLat(), cadete.getLng(), pedido.getOrigenLat(), pedido.getOrigenLng());
+        return distancia > radioKm.doubleValue();
+    }
+
+    private boolean viajeSuperaTopeDeBici(Pedido pedido) {
+        if (!"BICI".equals(pedido.getTipoVehiculoRequerido().getId())) return false;
+        BigDecimal topeKm = configuracionService.getBigDecimal("distancia_maxima_bici_km", BigDecimal.ZERO);
+        if (topeKm.signum() <= 0) return false; // 0 o sin cargar = sin límite
+        double distanciaViaje = GeocodingService.distanciaKm(
+                pedido.getOrigenLat(), pedido.getOrigenLng(), pedido.getDestinoLat(), pedido.getDestinoLng());
+        return distanciaViaje > topeKm.doubleValue();
     }
 
     /**
@@ -777,6 +814,7 @@ public class PedidoService {
             throw new BadRequestException("El tiempo para aceptar este viaje ya vencio.");
         }
         oferta.setResultado(resultado("ACEPTADO"));
+        oferta.setRespondidoEn(Instant.now());
         ofertaRepo.save(oferta);
 
         if ("PORCENTAJE".equals(cadete.getModalidadPago())) {
@@ -806,6 +844,7 @@ public class PedidoService {
         OfertaPedido oferta = ofertaPendiente(pedidoId, cadete.getId());
         oferta.setResultado(resultado("RECHAZADO"));
         oferta.setMotivoRechazo(motivo == null || motivo.isBlank() ? null : motivo.trim());
+        oferta.setRespondidoEn(Instant.now());
         ofertaRepo.save(oferta);
 
         publisher.publicarAlertaRechazo(cadete, PedidoResponse.from(pedido));

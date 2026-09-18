@@ -84,7 +84,7 @@ public class DataSeeder implements CommandLineRunner {
         admin.setUsername(props.getAdmin().getUsername());
         admin.setPasswordHash(passwordEncoder.encode(props.getAdmin().getPassword()));
         admin.setEnabled(true);
-        admin.setRol("DUENO");
+        admin.setRol("admin");
         adminRepo.save(admin);
         log.info("Seed: admin inicial '{}' creado.", admin.getUsername());
     }
@@ -99,7 +99,7 @@ public class DataSeeder implements CommandLineRunner {
         adminRepo.findAll().stream()
                 .filter(a -> a.getRol() == null)
                 .forEach(a -> {
-                    a.setRol("DUENO");
+                    a.setRol("admin");
                     adminRepo.save(a);
                 });
     }

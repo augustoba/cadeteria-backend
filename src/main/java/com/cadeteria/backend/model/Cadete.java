@@ -1,5 +1,6 @@
 package com.cadeteria.backend.model;
 
+import com.cadeteria.backend.util.TelefonoUtils;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
@@ -174,6 +175,20 @@ public class Cadete {
     @jakarta.persistence.Lob
     private String notasInternas;
 
+    /**
+     * Contraseña temporal (alta o "reenviar contraseña") sin cambiar todavía — mejora
+     * 2026-09-17, pedida por el dueño ("debería vencer a los 10 minutos"). Mientras sea
+     * true, el login solo funciona hasta {@link #passwordTemporalExpira}; pasado eso, el
+     * admin tiene que reenviarle una nueva desde el panel.
+     */
+    @Column(nullable = false)
+    private boolean debeCambiarPassword = false;
+    private Instant passwordTemporalExpira;
+
+    /** Última versión de APK con la que se logueó — visibilidad para el admin (mejora 2026-09-17), no bloquea nada. */
+    private Integer ultimaVersionApp;
+    private Instant ultimaVersionAppEn;
+
     public String getId() {
         return id;
     }
@@ -212,6 +227,12 @@ public class Cadete {
 
     public void setTelefono(String telefono) {
         this.telefono = telefono;
+    }
+
+    @PrePersist
+    @PreUpdate
+    private void normalizarTelefono() {
+        this.telefono = TelefonoUtils.normalizar(this.telefono);
     }
 
     public String getEmail() {
@@ -540,5 +561,37 @@ public class Cadete {
 
     public void setNotasInternas(String notasInternas) {
         this.notasInternas = notasInternas;
+    }
+
+    public boolean isDebeCambiarPassword() {
+        return debeCambiarPassword;
+    }
+
+    public void setDebeCambiarPassword(boolean debeCambiarPassword) {
+        this.debeCambiarPassword = debeCambiarPassword;
+    }
+
+    public Instant getPasswordTemporalExpira() {
+        return passwordTemporalExpira;
+    }
+
+    public void setPasswordTemporalExpira(Instant passwordTemporalExpira) {
+        this.passwordTemporalExpira = passwordTemporalExpira;
+    }
+
+    public Integer getUltimaVersionApp() {
+        return ultimaVersionApp;
+    }
+
+    public void setUltimaVersionApp(Integer ultimaVersionApp) {
+        this.ultimaVersionApp = ultimaVersionApp;
+    }
+
+    public Instant getUltimaVersionAppEn() {
+        return ultimaVersionAppEn;
+    }
+
+    public void setUltimaVersionAppEn(Instant ultimaVersionAppEn) {
+        this.ultimaVersionAppEn = ultimaVersionAppEn;
     }
 }

@@ -4,6 +4,7 @@ import com.cadeteria.backend.common.ApiError;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -24,10 +25,12 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
+    private final RateLimitFilter rateLimitFilter;
     private final AppProperties props;
 
-    public SecurityConfig(JwtAuthFilter jwtAuthFilter, AppProperties props) {
+    public SecurityConfig(JwtAuthFilter jwtAuthFilter, RateLimitFilter rateLimitFilter, AppProperties props) {
         this.jwtAuthFilter = jwtAuthFilter;
+        this.rateLimitFilter = rateLimitFilter;
         this.props = props;
     }
 
@@ -47,17 +50,20 @@ public class SecurityConfig {
                                 "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**",
                                 "/error"
                         ).permitAll()
-                        // Rutas de plata/config sensible/seguridad — solo el rol DUENO (ronda 5,
-                        // punto 11 — "operador" no debe ver ni tocar esto). Tienen que ir ANTES del
-                        // matcher general de /api/admin/** para que Spring Security las evalúe primero.
-                        .requestMatchers(
-                                "/api/admin/configuracion/**",
-                                "/api/admin/metricas/**",
-                                "/api/admin/pagos/**",
-                                "/api/admin/cadetes/*/pagos/**",
-                                "/api/admin/seguridad/**",
-                                "/api/admin/usuarios/**"
-                        ).hasRole("ADMIN_DUENO")
+                        // Rutas de plata/config sensible/seguridad — cada una exige su propio permiso
+                        // (roles configurables, mejora 2026-09-16 — antes era un solo bit "DUENO" fijo,
+                        // ver RolService/RolSeeder). Tienen que ir ANTES del matcher general de
+                        // /api/admin/** para que Spring Security las evalúe primero.
+                        .requestMatchers("/api/admin/configuracion/**").hasAuthority("PERM_configuracion")
+                        .requestMatchers("/api/admin/metricas/**").hasAuthority("PERM_metricas")
+                        .requestMatchers("/api/admin/pagos/**", "/api/admin/cadetes/*/pagos/**").hasAuthority("PERM_pagos")
+                        .requestMatchers("/api/admin/seguridad/**").hasAuthority("PERM_seguridad")
+                        .requestMatchers("/api/admin/usuarios/**").hasAuthority("PERM_usuarios")
+                        .requestMatchers("/api/admin/whatsapp/**").hasAuthority("PERM_whatsapp")
+                        // Ver roles (para el selector de "Usuarios") es de cualquier admin; crear/editar/borrar exige el permiso "roles".
+                        .requestMatchers(HttpMethod.POST, "/api/admin/roles/**").hasAuthority("PERM_roles")
+                        .requestMatchers(HttpMethod.PUT, "/api/admin/roles/**").hasAuthority("PERM_roles")
+                        .requestMatchers(HttpMethod.DELETE, "/api/admin/roles/**").hasAuthority("PERM_roles")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/cadetes/me/**").hasRole("CADETE")
                         .requestMatchers("/api/pedidos/me/**").hasRole("CADETE")
@@ -67,6 +73,7 @@ public class SecurityConfig {
                         .authenticationEntryPoint((req, res, e) -> writeError(res, mapper, HttpStatus.UNAUTHORIZED, "No autenticado"))
                         .accessDeniedHandler((req, res, e) -> writeError(res, mapper, HttpStatus.FORBIDDEN, "Acceso denegado"))
                 )
+                .addFilterBefore(rateLimitFilter, JwtAuthFilter.class)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

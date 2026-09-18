@@ -148,6 +148,12 @@ public class CadeteController {
         return CadeteResponse.from(service.cambiarModalidadPago(id, req.modalidadPago()));
     }
 
+    /** Para cuando la contraseña temporal venció sin que el cadete llegara a entrar (mejora 2026-09-17). */
+    @PostMapping("/api/admin/cadetes/{id}/reenviar-password")
+    public com.cadeteria.backend.dto.CadeteDtos.ReenviarPasswordResponse reenviarPassword(@PathVariable String id) {
+        return new com.cadeteria.backend.dto.CadeteDtos.ReenviarPasswordResponse(service.reenviarPasswordTemporal(id));
+    }
+
     // --- Self (app de cadetes) ---
 
     @PatchMapping("/api/cadetes/me/estado")

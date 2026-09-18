@@ -54,6 +54,9 @@ app:
     nominatim-url: ${NOMINATIM_URL:https://nominatim.openstreetmap.org}
     open-route-service-url: ${ORS_URL:https://api.openrouteservice.org}
     open-route-service-key: ${ORS_KEY:}
+    # Mismo key gratuito de Geoapify que ya usaba el front (ver admin-front geocoding.service.ts) —
+    # movido acá para el proxy de "/pedir" (GeocodingProxyService) y así no viajar expuesto en el bundle.
+    geoapify-key: ${GEOAPIFY_KEY:273798db51844ff6b761f6d09f7358e3}
   fcm:
     credenciales-path: ${FCM_CREDENTIALS_PATH:}
   # SMTP para el mail de alta de cadete (ronda 7) — host vacio = deshabilitado, se loguea y no rompe el alta.

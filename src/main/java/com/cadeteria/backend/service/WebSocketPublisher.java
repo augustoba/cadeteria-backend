@@ -4,6 +4,7 @@ import com.cadeteria.backend.dto.CadeteDtos.CadeteResponse;
 import com.cadeteria.backend.dto.ChatDtos.MensajeResponse;
 import com.cadeteria.backend.dto.PedidoDtos.PedidoResponse;
 import com.cadeteria.backend.dto.WhatsappDtos.ComandoEnvio;
+import com.cadeteria.backend.dto.WhatsappDtos.ComandoVincularChip;
 import com.cadeteria.backend.model.Cadete;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -106,6 +107,34 @@ public class WebSocketPublisher {
     /** Comando de envío para el gateway propio de WhatsApp (Baileys + chips descartables). */
     public void publicarComandoWhatsapp(ComandoEnvio comando) {
         template.convertAndSend("/topic/whatsapp/comandos", comando);
+    }
+
+    /** Pedido al gateway de vincular un chip nuevo (pairing code). */
+    public void publicarComandoVincularChip(ComandoVincularChip comando) {
+        template.convertAndSend("/topic/whatsapp/vincular-chip", comando);
+    }
+
+    /** Pedido al gateway de desloguear un chip y borrar su sesión — no se va a volver a usar. */
+    public void publicarComandoDarDeBajaChip(String chipId) {
+        template.convertAndSend("/topic/whatsapp/dar-de-baja-chip", Map.of("chipId", chipId));
+    }
+
+    /** Alerta visible (mismo canal que rechazos/inactividad) cuando un chip pasa a BANEADO. */
+    public void publicarAlertaChipWhatsappBaneado(String chipId, String numero) {
+        template.convertAndSend("/topic/admin/alertas", Map.of(
+                "tipo", "WHATSAPP_CHIP_BANEADO",
+                "chipId", chipId,
+                "numero", numero == null ? "" : numero
+        ));
+    }
+
+    /**
+     * Aviso liviano al panel de que algo del módulo WhatsApp cambió (chip, mensaje o
+     * respuesta nueva) — igual que el patrón de /queue/admin/chat, el panel recarga la
+     * lista que le interesa en vez de tratar de reconstruir el estado desde el evento.
+     */
+    public void publicarPanelWhatsapp(String evento) {
+        template.convertAndSend("/topic/whatsapp/panel", Map.of("evento", evento));
     }
 
     public record EventoViaje(String tipo, PedidoResponse pedido) {}

@@ -2,6 +2,7 @@ package com.cadeteria.backend.dto;
 
 import com.cadeteria.backend.model.Cadete;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -10,6 +11,10 @@ import java.time.LocalTime;
 public final class CadeteDtos {
 
     private CadeteDtos() {}
+
+    /** El usuario de login del cadete es su DNI: solo dígitos, hasta 8 (nada de letras ni más largo). */
+    static final String REGEX_USERNAME_DNI = "^[0-9]{1,8}$";
+    static final String MENSAJE_USERNAME_DNI = "El usuario debe ser el DNI: solo números, sin puntos ni letras, máximo 8 dígitos";
 
     /** password es obligatoria solo al crear (el service la ignora si viene null en un update). */
     public record CadeteRequest(
@@ -28,7 +33,7 @@ public final class CadeteDtos {
             String fotoVehiculoUrl,
             String fotoCarnetUrl,
             String fotoTarjetaVerdeUrl,
-            @NotBlank String username,
+            @NotBlank @Pattern(regexp = REGEX_USERNAME_DNI, message = MENSAJE_USERNAME_DNI) String username,
             String password,
             BigDecimal montoMaximoTransportado,
             Integer maxViajesSimultaneos,
@@ -70,7 +75,9 @@ public final class CadeteDtos {
             /** Solo aplica con modalidadPago=PORCENTAJE. */
             BigDecimal creditoDisponible,
             /** Notas libres del admin sobre este cadete (ronda 10, punto 103). */
-            String notasInternas
+            String notasInternas,
+            /** Última versión de APK con la que se logueó, y cuándo — null si nunca lo reportó (mejora 2026-09-17). */
+            Integer ultimaVersionApp, Instant ultimaVersionAppEn
     ) {
         /** Conveniencia para los endpoints que no recalculan la calificación (una mutación puntual, no la lista). */
         public static CadeteResponse from(Cadete c) {
@@ -91,7 +98,8 @@ public final class CadeteDtos {
                     calificacionPromedio, calificacionCantidad,
                     c.getModalidadPago(), c.isHabilitadoPago(), c.getPagoSemanalMontoPagado(), c.getPagoSemanalVenceEn(),
                     c.getMontoSemanalActual(),
-                    c.getCreditoDisponible(), c.getNotasInternas());
+                    c.getCreditoDisponible(), c.getNotasInternas(),
+                    c.getUltimaVersionApp(), c.getUltimaVersionAppEn());
         }
     }
 
@@ -108,6 +116,9 @@ public final class CadeteDtos {
 
     /** Cambiar el modelo de cobro de un cadete desde la pantalla "Pagos" (antes solo se podía al crear/editar el cadete). */
     public record ModalidadPagoRequest(@NotBlank String modalidadPago) {}
+
+    /** El admin la ve por si no le llegó el mail al cadete (mejora 2026-09-17). */
+    public record ReenviarPasswordResponse(String passwordTemporal) {}
 
     /** motivo: por qué se dio de baja/reactivó (ronda 10, punto 96) — opcional. */
     public record ActivoRequest(boolean activo, String motivo) {}

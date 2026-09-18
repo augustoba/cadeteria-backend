@@ -1,9 +1,12 @@
 package com.cadeteria.backend.model;
 
+import com.cadeteria.backend.util.TelefonoUtils;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Lob;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
@@ -42,10 +45,20 @@ public class WhatsappMensaje {
 
     private String error;
 
+    /** Id del mensaje en WhatsApp (lo devuelve Baileys al mandar) — permite traducir los
+     * recibos de entrega/lectura que llegan después, identificados por este id. */
+    private String waMessageId;
+
     @Column(nullable = false)
     private Instant creadoEn = Instant.now();
 
     private Instant enviadoEn;
+
+    /** Cuándo el celular del cliente recibió el mensaje (doble tilde gris/azul de WhatsApp). */
+    private Instant entregadoEn;
+
+    /** Cuándo el cliente lo leyó (doble tilde azul). */
+    private Instant leidoEn;
 
     public String getId() {
         return id;
@@ -69,6 +82,12 @@ public class WhatsappMensaje {
 
     public void setTelefono(String telefono) {
         this.telefono = telefono;
+    }
+
+    @PrePersist
+    @PreUpdate
+    private void normalizarTelefono() {
+        this.telefono = TelefonoUtils.normalizar(this.telefono);
     }
 
     public String getTexto() {
@@ -117,5 +136,29 @@ public class WhatsappMensaje {
 
     public void setEnviadoEn(Instant enviadoEn) {
         this.enviadoEn = enviadoEn;
+    }
+
+    public String getWaMessageId() {
+        return waMessageId;
+    }
+
+    public void setWaMessageId(String waMessageId) {
+        this.waMessageId = waMessageId;
+    }
+
+    public Instant getEntregadoEn() {
+        return entregadoEn;
+    }
+
+    public void setEntregadoEn(Instant entregadoEn) {
+        this.entregadoEn = entregadoEn;
+    }
+
+    public Instant getLeidoEn() {
+        return leidoEn;
+    }
+
+    public void setLeidoEn(Instant leidoEn) {
+        this.leidoEn = leidoEn;
     }
 }

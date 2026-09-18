@@ -142,6 +142,7 @@ public class SolicitudCadeteService {
                 null, null, null, null, null, null,
                 modalidadPago == null || modalidadPago.isBlank() ? "SEMANAL" : modalidadPago, null);
         Cadete cadete = cadeteService.create(cadeteReq);
+        cadeteService.marcarPasswordTemporal(cadete.getId(), Instant.now().plus(10, ChronoUnit.MINUTES));
 
         s.setEstado("APROBADA");
         s.setCadeteCreadoId(cadete.getId());
@@ -152,7 +153,7 @@ public class SolicitudCadeteService {
                         "Te dimos de alta como cadete. Estos son tus datos para entrar a la app:\n\n" +
                         "Usuario: " + username.trim() + "\n" +
                         "Contraseña temporal: " + passwordTemporal + "\n\n" +
-                        "Te recomendamos cambiarla la primera vez que entres, desde tu perfil.");
+                        "Tenés 10 minutos para entrar con esta contraseña — si se vence, pedile a la cadetería que te la reenvíe.");
         return new AprobacionResultado(cadete, passwordTemporal);
     }
 

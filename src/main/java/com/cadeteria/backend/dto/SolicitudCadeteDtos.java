@@ -2,6 +2,7 @@ package com.cadeteria.backend.dto;
 
 import com.cadeteria.backend.model.SolicitudCadete;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 
 import java.time.Instant;
 
@@ -30,7 +31,7 @@ public final class SolicitudCadeteDtos {
             String fotoVehiculoUrl,
             String fotoCarnetUrl,
             String fotoTarjetaVerdeUrl,
-            @NotBlank String usernamePropuesto
+            @NotBlank @Pattern(regexp = CadeteDtos.REGEX_USERNAME_DNI, message = CadeteDtos.MENSAJE_USERNAME_DNI) String usernamePropuesto
     ) {}
 
     public record SolicitudResponse(
@@ -54,7 +55,9 @@ public final class SolicitudCadeteDtos {
 
     /** El admin puede cambiar el usuario propuesto antes de crear la cuenta. */
     /** modalidadPago: "SEMANAL" | "PORCENTAJE" — la elige el admin al aprobar, null/blank cae en "SEMANAL". */
-    public record AprobarRequest(@NotBlank String username, String modalidadPago) {}
+    public record AprobarRequest(
+            @NotBlank @Pattern(regexp = CadeteDtos.REGEX_USERNAME_DNI, message = CadeteDtos.MENSAJE_USERNAME_DNI) String username,
+            String modalidadPago) {}
 
     /** passwordTemporal: por si el mail no está configurado todavía, el admin se la puede pasar a mano. */
     public record AprobarResponse(SolicitudResponse solicitud, String username, String passwordTemporal) {}

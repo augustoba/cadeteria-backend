@@ -23,18 +23,21 @@ public class CotizacionController {
         this.service = service;
     }
 
-    public record CotizacionResponse(BigDecimal precioSugerido, String metodo, String zonaId, String zonaNombre, Double distanciaKm) {
+    public record CotizacionResponse(BigDecimal precioSugerido, String metodo, String zonaId, String zonaNombre,
+                                      Double distanciaKm, BigDecimal recargoPorDinero) {
         static CotizacionResponse vacia() {
-            return new CotizacionResponse(null, null, null, null, null);
+            return new CotizacionResponse(null, null, null, null, null, null);
         }
     }
 
     @GetMapping
     public CotizacionResponse cotizar(
             @RequestParam double origenLat, @RequestParam double origenLng,
-            @RequestParam(required = false) Double destinoLat, @RequestParam(required = false) Double destinoLng) {
-        return service.cotizar(origenLat, origenLng, destinoLat, destinoLng)
-                .map(c -> new CotizacionResponse(c.precioSugerido(), c.metodo(), c.zonaId(), c.zonaNombre(), c.distanciaKm()))
+            @RequestParam(required = false) Double destinoLat, @RequestParam(required = false) Double destinoLng,
+            @RequestParam(required = false) BigDecimal montoDeclarado,
+            @RequestParam(required = false) String metodo) {
+        return service.cotizar(origenLat, origenLng, destinoLat, destinoLng, montoDeclarado, metodo)
+                .map(c -> new CotizacionResponse(c.precioSugerido(), c.metodo(), c.zonaId(), c.zonaNombre(), c.distanciaKm(), c.recargoPorDinero()))
                 .orElseGet(CotizacionResponse::vacia);
     }
 }

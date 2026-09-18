@@ -251,6 +251,8 @@ public class AppProperties {
         private String nominatimUrl = "https://nominatim.openstreetmap.org";
         private String openRouteServiceUrl = "https://api.openrouteservice.org";
         private String openRouteServiceKey = "";
+        /** Geoapify para el proxy de direcciones de "/pedir" (mejora 2026-09-17) — ver GeocodingProxyService. Vacío = solo Nominatim. */
+        private String geoapifyKey = "";
 
         public String getNominatimUrl() {
             return nominatimUrl;
@@ -274,6 +276,14 @@ public class AppProperties {
 
         public void setOpenRouteServiceKey(String openRouteServiceKey) {
             this.openRouteServiceKey = openRouteServiceKey;
+        }
+
+        public String getGeoapifyKey() {
+            return geoapifyKey;
+        }
+
+        public void setGeoapifyKey(String geoapifyKey) {
+            this.geoapifyKey = geoapifyKey;
         }
     }
 

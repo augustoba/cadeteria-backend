@@ -52,7 +52,7 @@ import java.util.Optional;
 public class DemoPedidoSeeder implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DemoPedidoSeeder.class);
-    private static final String CADETE_USERNAME_PREFERIDO = "jperez";
+    private static final String CADETE_USERNAME_PREFERIDO = "11111111";
 
     private static final List<String> PEDIDO_IDS = List.of(
             "demo-pedido-01", "demo-pedido-02", "demo-pedido-03", "demo-pedido-04",

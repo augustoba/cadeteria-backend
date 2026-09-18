@@ -38,14 +38,26 @@ public class Admin {
     private String sessionToken;
 
     /**
-     * "DUENO" (acceso total) u "OPERADOR" (sin Configuración/Métricas/Pagos/Seguridad ni
-     * gestión de usuarios — pensado para alguien que atiende el teléfono sin ver plata ni
-     * tocar ajustes sensibles). Mismo patrón de String plano que {@code Cadete.modalidadPago}.
-     * Los admins ya existentes en la base (columna nueva, quedan en NULL) se migran a
-     * "DUENO" en {@code DataSeeder} al arrancar, para no perder acceso a nada.
+     * Id de un {@link Rol} (roles con permisos configurables, mejora 2026-09-16 — ver
+     * RolService/RolSeeder). Sigue siendo un String plano (no una FK JPA) por simplicidad,
+     * mismo patrón que {@code WhatsappMensaje.chipUsado}. Valores legacy "DUENO"/"OPERADOR"
+     * de antes de este cambio se siguen resolviendo bien — RolService.permisosEfectivos
+     * trata "DUENO" como el rol "admin", y null/cualquier otra cosa como "operador" — no
+     * hizo falta migrar datos existentes.
      */
-    @Column(length = 20)
-    private String rol = "DUENO";
+    @Column
+    private String rol = "admin";
+
+    /**
+     * Contraseña temporal (alta o "reenviar contraseña" desde Usuarios) sin cambiar
+     * todavía — mejora 2026-09-17, pedida por el dueño ("debería vencer a los 10
+     * minutos"). Mientras sea true, el login solo funciona hasta
+     * {@link #passwordTemporalExpira}; pasado eso, hay que pedirle a otro admin con
+     * permiso "usuarios" que la reenvíe (genera una nueva, con otros 10 minutos).
+     */
+    @Column(nullable = false)
+    private boolean debeCambiarPassword = false;
+    private Instant passwordTemporalExpira;
 
     public String getId() {
         return id;
@@ -119,7 +131,19 @@ public class Admin {
         this.rol = rol;
     }
 
-    public boolean isDueno() {
-        return rol == null || "DUENO".equals(rol);
+    public boolean isDebeCambiarPassword() {
+        return debeCambiarPassword;
+    }
+
+    public void setDebeCambiarPassword(boolean debeCambiarPassword) {
+        this.debeCambiarPassword = debeCambiarPassword;
+    }
+
+    public Instant getPasswordTemporalExpira() {
+        return passwordTemporalExpira;
+    }
+
+    public void setPasswordTemporalExpira(Instant passwordTemporalExpira) {
+        this.passwordTemporalExpira = passwordTemporalExpira;
     }
 }

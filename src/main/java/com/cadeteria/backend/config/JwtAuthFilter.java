@@ -4,6 +4,7 @@ import com.cadeteria.backend.model.Admin;
 import com.cadeteria.backend.model.Cadete;
 import com.cadeteria.backend.repository.AdminRepository;
 import com.cadeteria.backend.repository.CadeteRepository;
+import com.cadeteria.backend.service.RolService;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -31,11 +32,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
     private final AdminRepository admins;
     private final CadeteRepository cadetes;
+    private final RolService rolService;
 
-    public JwtAuthFilter(JwtService jwtService, AdminRepository admins, CadeteRepository cadetes) {
+    public JwtAuthFilter(JwtService jwtService, AdminRepository admins, CadeteRepository cadetes, RolService rolService) {
         this.jwtService = jwtService;
         this.admins = admins;
         this.cadetes = cadetes;
+        this.rolService = rolService;
     }
 
     @Override
@@ -61,13 +64,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                                         .filter(c -> sid != null && sid.equals(c.getSessionToken()))
                                         .isPresent());
                 if (valido) {
-                    // El rol de ADMIN se revalida contra la base en cada request (no contra el
-                    // claim del token) para que un cambio de rol a mitad de sesión aplique al
-                    // toque, no recién cuando expire el JWT viejo.
+                    // Los permisos de ADMIN se revalidan contra la base en cada request (no contra
+                    // el claim del token) para que un cambio de rol/permiso a mitad de sesión
+                    // aplique al toque, no recién cuando expire el JWT viejo.
                     List<SimpleGrantedAuthority> authorities = adminValido != null
-                            ? (adminValido.isDueno()
-                                    ? List.of(new SimpleGrantedAuthority("ROLE_ADMIN"), new SimpleGrantedAuthority("ROLE_ADMIN_DUENO"))
-                                    : List.of(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                            ? authoritiesParaAdmin(adminValido)
                             : List.of(new SimpleGrantedAuthority("ROLE_" + tipo));
                     var auth = new UsernamePasswordAuthenticationToken(username, null, authorities);
                     auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
@@ -76,5 +77,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             }
         }
         chain.doFilter(request, response);
+    }
+
+    /** ROLE_ADMIN siempre (distingue de ROLE_CADETE) + un PERM_x por cada permiso que le da su rol (ver RolService). */
+    private List<SimpleGrantedAuthority> authoritiesParaAdmin(Admin admin) {
+        List<SimpleGrantedAuthority> authorities = new java.util.ArrayList<>();
+        authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        rolService.permisosEfectivos(admin.getRol())
+                .forEach(permiso -> authorities.add(new SimpleGrantedAuthority("PERM_" + permiso)));
+        return authorities;
     }
 }

@@ -39,7 +39,11 @@ public final class MetricasDtos {
             double promedioPrecioPorHora,
             /** null si ningún cliente lo calificó todavía en el rango. */
             Double promedioCalificacion,
-            long cantidadCalificaciones
+            long cantidadCalificaciones,
+            /** Incidencias ABIERTAS de este cadete ahora mismo (no del rango) — para el score de riesgo (mejora 2026-09-17). */
+            long incidenciasAbiertas,
+            /** null si no respondió ninguna oferta en el rango (todas expiraron o no le ofertaron nada). */
+            Double promedioSegundosRespuesta
     ) {}
 
     /** Un rechazo con motivo, para la sección "Motivos de rechazo" de Métricas. */

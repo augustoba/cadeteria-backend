@@ -26,16 +26,19 @@ public class AuthService {
     private final JwtService jwtService;
     private final ConfiguracionService configuracionService;
     private final AccesoLogRepository accesoLogRepo;
+    private final RolService rolService;
 
     public AuthService(AdminRepository admins, CadeteRepository cadetes,
                         PasswordEncoder passwordEncoder, JwtService jwtService,
-                        ConfiguracionService configuracionService, AccesoLogRepository accesoLogRepo) {
+                        ConfiguracionService configuracionService, AccesoLogRepository accesoLogRepo,
+                        RolService rolService) {
         this.admins = admins;
         this.cadetes = cadetes;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.configuracionService = configuracionService;
         this.accesoLogRepo = accesoLogRepo;
+        this.rolService = rolService;
     }
 
     /** Bloqueo temporal tras varios intentos fallidos (ronda 6, punto 49) — umbral y duración configurables. */
@@ -56,6 +59,14 @@ public class AuthService {
             if (admin != null) registrarFalloAdmin(admin);
             throw new BadCredentialsException("Usuario o contrasena incorrectos");
         }
+        if (admin.isDebeCambiarPassword()) {
+            if (passwordTemporalVencida(admin.getPasswordTemporalExpira())) {
+                throw new BadCredentialsException("La contraseña temporal venció. Pedile a otro admin que te la reenvíe desde Usuarios.");
+            }
+            // Entró a tiempo: la temporal pasa a ser su contraseña normal (no hay pantalla de "cambiar contraseña" para admin todavía).
+            admin.setDebeCambiarPassword(false);
+            admin.setPasswordTemporalExpira(null);
+        }
         admin.setIntentosFallidos(0);
         admin.setBloqueadoHasta(null);
         String sessionId = UUID.randomUUID().toString();
@@ -67,7 +78,8 @@ public class AuthService {
         log.setIngresoEn(Instant.now());
         log.setIp(ip);
         accesoLogRepo.save(log);
-        return jwtService.generate(admin.getUsername(), JwtService.TIPO_ADMIN, sessionId, admin.getRol());
+        String permisosCsv = String.join(",", rolService.permisosEfectivos(admin.getRol()));
+        return jwtService.generate(admin.getUsername(), JwtService.TIPO_ADMIN, sessionId, admin.getRol(), permisosCsv);
     }
 
     @Transactional(readOnly = true)
@@ -82,8 +94,12 @@ public class AuthService {
      * sesion anterior en otro celular apenas ese celular haga su proxima request. Mismo
      * bloqueo temporal por intentos fallidos que el admin (ronda 6, punto 49).
      */
-    @Transactional
     public JwtService.TokenData loginCadete(String username, String rawPassword) {
+        return loginCadete(username, rawPassword, null);
+    }
+
+    @Transactional
+    public JwtService.TokenData loginCadete(String username, String rawPassword, Integer versionApp) {
         Cadete cadete = cadetes.findByUsername(username == null ? "" : username.trim())
                 .filter(Cadete::isActivo)
                 .orElse(null);
@@ -94,11 +110,23 @@ public class AuthService {
             if (cadete != null) registrarFalloCadete(cadete);
             throw new BadCredentialsException("Usuario o contrasena incorrectos");
         }
+        if (cadete.isDebeCambiarPassword()) {
+            if (passwordTemporalVencida(cadete.getPasswordTemporalExpira())) {
+                throw new BadCredentialsException("La contraseña temporal venció. Pedile a la cadetería que te la reenvíe.");
+            }
+            // Entró a tiempo: la temporal pasa a ser su contraseña normal — puede cambiarla cuando quiera desde su perfil.
+            cadete.setDebeCambiarPassword(false);
+            cadete.setPasswordTemporalExpira(null);
+        }
         if ("SEMANAL".equals(cadete.getModalidadPago()) && !cadete.isHabilitadoPago()) {
             throw new BadCredentialsException("No podes ingresar: falta pagar la cuota semanal. Comunicate con la cadeteria.");
         }
         cadete.setIntentosFallidos(0);
         cadete.setBloqueadoHasta(null);
+        if (versionApp != null) {
+            cadete.setUltimaVersionApp(versionApp);
+            cadete.setUltimaVersionAppEn(Instant.now());
+        }
         String sessionId = UUID.randomUUID().toString();
         cadete.setSessionToken(sessionId);
         cadetes.save(cadete);
@@ -120,6 +148,11 @@ public class AuthService {
         todosLosCadetes.forEach(c -> c.setSessionToken(UUID.randomUUID().toString()));
         cadetes.saveAll(todosLosCadetes);
         return todosLosAdmins.size() + todosLosCadetes.size();
+    }
+
+    /** Mejora 2026-09-17: sin fecha de vencimiento cargada, se trata como vencida (no debería pasar, pero es la opción segura). */
+    private boolean passwordTemporalVencida(Instant expira) {
+        return expira == null || expira.isBefore(Instant.now());
     }
 
     private boolean bloqueado(Instant bloqueadoHasta) {

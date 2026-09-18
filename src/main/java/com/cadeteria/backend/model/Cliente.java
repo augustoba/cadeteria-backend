@@ -1,8 +1,10 @@
 package com.cadeteria.backend.model;
 
+import com.cadeteria.backend.util.TelefonoUtils;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
@@ -43,6 +45,12 @@ public class Cliente {
 
     /** Hasta cuándo ya se le liquidó — null = nunca se liquidó, cuenta desde el primer pedido. */
     private Instant cuentaCorrienteLiquidadaHasta;
+
+    /** Solo al crear — el teléfono es el @Id, no se puede tocar en un update (mejora 2026-09-17). */
+    @PrePersist
+    private void normalizarTelefono() {
+        this.telefono = TelefonoUtils.normalizar(this.telefono);
+    }
 
     public String getTelefono() {
         return telefono;

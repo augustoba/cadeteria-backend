@@ -30,6 +30,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -285,7 +286,44 @@ public class CadeteService {
             throw new BadRequestException("La contraseña nueva no puede estar vacía.");
         }
         c.setPasswordHash(passwordEncoder.encode(nueva));
+        c.setDebeCambiarPassword(false);
+        c.setPasswordTemporalExpira(null);
         return repo.save(c);
+    }
+
+    /** Lo usa SolicitudCadeteService.aprobar justo después de crear el cadete con contraseña temporal. */
+    public void marcarPasswordTemporal(String cadeteId, java.time.Instant expira) {
+        Cadete c = get(cadeteId);
+        c.setDebeCambiarPassword(true);
+        c.setPasswordTemporalExpira(expira);
+        repo.save(c);
+    }
+
+    /**
+     * El admin le reenvía una contraseña temporal nueva (mejora 2026-09-17): para cuando
+     * la original venció sin que el cadete llegara a entrar. Cierra cualquier sesión
+     * abierta con la contraseña vieja, igual que el reseteo de contraseña de un admin.
+     */
+    public String reenviarPasswordTemporal(String id) {
+        Cadete c = get(id);
+        String passwordTemporal = generarPasswordTemporal();
+        c.setPasswordHash(passwordEncoder.encode(passwordTemporal));
+        c.setSessionToken(UUID.randomUUID().toString());
+        c.setDebeCambiarPassword(true);
+        c.setPasswordTemporalExpira(java.time.Instant.now().plusSeconds(10 * 60L));
+        repo.save(c);
+        return passwordTemporal;
+    }
+
+    private static final String ALFABETO_PASSWORD_TEMPORAL = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+    private final SecureRandom randomPasswordTemporal = new SecureRandom();
+
+    private String generarPasswordTemporal() {
+        StringBuilder sb = new StringBuilder(10);
+        for (int i = 0; i < 10; i++) {
+            sb.append(ALFABETO_PASSWORD_TEMPORAL.charAt(randomPasswordTemporal.nextInt(ALFABETO_PASSWORD_TEMPORAL.length())));
+        }
+        return sb.toString();
     }
 
     /** El cadete cambia su propio teléfono desde la app (si cambia de celular/línea). */

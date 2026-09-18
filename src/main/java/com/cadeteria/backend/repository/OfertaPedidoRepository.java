@@ -24,4 +24,8 @@ public interface OfertaPedidoRepository extends JpaRepository<OfertaPedido, Stri
     /** Rechazos con motivo cargado, para la sección "Motivos de rechazo" de Métricas. */
     List<OfertaPedido> findByResultadoIdAndOfrecidoEnBetweenOrderByOfrecidoEnDesc(
             String resultadoId, java.time.Instant desde, java.time.Instant hasta);
+
+    /** Para el tiempo de respuesta promedio por cadete (mejora 2026-09-17) — solo las que el cadete realmente contestó. */
+    List<OfertaPedido> findByCadeteIdAndRespondidoEnIsNotNullAndOfrecidoEnBetween(
+            String cadeteId, java.time.Instant desde, java.time.Instant hasta);
 }

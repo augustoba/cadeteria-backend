@@ -10,6 +10,8 @@ import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.stereotype.Component;
 
+import java.util.Set;
+
 /**
  * El endpoint /ws es permitAll a nivel HTTP (SecurityConfig) porque lo comparten el
  * panel, la app de cadetes y ahora el gateway de WhatsApp. Sin este interceptor,
@@ -17,15 +19,25 @@ import org.springframework.stereotype.Component;
  * (veria telefonos y textos de clientes en texto plano) o mandar acks falsos a
  * /app/whatsapp/ack. Se exige un token compartido (app.whatsapp.gateway-token) solo en
  * el CONNECT, y solo los destinos de whatsapp lo verifican despues — el resto de los
- * topics/queues (chat, ubicaciones, etc.) sigue igual que antes.
+ * topics/queues (chat, ubicaciones, etc.) sigue igual que antes. /topic/whatsapp/panel es
+ * la excepción: lo consume el panel admin (ya autenticado por el login normal), no el
+ * gateway, así que no se incluye acá.
  */
 @Component
 public class WhatsappGatewayAuthInterceptor implements ChannelInterceptor {
 
     private static final Logger log = LoggerFactory.getLogger(WhatsappGatewayAuthInterceptor.class);
     private static final String ATRIBUTO_ES_GATEWAY = "esGatewayWhatsapp";
-    private static final String DESTINO_COMANDOS = "/topic/whatsapp/comandos";
-    private static final String DESTINO_ACK = "/app/whatsapp/ack";
+    private static final Set<String> DESTINOS_GATEWAY = Set.of(
+            "/topic/whatsapp/comandos",
+            "/topic/whatsapp/vincular-chip",
+            "/topic/whatsapp/dar-de-baja-chip",
+            "/app/whatsapp/ack",
+            "/app/whatsapp/entrega",
+            "/app/whatsapp/respuesta",
+            "/app/whatsapp/chips-estado",
+            "/app/whatsapp/pairing-codigo"
+    );
 
     private final AppProperties props;
 
@@ -47,8 +59,7 @@ public class WhatsappGatewayAuthInterceptor implements ChannelInterceptor {
             return message;
         }
 
-        boolean esDestinoWhatsapp = DESTINO_COMANDOS.equals(accessor.getDestination())
-                || DESTINO_ACK.equals(accessor.getDestination());
+        boolean esDestinoWhatsapp = DESTINOS_GATEWAY.contains(accessor.getDestination());
         if (!esDestinoWhatsapp) return message;
 
         boolean autorizado = accessor.getSessionAttributes() != null

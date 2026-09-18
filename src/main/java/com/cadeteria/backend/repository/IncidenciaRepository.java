@@ -18,4 +18,7 @@ public interface IncidenciaRepository extends JpaRepository<Incidencia, String> 
 
     /** Para bloquear la asignación automática a un cadete con un reclamo grave sin resolver. */
     boolean existsByCadeteIdAndPrioridadAndEstado(String cadeteId, String prioridad, String estado);
+
+    /** Para el score de riesgo de la tabla comparativa de cadetes (mejora 2026-09-17). */
+    long countByCadeteIdAndEstado(String cadeteId, String estado);
 }
