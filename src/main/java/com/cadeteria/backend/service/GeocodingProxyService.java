@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.net.URLEncoder;
@@ -31,6 +32,11 @@ import java.util.regex.Pattern;
  * contingencias de bajo impacto según el propio comentario original ("rara vez suma
  * cobertura nueva"), no hacía falta duplicar las 4 en Java para esta página secundaria.
  * El panel admin (nuevo pedido, zonas) sigue con las 4 fuentes de siempre, sin cambios.
+ * <p>
+ * Geoapify admite VARIAS keys (varias cuentas gratuitas propias) separadas por coma o salto
+ * de línea en Configuración ("geoapify_keys") — {@link ApiKeyPoolService} rota a la siguiente
+ * apenas una se queda sin cupo (HTTP 429/403). Si no hay ninguna cargada en Configuración,
+ * se usa la de application.yml (env var GEOAPIFY_KEY) como valor legado.
  */
 @Service
 public class GeocodingProxyService {
@@ -43,18 +49,23 @@ public class GeocodingProxyService {
     private static final String NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
     private static final String NOMINATIM_REVERSE_URL = "https://nominatim.openstreetmap.org/reverse";
     private static final String GEOAPIFY_URL = "https://api.geoapify.com/v1/geocode/search";
+    public static final String PROVEEDOR_GEOAPIFY = "geoapify";
+    public static final String CONFIG_GEOAPIFY_KEYS = "geoapify_keys";
+    private static final int MAX_INTENTOS_POR_PROVEEDOR = 10;
     /** left,top,right,bottom de la provincia de Tucumán, para sesgar la búsqueda. */
     private static final String TUCUMAN_VIEWBOX = "-66.2,-26.0,-64.4,-28.1";
     private static final Pattern NUMERO_FINAL = Pattern.compile("^(.+?)[\\s,]*(\\d{1,6})\\s*$");
 
     private final RestClient restClient = RestClient.create();
-    private final String geoapifyKey;
+    private final ApiKeyPoolService apiKeyPool;
+    private final String geoapifyKeyLegado;
 
     /** Último resultado real de Nominatim — lo lee el panel de salud (ver SaludController), no hace un ping aparte. */
     private volatile boolean nominatimOk = true;
 
-    public GeocodingProxyService(AppProperties props) {
-        this.geoapifyKey = props.getMaps().getGeoapifyKey();
+    public GeocodingProxyService(AppProperties props, ApiKeyPoolService apiKeyPool) {
+        this.apiKeyPool = apiKeyPool;
+        this.geoapifyKeyLegado = props.getMaps().getGeoapifyKey();
     }
 
     public boolean isNominatimOk() {
@@ -130,30 +141,42 @@ public class GeocodingProxyService {
     }
 
     private List<GeoAddress> queryGeoapify(String texto, Integer numeroEsperado) {
-        if (geoapifyKey == null || geoapifyKey.isBlank()) return List.of();
-        String url = GEOAPIFY_URL + "?apiKey=" + geoapifyKey + "&format=json&limit=12&lang=es"
-                + "&filter=countrycode:ar&bias=rect:" + TUCUMAN_VIEWBOX
-                + "&text=" + encode(texto + ", Tucumán");
-        try {
-            Map<String, Object> data = restClient.get().uri(url)
-                    .retrieve()
-                    .body(new ParameterizedTypeReference<Map<String, Object>>() {});
-            if (data == null) return List.of();
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> results = (List<Map<String, Object>>) data.get("results");
-            if (results == null) return List.of();
-            List<GeoAddress> out = new ArrayList<>();
-            for (Map<String, Object> r : results) {
-                String state = String.valueOf(r.getOrDefault("state", ""));
-                if (!state.toLowerCase().contains("tucum") || blank(r.get("street"))
-                        || r.get("lat") == null || r.get("lon") == null) continue;
-                out.add(desdeGeoapify(r, numeroEsperado));
+        for (int intento = 0; intento < MAX_INTENTOS_POR_PROVEEDOR; intento++) {
+            String key = apiKeyPool.siguienteClave(PROVEEDOR_GEOAPIFY, CONFIG_GEOAPIFY_KEYS, geoapifyKeyLegado);
+            if (key == null || key.isBlank()) return List.of();
+            String url = GEOAPIFY_URL + "?apiKey=" + key + "&format=json&limit=12&lang=es"
+                    + "&filter=countrycode:ar&bias=rect:" + TUCUMAN_VIEWBOX
+                    + "&text=" + encode(texto + ", Tucumán");
+            try {
+                apiKeyPool.registrarUso(PROVEEDOR_GEOAPIFY, CONFIG_GEOAPIFY_KEYS, key);
+                Map<String, Object> data = restClient.get().uri(url)
+                        .retrieve()
+                        .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+                if (data == null) return List.of();
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> results = (List<Map<String, Object>>) data.get("results");
+                if (results == null) return List.of();
+                List<GeoAddress> out = new ArrayList<>();
+                for (Map<String, Object> r : results) {
+                    String state = String.valueOf(r.getOrDefault("state", ""));
+                    if (!state.toLowerCase().contains("tucum") || blank(r.get("street"))
+                            || r.get("lat") == null || r.get("lon") == null) continue;
+                    out.add(desdeGeoapify(r, numeroEsperado));
+                }
+                return out;
+            } catch (HttpClientErrorException e) {
+                if (e.getStatusCode().value() == 429 || e.getStatusCode().value() == 403) {
+                    apiKeyPool.marcarAgotada(PROVEEDOR_GEOAPIFY, CONFIG_GEOAPIFY_KEYS, key);
+                    continue;
+                }
+                log.warn("Fallo la búsqueda en Geoapify de \"{}\": {}", texto, e.getMessage());
+                return List.of();
+            } catch (Exception e) {
+                log.warn("Fallo la búsqueda en Geoapify de \"{}\": {}", texto, e.getMessage());
+                return List.of();
             }
-            return out;
-        } catch (Exception e) {
-            log.warn("Fallo la búsqueda en Geoapify de \"{}\": {}", texto, e.getMessage());
-            return List.of();
         }
+        return List.of();
     }
 
     private GeoAddress desdeNominatim(Map<String, Object> p, Map<String, Object> address, Integer numeroEsperado) {

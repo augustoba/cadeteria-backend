@@ -455,8 +455,16 @@ public class PedidoService {
      * ofrece igual al elegible más cercano por GPS en línea recta al origen del pedido. Un
      * cadete sin ubicación cargada todavía no entra en este fallback porque no hay con qué
      * calcular la distancia.
+     * <p>
+     * Si el pedido requiere BICI y el viaje (origen→destino) supera {@code distancia_maxima_bici_km},
+     * no se ofrece a nadie automáticamente — una bici no puede cubrir esa distancia. Es un
+     * límite de la ASIGNACIÓN AUTOMÁTICA nomás; el admin puede seguir asignando a mano si le
+     * parece razonable en el caso puntual.
      */
     private Optional<Cadete> buscarCandidato(Pedido pedido) {
+        if (viajeSuperaTopeDeBici(pedido)) {
+            return Optional.empty();
+        }
         Set<String> zonasCompatibles = zonasCompatibles(pedido.getZona());
         List<OfertaPedido> ofertasPrevias = ofertaRepo.findByPedidoId(pedido.getId());
         Set<String> yaIntentados = ofertasPrevias.stream().map(o -> o.getCadete().getId()).collect(Collectors.toSet());
@@ -505,6 +513,15 @@ public class PedidoService {
                                 GeocodingService.distanciaKm(c.getLat(), c.getLng(), pedido.getOrigenLat(), pedido.getOrigenLng()))
                         .thenComparing(this::tienePedidosPendientes)
                         .thenComparing(Cadete::getOrdenColaEspera));
+    }
+
+    private boolean viajeSuperaTopeDeBici(Pedido pedido) {
+        if (!"BICI".equals(pedido.getTipoVehiculoRequerido().getId())) return false;
+        BigDecimal topeKm = configuracionService.getBigDecimal("distancia_maxima_bici_km", BigDecimal.ZERO);
+        if (topeKm.signum() <= 0) return false; // 0 o sin cargar = sin límite
+        double distanciaViaje = GeocodingService.distanciaKm(
+                pedido.getOrigenLat(), pedido.getOrigenLng(), pedido.getDestinoLat(), pedido.getDestinoLng());
+        return distanciaViaje > topeKm.doubleValue();
     }
 
     /**
