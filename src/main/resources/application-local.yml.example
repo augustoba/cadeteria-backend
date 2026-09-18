@@ -2,6 +2,10 @@
 # credenciales reales de MySQL. Spring lo toma automaticamente si corres con
 # el perfil `local`: ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 # o seteá las variables de entorno DB_USER / DB_PASSWORD y no hace falta este archivo.
+#
+# Las API keys de ruteo (OpenRouteService, GraphHopper) NO van acá — se cargan desde
+# el panel (Configuración → Rutas), porque varían por cliente. OSRM (primera opción,
+# gratis) no necesita key.
 
 spring:
   datasource:
@@ -16,7 +20,5 @@ app:
     gateway-url: http://192.168.0.50:8080
     gateway-user: sms
     gateway-password: cambiar
-  maps:
-    open-route-service-key: pon-aca-tu-api-key-gratuita-de-openrouteservice
   fcm:
     credenciales-path: C:/ruta/a/tu/firebase-service-account.json

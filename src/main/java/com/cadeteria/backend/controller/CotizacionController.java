@@ -23,10 +23,9 @@ public class CotizacionController {
         this.service = service;
     }
 
-    public record CotizacionResponse(BigDecimal precioSugerido, String metodo, String zonaId, String zonaNombre,
-                                      Double distanciaKm, BigDecimal recargoPorDinero) {
+    public record CotizacionResponse(BigDecimal precioSugerido, String metodo, String zonaId, String zonaNombre, Double distanciaKm) {
         static CotizacionResponse vacia() {
-            return new CotizacionResponse(null, null, null, null, null, null);
+            return new CotizacionResponse(null, null, null, null, null);
         }
     }
 
@@ -34,10 +33,9 @@ public class CotizacionController {
     public CotizacionResponse cotizar(
             @RequestParam double origenLat, @RequestParam double origenLng,
             @RequestParam(required = false) Double destinoLat, @RequestParam(required = false) Double destinoLng,
-            @RequestParam(required = false) BigDecimal montoDeclarado,
-            @RequestParam(required = false) String metodo) {
-        return service.cotizar(origenLat, origenLng, destinoLat, destinoLng, montoDeclarado, metodo)
-                .map(c -> new CotizacionResponse(c.precioSugerido(), c.metodo(), c.zonaId(), c.zonaNombre(), c.distanciaKm(), c.recargoPorDinero()))
+            @RequestParam(required = false) BigDecimal montoDeclarado) {
+        return service.cotizar(origenLat, origenLng, destinoLat, destinoLng, montoDeclarado)
+                .map(c -> new CotizacionResponse(c.precioSugerido(), c.metodo(), c.zonaId(), c.zonaNombre(), c.distanciaKm()))
                 .orElseGet(CotizacionResponse::vacia);
     }
 }

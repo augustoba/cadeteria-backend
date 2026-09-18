@@ -417,11 +417,7 @@ public class PedidoService {
     /** Candidato sugerido para asignacion (spec 5.1) — el admin lo confirma con si/no antes de ofertarlo. */
     @Transactional(readOnly = true)
     public Optional<Cadete> sugerirCandidato(String pedidoId) {
-        Pedido pedido = get(pedidoId);
-        Set<String> yaOfertados = ofertaRepo.findByPedidoId(pedidoId).stream()
-                .map(o -> o.getCadete().getId())
-                .collect(Collectors.toSet());
-        return buscarCandidato(pedido, yaOfertados);
+        return buscarCandidato(get(pedidoId));
     }
 
     /**
@@ -443,55 +439,72 @@ public class PedidoService {
     }
 
     /**
-     * Orden de prioridad (mejora 2026-09-17, pedida por el dueño): primero cadetes SIN
-     * pedidos pendientes y CERCA del origen (dentro de {@code asignacion_radio_km}),
-     * después sin pedidos pero lejos, después con pedidos y cerca, y por último con
-     * pedidos y lejos — dentro de cada uno de esos 4 grupos, FIFO de siempre
-     * ({@link Cadete#getOrdenColaEspera()}). Un cadete lejos NUNCA queda excluido del
-     * todo, solo pospuesto — así un pedido no se queda sin nadie solo porque todos
-     * están un poco lejos.
+     * Primero busca candidato dentro de la zona del pedido (o una aledaña). Un cadete que
+     * ya rechazó ESTE pedido puntual "max_rechazos_por_pedido" veces (default 3) queda
+     * afuera de él — salvo que el pedido ya lleve "minutos_pedido_urgente_reintentar"
+     * minutos (default 30) sin poder asignarse, en cuyo caso se ignora ese límite para que
+     * un pedido que todos rechazan no quede flotando para siempre. Una oferta vencida sin
+     * respuesta ("no lo vio") NO cuenta como rechazo ni lo excluye, pero sí lo manda al
+     * final de la cola: se prueba primero con cadetes a los que nunca se les ofreció este
+     * pedido. Tampoco se le ofrece a un cadete que ya tiene "asignacion_automatica_max_viajes_cadete"
+     * viajes sin terminar encima (independiente de su propio tope maxViajesSimultaneos,
+     * que es cuánto puede cargar él, no cuánto quiere darle de una el sistema).
      * <p>
-     * Si el pedido requiere BICI y el viaje (origen→destino) supera
-     * {@code distancia_maxima_bici_km}, no se ofrece a nadie automáticamente — una bici
-     * no puede cubrir esa distancia. Es un límite de la ASIGNACIÓN AUTOMÁTICA nomás; el
-     * admin puede seguir asignando a mano si le parece razonable en el caso puntual
-     * (spec: número todavía no definido, se ajusta en Configuración).
+     * Si nadie matchea zona (ej. todavía no hay zonas cargadas para donde está el cadete,
+     * o el pedido cayó en una zona sin cadetes cerca), en vez de dejarlo sin nadie se lo
+     * ofrece igual al elegible más cercano por GPS en línea recta al origen del pedido. Un
+     * cadete sin ubicación cargada todavía no entra en este fallback porque no hay con qué
+     * calcular la distancia.
      */
-    private Optional<Cadete> buscarCandidato(Pedido pedido, Set<String> excluirCadeteIds) {
-        if (viajeSuperaTopeDeBici(pedido)) {
-            return Optional.empty();
-        }
+    private Optional<Cadete> buscarCandidato(Pedido pedido) {
         Set<String> zonasCompatibles = zonasCompatibles(pedido.getZona());
-        BigDecimal radioKm = configuracionService.getBigDecimal("asignacion_radio_km", BigDecimal.valueOf(5));
-        return cadeteRepo.findAll().stream()
+        List<OfertaPedido> ofertasPrevias = ofertaRepo.findByPedidoId(pedido.getId());
+        Set<String> yaIntentados = ofertasPrevias.stream().map(o -> o.getCadete().getId()).collect(Collectors.toSet());
+        Map<String, Long> rechazosPorCadete = ofertasPrevias.stream()
+                .filter(o -> "RECHAZADO".equals(o.getResultado().getId()))
+                .collect(Collectors.groupingBy(o -> o.getCadete().getId(), Collectors.counting()));
+
+        int maxRechazos = configuracionService.getInt("max_rechazos_por_pedido", 3);
+        int minutosUrgente = configuracionService.getInt("minutos_pedido_urgente_reintentar", 30);
+        int maxViajesAsignacion = configuracionService.getInt("asignacion_automatica_max_viajes_cadete", 1);
+        boolean pedidoUrgente = pedido.getCreadoEn().isBefore(Instant.now().minus(Duration.ofMinutes(minutosUrgente)));
+
+        List<Cadete> elegibles = cadeteRepo.findAll().stream()
                 .filter(Cadete::isActivo)
                 .filter(c -> "LIBRE".equals(c.getEstado().getId()))
                 .filter(this::puedeRecibirViajes)
-                .filter(c -> !excluirCadeteIds.contains(c.getId()))
+                .filter(c -> pedidoUrgente || rechazosPorCadete.getOrDefault(c.getId(), 0L) < maxRechazos)
                 .filter(c -> c.getTipoVehiculo().getId().equals(pedido.getTipoVehiculoRequerido().getId()))
-                .filter(c -> c.getZonaActual() != null && zonasCompatibles.contains(c.getZonaActual().getId()))
                 .filter(c -> dentroDeTopes(c, pedido))
+                .filter(c -> cantidadPedidosPendientes(c) < maxViajesAsignacion)
                 .filter(this::dentroDeTurno)
                 .filter(c -> !incidenciaRepo.existsByCadeteIdAndPrioridadAndEstado(c.getId(), "GRAVE", "ABIERTA"))
-                .min(Comparator.comparing(this::tienePedidosPendientes)
-                        .thenComparing((Cadete c) -> lejosDelOrigen(c, pedido, radioKm))
+                .toList();
+
+        Comparator<Cadete> prioridad = Comparator
+                .comparing((Cadete c) -> yaIntentados.contains(c.getId()))
+                .thenComparing(this::tienePedidosPendientes);
+        // Apagado por defecto: con esto prendido, entre cadetes libres igual de disponibles
+        // se prioriza al que históricamente rechaza menos ofertas, en vez de solo el orden
+        // FIFO de la cola de espera (pedido del dueño: en horas flojas, no siempre conviene
+        // ofrecerle primero al que está hace más tiempo libre si suele rechazar casi todo).
+        if (configuracionService.getBoolean("asignacion_prioriza_ranking_aceptacion", false)) {
+            prioridad = prioridad.thenComparingDouble(this::tasaRechazoHistorica);
+        }
+        prioridad = prioridad.thenComparing(Cadete::getOrdenColaEspera);
+
+        Optional<Cadete> enZona = elegibles.stream()
+                .filter(c -> c.getZonaActual() != null && zonasCompatibles.contains(c.getZonaActual().getId()))
+                .min(prioridad);
+        if (enZona.isPresent()) return enZona;
+
+        return elegibles.stream()
+                .filter(c -> c.getLat() != null && c.getLng() != null)
+                .min(Comparator.comparing((Cadete c) -> yaIntentados.contains(c.getId()))
+                        .thenComparingDouble(c ->
+                                GeocodingService.distanciaKm(c.getLat(), c.getLng(), pedido.getOrigenLat(), pedido.getOrigenLng()))
+                        .thenComparing(this::tienePedidosPendientes)
                         .thenComparing(Cadete::getOrdenColaEspera));
-    }
-
-    /** true si el cadete no mandó ubicación todavía, o si está a más del radio configurado del origen del pedido. */
-    private boolean lejosDelOrigen(Cadete cadete, Pedido pedido, BigDecimal radioKm) {
-        if (cadete.getLat() == null || cadete.getLng() == null) return true;
-        double distancia = GeocodingService.distanciaKm(cadete.getLat(), cadete.getLng(), pedido.getOrigenLat(), pedido.getOrigenLng());
-        return distancia > radioKm.doubleValue();
-    }
-
-    private boolean viajeSuperaTopeDeBici(Pedido pedido) {
-        if (!"BICI".equals(pedido.getTipoVehiculoRequerido().getId())) return false;
-        BigDecimal topeKm = configuracionService.getBigDecimal("distancia_maxima_bici_km", BigDecimal.ZERO);
-        if (topeKm.signum() <= 0) return false; // 0 o sin cargar = sin límite
-        double distanciaViaje = GeocodingService.distanciaKm(
-                pedido.getOrigenLat(), pedido.getOrigenLng(), pedido.getDestinoLat(), pedido.getDestinoLng());
-        return distanciaViaje > topeKm.doubleValue();
     }
 
     /**
@@ -501,7 +514,23 @@ public class PedidoService {
      * curso, aunque este último se haya puesto libre antes (mejora pedida por el dueño).
      */
     private boolean tienePedidosPendientes(Cadete cadete) {
-        return repo.countByCadeteAsignadoIdAndEstadoIdIn(cadete.getId(), ESTADOS_OCUPAN_CADETE) > 0;
+        return cantidadPedidosPendientes(cadete) > 0;
+    }
+
+    private long cantidadPedidosPendientes(Cadete cadete) {
+        return repo.countByCadeteAsignadoIdAndEstadoIdIn(cadete.getId(), ESTADOS_OCUPAN_CADETE);
+    }
+
+    /**
+     * % histórico de rechazos sobre el total de ofertas ya resueltas (aceptadas + rechazadas,
+     * de todos los pedidos, no solo este) — 0 si todavía no tuvo ninguna. Usado solo como
+     * criterio de orden cuando "asignacion_prioriza_ranking_aceptacion" está prendido.
+     */
+    private double tasaRechazoHistorica(Cadete cadete) {
+        long aceptados = ofertaRepo.countByCadeteIdAndResultadoId(cadete.getId(), "ACEPTADO");
+        long rechazados = ofertaRepo.countByCadeteIdAndResultadoId(cadete.getId(), "RECHAZADO");
+        long total = aceptados + rechazados;
+        return total == 0 ? 0.0 : (double) rechazados / total;
     }
 
     /**
@@ -1033,10 +1062,7 @@ public class PedidoService {
         fcmService.enviar(cadeteQueNoAcepto.getFcmToken(), "Viaje quitado",
                 "Se te quito el viaje", Map.of("tipo", "VIAJE_QUITADO", "pedidoId", pedido.getId()));
 
-        Set<String> yaOfertados = ofertaRepo.findByPedidoId(pedido.getId()).stream()
-                .map(o -> o.getCadete().getId())
-                .collect(Collectors.toSet());
-        Optional<Cadete> siguiente = buscarCandidato(pedido, yaOfertados);
+        Optional<Cadete> siguiente = buscarCandidato(pedido);
         if (siguiente.isPresent()) {
             ofertar(pedido, siguiente.get());
         } else {
@@ -1125,10 +1151,7 @@ public class PedidoService {
         if (!configuracionService.getBoolean("asignacion_automatica", false)) return;
         List<Pedido> sinAsignar = repo.findByEstadoIdInOrderByCreadoEnDesc(List.of("SIN_ASIGNAR"));
         for (Pedido p : sinAsignar) {
-            Set<String> yaOfertados = ofertaRepo.findByPedidoId(p.getId()).stream()
-                    .map(o -> o.getCadete().getId())
-                    .collect(Collectors.toSet());
-            buscarCandidato(p, yaOfertados).ifPresent(c -> ofertar(p, c));
+            buscarCandidato(p).ifPresent(c -> ofertar(p, c));
         }
     }
 

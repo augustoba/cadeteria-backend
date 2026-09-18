@@ -114,6 +114,19 @@ public class DataSeeder implements CommandLineRunner {
         // Apagada por defecto: hasta que el admin la prenda a mano, asignar sigue siendo
         // 100% manual (boton "Asignar" del dashboard, con sugerencia del sistema).
         configuracionRepo.save(config("asignacion_automatica", "false"));
+        // Reintentos de asignacion (PedidoService.buscarCandidato): despues de este numero
+        // de rechazos explicitos de un mismo cadete para un mismo pedido, se lo deja de
+        // ofertar — salvo que el pedido ya lleve "minutos_pedido_urgente_reintentar" sin
+        // poder asignarse, en cuyo caso se ignora el limite para que no quede flotando.
+        configuracionRepo.save(config("max_rechazos_por_pedido", "3"));
+        configuracionRepo.save(config("minutos_pedido_urgente_reintentar", "30"));
+        // Tope de viajes sin terminar que la asignacion automatica/sugerida le puede dar a
+        // UN cadete, independiente de su maxViajesSimultaneos individual (que es el techo
+        // que el cadete puede cargar, no cuanto quiere darle el admin de una sola vez).
+        configuracionRepo.save(config("asignacion_automatica_max_viajes_cadete", "1"));
+        // Apagado por defecto: si se prende, entre cadetes libres igualmente disponibles se
+        // prioriza al que historicamente rechaza menos ofertas por sobre el orden FIFO puro.
+        configuracionRepo.save(config("asignacion_prioriza_ranking_aceptacion", "false"));
         // Umbrales de los avisos de demora al cadete (PedidoService.avisosDemora).
         configuracionRepo.save(config("alerta_demora_retiro_min", "30"));
         configuracionRepo.save(config("alerta_demora_finalizacion_min", "60"));
@@ -121,6 +134,21 @@ public class DataSeeder implements CommandLineRunner {
         // upload preset, no son datos secretos. Vacio hasta que se cargen desde el panel.
         configuracionRepo.save(config("cloudinary_cloud_name", ""));
         configuracionRepo.save(config("cloudinary_upload_preset", ""));
+        // API keys de ruteo por calle (RutaService) — varian por cliente, se cargan desde el
+        // panel. Vacias por defecto: sin ellas, la cotizacion por km y la ruta al cadete
+        // siguen funcionando con OSRM (gratis, sin key) o linea recta como ultimo respaldo.
+        configuracionRepo.save(config("open_route_service_key", ""));
+        configuracionRepo.save(config("open_route_service_url", ""));
+        configuracionRepo.save(config("graphhopper_key", ""));
+        // Cotizacion automatica (CotizacionService) — valores de ejemplo para que la demo
+        // (DemoPedidoSeeder) ya sugiera precio en "Nuevo pedido" sin que el admin tenga que
+        // cargar nada a mano primero. AUTOMATICO = zona si tiene tarifa, si no por km.
+        configuracionRepo.save(config("metodo_cotizacion", "AUTOMATICO"));
+        configuracionRepo.save(config("precio_base_viaje", "2000"));
+        configuracionRepo.save(config("distancia_minima_km", "2"));
+        configuracionRepo.save(config("precio_por_km", "150"));
+        configuracionRepo.save(config("recargo_dinero_transportado_umbral", "10000"));
+        configuracionRepo.save(config("recargo_dinero_transportado_monto", "100"));
         // Bloqueo temporal de cuenta tras intentos fallidos de login (ronda 6, punto 49).
         configuracionRepo.save(config("max_intentos_login", "5"));
         configuracionRepo.save(config("bloqueo_login_min", "15"));
