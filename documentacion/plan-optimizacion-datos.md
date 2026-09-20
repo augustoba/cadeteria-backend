@@ -374,15 +374,22 @@ calificación. 30 cadetes = 30 queries por carga. Se reemplaza por una sola quer
 y **estaba mal**: el listado usa DNI, teléfono, usuario, calificación y datos de pago de
 verdad. Lo que no usa son 4 URLs de fotos + `cbu` + `aliasCbu`. Se sacan solo esos.
 
-- [ ] **Step 1: Confirmar que esos 6 campos no se usan en el front**
+- [ ] **Step 1: Confirmar que esos 6 campos no se usan en el listado**
+
+**Cuidado con el alcance del grep** (corregido 2026-09-20 — la versión original de este paso
+barría `features/cadetes/` entero y **nunca podía pasar**): `cadete-form.component.ts` vive
+en esa carpeta y **sí usa los 6 campos**, porque es el formulario de alta/edición. Pero carga
+por `cadetes.get(id)` → `GET /api/admin/cadetes/{id}` (`cadete.service.ts:25-26`), que pega al
+endpoint **singular** y sigue mandando todo — no es el listado. Hay que excluirlo.
 
 Run:
 ```bash
 cd admin-front && grep -rn "fotoUrl\|fotoVehiculoUrl\|fotoCarnetUrl\|fotoTarjetaVerdeUrl\|cbu\|aliasCbu" \
-  src/app/features/cadetes src/app/features/dashboard
+  src/app/features/cadetes/cadetes.component.ts src/app/features/dashboard
 ```
-Expected: sin resultados en el **listado**. Si aparece alguno, **parar** y revisar: significa
-que el listado sí lo usa y hay que sacarlo de la lista de campos a vaciar.
+Expected: **sin resultados**, salvo `dashboard.component.ts:1353` — que es un payload de
+**pedido** (`pedidos.finalizar(..., { fotoUrl: null })`), otro DTO y una escritura, no una
+lectura del listado de cadetes. Cualquier otro hit: **parar** y revisar.
 
 (La ficha del cadete y la página de seguimiento sí los usan — pero esas pegan a
 `GET /api/cadetes/{id}`, que sigue completo.)
