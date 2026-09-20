@@ -137,5 +137,29 @@ public class WebSocketPublisher {
         template.convertAndSend("/topic/whatsapp/panel", Map.of("evento", evento));
     }
 
+    /** Mismo canal que el chip de WhatsApp baneado: ninguna cuenta cargada de este proveedor tiene cupo. */
+    public void publicarAlertaApiKeyPoolAgotado(String proveedor) {
+        template.convertAndSend("/topic/admin/alertas", Map.of(
+                "tipo", "API_KEY_POOL_AGOTADO",
+                "proveedor", proveedor
+        ));
+    }
+
+    /** Aviso preventivo: a la última cuenta con cupo del proveedor le queda poco — conviene cargar otra antes de que se corte. */
+    public void publicarAlertaApiKeyPoolBajo(String proveedor, int restante) {
+        template.convertAndSend("/topic/admin/alertas", Map.of(
+                "tipo", "API_KEY_POOL_BAJO",
+                "proveedor", proveedor,
+                "restante", restante
+        ));
+    }
+
+    /** Varios envíos de SMS seguidos (cada uno tras agotar sus propios reintentos) fallaron — probablemente el gateway está caído, no solo un número puntual. */
+    public void publicarAlertaSmsGatewayCaido() {
+        template.convertAndSend("/topic/admin/alertas", Map.of(
+                "tipo", "SMS_GATEWAY_CAIDO"
+        ));
+    }
+
     public record EventoViaje(String tipo, PedidoResponse pedido) {}
 }

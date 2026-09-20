@@ -60,6 +60,8 @@ public class ApiKeyPoolService {
          *  cambia el día local (y el conteo de uso se reinicia) ya se puede volver a ofrecer sin riesgo. */
         volatile boolean agotadaPorPrediccion;
         volatile Instant actualizadoEn = Instant.now();
+        /** Para no repetir el aviso de "cupo bajo" en cada uso mientras siga bajo — se reinicia solo al cambiar el día. */
+        volatile boolean avisoBajoEnviadoHoy;
 
         ClaveEstado(String valor) {
             this.valor = valor;
@@ -71,6 +73,7 @@ public class ApiKeyPoolService {
                 diaUsadas = hoy;
                 usadasHoy = 0;
                 restanteInformado = null;
+                avisoBajoEnviadoHoy = false;
                 if (agotadaPorPrediccion) {
                     estado = Estado.OK;
                     agotadaEn = null;
@@ -79,29 +82,35 @@ public class ApiKeyPoolService {
             }
         }
 
-        synchronized void registrarUso(Integer limiteDiarioEstimado) {
+        /** @return true si esta key recién pasó a AGOTADA en esta llamada (transición real, no una ya conocida). */
+        synchronized boolean registrarUso(Integer limiteDiarioEstimado) {
             rotarDiaSiCorresponde();
             usadasHoy++;
             if (limiteDiarioEstimado != null && usadasHoy >= limiteDiarioEstimado) {
-                marcarAgotadaPorPrediccion();
+                return marcarAgotadaPorPrediccion();
             }
+            return false;
         }
 
-        synchronized void marcarAgotadaPorPrediccion() {
+        synchronized boolean marcarAgotadaPorPrediccion() {
             if (estado == Estado.OK) {
                 estado = Estado.AGOTADA;
                 agotadaEn = Instant.now();
                 agotadaPorPrediccion = true;
+                return true;
             }
+            return false;
         }
     }
 
     private final ConfiguracionService configuracionService;
+    private final WebSocketPublisher publisher;
     private final Map<String, List<ClaveEstado>> cache = new ConcurrentHashMap<>();
     private final Map<String, String> ultimaConfigCruda = new ConcurrentHashMap<>();
 
-    public ApiKeyPoolService(ConfiguracionService configuracionService) {
+    public ApiKeyPoolService(ConfiguracionService configuracionService, WebSocketPublisher publisher) {
         this.configuracionService = configuracionService;
+        this.publisher = publisher;
     }
 
     /** Como {@link #siguienteClave(String, String, String)} pero sin valor legado por defecto. */
@@ -134,10 +143,12 @@ public class ApiKeyPoolService {
     /** Marcar como sin cupo por un 429/403 REAL del proveedor — a diferencia de una predicción propia, espera las 24hs completas antes de reintentar, porque no sabemos a qué hora exacta reinicia el cupo. */
     public void marcarAgotada(String proveedor, String configKey, String valor) {
         buscar(proveedor, configKey, valor).ifPresent(c -> {
+            boolean eraOk = c.estado == Estado.OK;
             c.estado = Estado.AGOTADA;
             c.agotadaEn = Instant.now();
             c.agotadaPorPrediccion = false;
             c.actualizadoEn = Instant.now();
+            if (eraOk) avisarSiPoolAgotado(proveedor);
         });
     }
 
@@ -150,7 +161,14 @@ public class ApiKeyPoolService {
      */
     public void registrarUso(String proveedor, String configKey, String valor) {
         Integer limite = LIMITE_DIARIO_ESTIMADO.get(proveedor);
-        buscar(proveedor, configKey, valor).ifPresent(c -> c.registrarUso(limite));
+        buscar(proveedor, configKey, valor).ifPresent(c -> {
+            boolean recienAgotada = c.registrarUso(limite);
+            if (recienAgotada) {
+                avisarSiPoolAgotado(proveedor);
+            } else if (limite != null) {
+                avisarSiCupoBajo(proveedor, c, Math.max(0, limite - c.usadasHoy), limite);
+            }
+        });
     }
 
     /**
@@ -162,10 +180,32 @@ public class ApiKeyPoolService {
         buscar(proveedor, configKey, valor).ifPresent(c -> {
             c.restanteInformado = restante;
             c.actualizadoEn = Instant.now();
-            if (restante != null && restante <= 0) {
-                c.marcarAgotadaPorPrediccion();
+            if (restante == null) return;
+            if (restante <= 0) {
+                if (c.marcarAgotadaPorPrediccion()) avisarSiPoolAgotado(proveedor);
+            } else {
+                Integer limite = LIMITE_DIARIO_ESTIMADO.get(proveedor);
+                avisarSiCupoBajo(proveedor, c, restante, limite);
             }
         });
+    }
+
+    /** Todas las cuentas cargadas de este proveedor se quedaron sin cupo a la vez — recién ahí vale la alerta. */
+    private void avisarSiPoolAgotado(String proveedor) {
+        List<ClaveEstado> claves = cache.getOrDefault(proveedor, List.of());
+        if (!claves.isEmpty() && claves.stream().allMatch(c -> c.estado == Estado.AGOTADA)) {
+            publisher.publicarAlertaApiKeyPoolAgotado(proveedor);
+        }
+    }
+
+    /** Aviso preventivo (una vez por día por key) cuando el cupo restante cae al 10% del límite diario conocido. */
+    private void avisarSiCupoBajo(String proveedor, ClaveEstado c, int restante, Integer limiteDiario) {
+        if (limiteDiario == null || c.estado != Estado.OK || c.avisoBajoEnviadoHoy) return;
+        int umbral = Math.max(1, limiteDiario / 10);
+        if (restante <= umbral) {
+            c.avisoBajoEnviadoHoy = true;
+            publisher.publicarAlertaApiKeyPoolBajo(proveedor, restante);
+        }
     }
 
     /** Para el semáforo del panel de Configuración: estado de cada key cargada de este proveedor. */

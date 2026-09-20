@@ -11,6 +11,7 @@ import org.springframework.web.client.RestClient;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Cliente del gateway de SMS propio (android-sms-gateway sobre un Android dedicado,
@@ -33,14 +34,20 @@ public class SmsGatewayService {
     private static final Logger log = LoggerFactory.getLogger(SmsGatewayService.class);
     private static final int INTENTOS_MAXIMOS = 3;
     private static final long ESPERA_ENTRE_INTENTOS_MS = 3_000L;
+    /** Cuántos envíos seguidos tienen que agotar sus reintentos (cada uno a un número distinto) antes de sospechar del gateway entero, no de un número puntual sin señal. */
+    private static final int FALLOS_CONSECUTIVOS_PARA_AVISAR = 3;
 
     private final AppProperties props;
     private final PedidoRepository pedidoRepo;
+    private final WebSocketPublisher publisher;
     private final RestClient restClient = RestClient.create();
+    private final AtomicInteger fallosConsecutivos = new AtomicInteger(0);
+    private volatile boolean avisoActivo = false;
 
-    public SmsGatewayService(AppProperties props, PedidoRepository pedidoRepo) {
+    public SmsGatewayService(AppProperties props, PedidoRepository pedidoRepo, WebSocketPublisher publisher) {
         this.props = props;
         this.pedidoRepo = pedidoRepo;
+        this.publisher = publisher;
     }
 
     /** Uso sin pedido asociado (no hay donde marcar el fallo, solo se loguea). */
@@ -73,6 +80,7 @@ public class SmsGatewayService {
                         ))
                         .retrieve()
                         .toBodilessEntity();
+                registrarResultado(true);
                 return true;
             } catch (Exception e) {
                 log.error("Fallo el envio de SMS a {} (intento {}/{}): {}", telefono, intento, INTENTOS_MAXIMOS, e.getMessage());
@@ -80,7 +88,27 @@ public class SmsGatewayService {
             }
         }
         log.error("Se agotaron los reintentos de SMS a {} — el mensaje no se pudo enviar.", telefono);
+        registrarResultado(false);
         return false;
+    }
+
+    /**
+     * Un envío más (ya con sus propios reintentos agotados o no) — si se acumulan varios fallos
+     * SEGUIDOS de pedidos distintos, ya no es "un número sin señal" sino que probablemente el
+     * gateway completo dejó de responder. Un solo envío exitoso corta la racha. No repite el
+     * aviso mientras siga cayendo (recién vuelve a avisar tras recuperarse y volver a fallar).
+     */
+    void registrarResultado(boolean ok) {
+        if (ok) {
+            fallosConsecutivos.set(0);
+            avisoActivo = false;
+            return;
+        }
+        int fallos = fallosConsecutivos.incrementAndGet();
+        if (fallos >= FALLOS_CONSECUTIVOS_PARA_AVISAR && !avisoActivo) {
+            avisoActivo = true;
+            publisher.publicarAlertaSmsGatewayCaido();
+        }
     }
 
     private void marcarFallido(String pedidoId) {
