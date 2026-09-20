@@ -54,8 +54,18 @@ y se pueden recortar los pesos que no se usen.
 | Texto | `#17181A` | Texto principal |
 | Muted | `#8A8D93` | Subtítulos, etiquetas |
 
-Ojo: `CademOrangeDark` (`#D65A12`) ya existe en `ui/theme/Color.kt` — hay que reconciliar
-el naranja del mockup con el que ya está en uso, no convivir con dos.
+**Resuelto (2026-09-20) — y no hay nada que cambiar.** El `#F26B1D` del mockup **ya es el
+color principal de la app**: `CademOrange` (`Color.kt:8`) es exactamente ese valor, y
+`Theme.kt:14`/`:38` lo asignan a `primary` en los dos esquemas. El mockup no proponía un
+naranja nuevo, estaba usando el de la marca.
+
+`CademOrangeDark` (`#D65A12`) **no es "el naranja de la app"**: es un tono de contenedor
+(`primaryContainer` en oscuro, `onPrimaryContainer` en claro). Los dos conviven a propósito y
+los dos se mantienen.
+
+Consecuencia: **cero cambios de color.** El resto de los valores de color del mockup se adaptan
+a los tokens que ya existen en `ui/theme/Color.kt` (`Emerald600`, `Amber500`, `Red600`,
+`Gray500`) — no se agregan colores nuevos si ya hay uno equivalente.
 
 ## 2. Pantalla de Inicio
 
@@ -117,7 +127,7 @@ Referencia: `APK-Oferta.dc.html`.
 | 3 | **Fila de datos**: Distancia / Zona / Pago |
 | 4 | **Aceptar más grande que Rechazar** (proporción ~70/30). Hoy son iguales (50/50) |
 | 5 | Nota al pie: *"Si no respondés a tiempo, se le ofrece a otro cadete."* |
-| 6 | Tema oscuro: fondo `#17181A`, card `#232426` |
+| 6 | Usa el **modo oscuro que la app ya tiene** (`Theme.kt`), no un tema propio. Ver abajo |
 
 Todo lo que muestra ya está disponible: `PedidoDto` trae `zona` y `precio`, y la distancia
 sale de `state.ruta`, que la app ya pide. **Cero backend nuevo.**
@@ -132,12 +142,17 @@ Criterio: el canal de notificaciones ya usa **tono de llamada** (`TYPE_RINGTONE`
 chime corto, con un comentario en el código explicando que en varios Motorola el tono de
 notificación es *"casi un solo tin"*. El sonido del countdown sigue el mismo criterio.
 
-### Tema oscuro: decisión abierta
+### Tema oscuro: resuelto — sigue el tema del sistema
 
-La app **ya tiene modo oscuro completo** (`Theme.kt`, `isSystemInDarkTheme`). Si la oferta
-va siempre oscura, sería la única pantalla con tema fijo. **Recomendación: que siga el tema
-del sistema**, como el resto — el mockup está en oscuro porque es el caso más lindo de
-mostrar, no porque la pantalla deba serlo.
+**Decidido el 2026-09-20.** La oferta **no** va fija en oscuro: usa el modo oscuro que la app
+ya tiene (`Theme.kt`, `isSystemInDarkTheme`), igual que el resto de las pantallas. En un
+celular en modo claro la oferta se ve clara.
+
+Consecuencia para la implementación: **el mockup sirve como referencia de layout, jerarquía y
+medidas — no de colores.** Los valores `#17181A` / `#232426` del mockup **no se copian**; se
+usan los tokens del tema (`MaterialTheme.colorScheme.surface`, `onSurface`, etc.), que ya
+resuelven claro y oscuro. El anillo del contador sí mantiene su acento (naranja de marca, rojo
+cuando queda poco tiempo) porque ese color es del dato, no del tema.
 
 ## 4. Pantalla del viaje
 
@@ -258,10 +273,26 @@ desapareció, no se pierde un viaje por eso.
 **D se puede hacer primero y sola**: no depende de nada, es la más chica, y arregla una
 inconsistencia que ya existe (foto clavada vs. firma configurable).
 
-## 8. Decisiones abiertas
+## 8. Decisiones — resueltas el 2026-09-20
 
-1. **¿La oferta siempre en oscuro, o sigue el tema del sistema?** Recomendación: el sistema.
-2. **¿La hamburguesa abre solo el menú de cuenta (Salir, Ayuda, Config), o algo más?**
-3. **Naranja de marca**: el mockup usa `#F26B1D`, la app ya tiene `CademOrangeDark`
-   (`#D65A12`) — hay que elegir uno, no convivir con dos.
-4. **¿Se recortan los pesos de fuente** que no se usen, por el peso del APK?
+1. **La oferta sigue el tema del sistema**, no va fija en oscuro. Ver sección 3.
+2. **La hamburguesa abre el menú de cuenta**: Salir, Ayuda y configuración del servidor. No
+   navega entre pantallas — para eso está la barra inferior, y así no se contradice la
+   decisión del 2026-09-15. Es además donde vive el botón **"Salir"** de la sección 5.
+3. **Naranja de marca: no se toca nada.** Corregido el 2026-09-20: la pregunta original
+   planteaba una elección entre dos colores que en realidad **no competían** — `#F26B1D` es
+   `CademOrange`, el `primary` de la app en ambos esquemas, y el mockup lo estaba usando.
+   `CademOrangeDark` (`#D65A12`) es un tono de contenedor y se mantiene como tal.
+4. **Pesos de fuente: se recortan.** Se cargan solo los pesos que las pantallas usan de verdad
+   (`Plus Jakarta Sans` no necesita los 5; `Space Grotesk` se usa solo para números). El APK se
+   reparte por Bluetooth, así que cada MB cuenta.
+
+## 9. Lo que este spec NO hace
+
+- **No toca el panel admin.** El mockup del naranja unificado en todo el sistema se descartó
+  (decisión 3): el panel sigue como está.
+- **No toca el backend**, salvo el endpoint chico de "Conectado" para las estadísticas
+  (fase G del orden sugerido), que es lo único que necesita datos que hoy no expone.
+- **No implementa el botón de reportar al cliente.** Ese vive en
+  [`spec-antiabuso-pedidos-publicos.md`](./spec-antiabuso-pedidos-publicos.md) Fase 3; acá solo
+  se define que el rediseño de la pantalla del viaje tiene que dejarle lugar.
