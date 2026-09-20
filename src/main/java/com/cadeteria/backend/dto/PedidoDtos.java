@@ -80,6 +80,21 @@ public final class PedidoDtos {
             boolean prioritario
     ) {
         public static PedidoResponse from(Pedido p) {
+            return from(p, true);
+        }
+
+        /**
+         * Variante liviana para el listado de "activos"/"programados" (GET /api/admin/pedidos):
+         * la tabla del dashboard no muestra el detalle de paradas por fila, así que evitamos
+         * tocar `p.getParadas()` (lazy @OneToMany) para no disparar una query por pedido (N+1).
+         * El detalle (GET /api/admin/pedidos/{id}) y el broadcast por WebSocket siguen usando
+         * {@link #from(Pedido)}, que sí las incluye.
+         */
+        public static PedidoResponse fromResumen(Pedido p) {
+            return from(p, false);
+        }
+
+        private static PedidoResponse from(Pedido p, boolean incluirParadas) {
             return new PedidoResponse(
                     p.getId(), p.getNumero(), p.getClienteTelefono(), p.getClienteNombre(),
                     p.getOrigenDireccion(), p.getOrigenLat(), p.getOrigenLng(),
@@ -97,8 +112,10 @@ public final class PedidoDtos {
                     p.getMotivoCancelacion(), p.getTokenSeguimiento(), p.isSmsFallido(),
                     p.getCalificacionEstrellas(), p.getCalificacionComentario(),
                     p.getMotivoNoEntrega(), p.getNoEntregadoEn(),
-                    p.getParadas().stream().sorted(java.util.Comparator.comparingInt(com.cadeteria.backend.model.PedidoParada::getOrden))
-                            .map(ParadaResponse::from).toList(),
+                    incluirParadas
+                            ? p.getParadas().stream().sorted(java.util.Comparator.comparingInt(com.cadeteria.backend.model.PedidoParada::getOrden))
+                                    .map(ParadaResponse::from).toList()
+                            : List.of(),
                     p.getAsignadoPorUsername(), p.getCanceladoPorUsername(), p.isPrioritario());
         }
     }

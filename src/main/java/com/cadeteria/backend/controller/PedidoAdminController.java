@@ -35,14 +35,19 @@ public class PedidoAdminController {
         this.pdfService = pdfService;
     }
 
-    /** tipo=activos (default) | programados — "finalizados" tiene su propio endpoint paginado, ver abajo. */
+    /**
+     * tipo=activos (default) | programados — "finalizados" tiene su propio endpoint paginado, ver abajo.
+     * Usa {@link PedidoResponse#fromResumen} (sin paradas): la tabla del dashboard no muestra el
+     * detalle de paradas por fila, y mapearlas acá disparaba una query lazy por pedido (N+1) en
+     * la lista que más tráfico recibe. El detalle sí las trae, ver {@link #get}.
+     */
     @GetMapping
     public List<PedidoResponse> list(@RequestParam(defaultValue = "activos") String tipo) {
         List<Pedido> pedidos = switch (tipo) {
             case "programados" -> service.listarProgramados();
             default -> service.listarActivos();
         };
-        return pedidos.stream().map(PedidoResponse::from).toList();
+        return pedidos.stream().map(PedidoResponse::fromResumen).toList();
     }
 
     /**

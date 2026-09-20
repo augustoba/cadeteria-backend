@@ -2,9 +2,13 @@ package com.cadeteria.backend.controller;
 
 import com.cadeteria.backend.service.ConfiguracionService;
 import com.cadeteria.backend.service.WebPushService;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * Únicos valores de Configuración que necesita una pantalla pública (ronda 7: el
@@ -14,6 +18,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/publico/configuracion")
 public class ConfiguracionPublicaController {
+
+    /** Estos valores casi no cambian (config de cloudinary/marca/vapid) — 5 min de cache evita pegarle a la base en cada carga de pantalla pública. */
+    private static final CacheControl CACHE = CacheControl.maxAge(300, TimeUnit.SECONDS).cachePublic();
 
     private final ConfiguracionService service;
     private final WebPushService webPushService;
@@ -26,26 +33,28 @@ public class ConfiguracionPublicaController {
     public record CloudinaryPublicoResponse(String cloudName, String uploadPreset) {}
 
     @GetMapping("/cloudinary")
-    public CloudinaryPublicoResponse cloudinary() {
+    public ResponseEntity<CloudinaryPublicoResponse> cloudinary() {
         var valores = service.findAll();
-        return new CloudinaryPublicoResponse(
+        return ResponseEntity.ok().cacheControl(CACHE).body(new CloudinaryPublicoResponse(
                 valores.getOrDefault("cloudinary_cloud_name", ""),
-                valores.getOrDefault("cloudinary_upload_preset", ""));
+                valores.getOrDefault("cloudinary_upload_preset", "")));
     }
 
     public record MarcaPublicaResponse(String nombreCadeteria) {}
 
     /** Mejora 119 — nombre de la cadetería configurable, mostrado en el header de /seguimiento/:token. */
     @GetMapping("/marca")
-    public MarcaPublicaResponse marca() {
-        return new MarcaPublicaResponse(service.getString("nombre_cadeteria", "Cadetería"));
+    public ResponseEntity<MarcaPublicaResponse> marca() {
+        return ResponseEntity.ok().cacheControl(CACHE)
+                .body(new MarcaPublicaResponse(service.getString("nombre_cadeteria", "Cadetería")));
     }
 
     public record VapidPublicKeyResponse(boolean habilitado, String publicKey) {}
 
     /** Mejora 89 — la clave pública VAPID no es secreta, la necesita el navegador para suscribirse. */
     @GetMapping("/vapid-public-key")
-    public VapidPublicKeyResponse vapidPublicKey() {
-        return new VapidPublicKeyResponse(webPushService.isHabilitado(), webPushService.getPublicKeyBase64Url());
+    public ResponseEntity<VapidPublicKeyResponse> vapidPublicKey() {
+        return ResponseEntity.ok().cacheControl(CACHE)
+                .body(new VapidPublicKeyResponse(webPushService.isHabilitado(), webPushService.getPublicKeyBase64Url()));
     }
 }

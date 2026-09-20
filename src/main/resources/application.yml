@@ -5,6 +5,8 @@ spring:
     url: jdbc:mysql://localhost:3306/cadeteria?createDatabaseIfNotExist=true&serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false
     username: ${DB_USER:root}
     password: ${DB_PASSWORD:root}
+    hikari:
+      maximum-pool-size: 5
   jpa:
     hibernate:
       ddl-auto: update
@@ -19,6 +21,10 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+  compression:
+    enabled: true
+    mime-types: application/json,text/plain,text/css,application/javascript
+    min-response-size: 1024
 
 springdoc:
   swagger-ui:
@@ -69,3 +75,15 @@ app:
 logging:
   level:
     org.hibernate.SQL: warn
+
+# Solo para pruebas de carga locales (ver PROYECTO.md del ecommerce, seccion
+# de despliegue). Antes de crear un perfil prod, restringir esta exposicion
+# (hoy expone metrics/health sin auth).
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics
+  endpoint:
+    health:
+      show-details: always

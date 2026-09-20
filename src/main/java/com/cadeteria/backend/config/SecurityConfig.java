@@ -48,7 +48,8 @@ public class SecurityConfig {
                                 "/api/publico/**",
                                 "/ws/**",
                                 "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**",
-                                "/error"
+                                "/error",
+                                "/actuator/**"
                         ).permitAll()
                         // Rutas de plata/config sensible/seguridad — cada una exige su propio permiso
                         // (roles configurables, mejora 2026-09-16 — antes era un solo bit "DUENO" fijo,
@@ -73,8 +74,8 @@ public class SecurityConfig {
                         .authenticationEntryPoint((req, res, e) -> writeError(res, mapper, HttpStatus.UNAUTHORIZED, "No autenticado"))
                         .accessDeniedHandler((req, res, e) -> writeError(res, mapper, HttpStatus.FORBIDDEN, "Acceso denegado"))
                 )
-                .addFilterBefore(rateLimitFilter, JwtAuthFilter.class)
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(rateLimitFilter, JwtAuthFilter.class);
 
         return http.build();
     }
