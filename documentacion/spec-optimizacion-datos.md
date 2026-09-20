@@ -97,45 +97,70 @@ molesta el tiempo de subida.
 
 ## 3. Qué falta — DTOs
 
-### El caso concreto
+### Corrección: el primer instinto estaba mal
 
-`CadeteController.list()` (`CadeteController.java:57`) devuelve `List<CadeteResponse>` —
-el DTO completo de ~30 campos:
+El planteo original era *"el listado manda 30 campos para pintar tres cosas, hagamos un
+`CadeteResumenResponse`"*. **Verificado contra el front, es falso.**
 
+El listado de cadetes (`cadetes.component.ts`) tiene estas columnas: Nombre, **DNI**,
+**Teléfono**, **Usuario**, App (versión), Vehículo, **Calificación**, Estado, **Pago**. Más
+`lat`/`lng` para el botón "Encontrar" del mapa. O sea: la mayoría de los campos **se usan de
+verdad**, y un "resumen agresivo" habría roto la pantalla en silencio — Angular no valida
+contra el DTO en tiempo de compilación, así que un campo que falta se ve como `undefined` en
+la celda, no como un error.
+
+### El caso real (mucho más chico)
+
+Lo que el listado **no usa** y sí viaja en cada carga:
+
+| Campo | Peso |
+| --- | --- |
+| `fotoUrl`, `fotoVehiculoUrl`, `fotoCarnetUrl`, `fotoTarjetaVerdeUrl` | 4 URLs por cadete |
+| `cbu`, `aliasCbu` | datos de cobro del cadete |
+
+Seis campos, no veinte. Y de esos, los que importan son las **4 URLs de fotos** — son las
+que el panel no muestra en el listado, y las que alguien podría llegar a renderizar por
+accidente bajando megabytes.
+
+### Y un N+1 que apareció al escribir el plan (más caro que los 6 campos)
+
+`CadeteService.toResponse()` (`CadeteService.java:115-120`) hace **una query por cadete** para
+calcular la calificación:
+
+```java
+public CadeteResponse toResponse(Cadete c) {
+    List<Pedido> calificados = pedidoRepo.findByCadeteAsignadoIdAndCalificacionEstrellasIsNotNull(c.getId());
+    ...
+}
 ```
-id, nombre, apellido, dni, telefono, email, fotoUrl, tipoVehiculo, vehiculoColor,
-vehiculoPatente, vehiculoMarca, vehiculoModelo, vehiculoAnio, fotoVehiculoUrl,
-fotoCarnetUrl, fotoTarjetaVerdeUrl, username, activo, estado, lat, lng,
-ubicacionActualizadaEn, zonaActual, montoMaximoTransportado, maxViajesSimultaneos,
-maxViajesDiarios, maxViajesSemanales, ordenColaEspera, cbu, aliasCbu, ...
-```
 
-Para pintar el listado de cadetes hacen falta **nombre, estado, vehículo y poco más**. Se
-están mandando el DNI, el CBU, el alias, las 4 URLs de fotos y las coordenadas GPS de cada
-cadete, en cada carga del listado.
+Y `CadeteController.list()` es `service.findAll().stream().map(service::toResponse)`. O sea:
+**30 cadetes = 30 queries**, en cada carga del listado. Es el mismo patrón que se sacó el
+2026-09-20 con las paradas del listado de pedidos.
 
-**Seguridad, además de costo:** son datos personales (DNI, CBU, alias) que no tienen por qué
-viajar para pintar una lista.
+**Este ahorro es en la base, no en el tráfico** — pero es trabajo de servidor igual, y es más
+grande que el de los 6 campos. Va junto con `fromListado`, en la misma tarea, porque los dos
+tocan la misma llamada y ninguno se entiende solo.
 
-### La solución
+Arreglo: **una sola query** que agrupe por cadete (promedio y cantidad), un `Map<cadeteId, ...>`
+y `CadeteResponse.from(c, promedio, cantidad)` por cadete. De N queries a 1.
 
-Un `CadeteResumenResponse` — igual que ya se hizo con `PedidoResponse.fromResumen()`:
+### La solución (proporcional al problema)
 
-```
-id, nombre, apellido, fotoUrl, tipoVehiculo, estado, activo, zonaActual,
-ordenColaEspera, maxViajesSimultaneos
-```
+**No crear un DTO nuevo.** Sacar esos 6 campos del listado, con un
+`CadeteResponse.fromListado()` que los deja en `null` — el mismo patrón exacto que
+`PedidoResponse.fromResumen()` ya usa con `paradas` (`PedidoDtos.java:93`).
 
-- `CadeteController.list()` pasa a devolverlo.
-- `GET /api/cadetes/{id}` (ficha) y `GET /api/cadetes/me` (perfil propio) **siguen con el
-  DTO completo** — ahí sí hace falta todo.
-- **El front tiene que revisarse**: si el listado usa algún campo que se saca, se rompe en
-  silencio (Angular no valida contra el DTO en tiempo de compilación, igual que Gson en la
-  app).
+- `CadeteController.list()` (`CadeteController.java:57`) usa `fromListado()`.
+- `GET /api/cadetes/{id}` (ficha) y `GET /api/cadetes/me` (perfil propio) **siguen completos**
+  — ahí sí hacen falta (la ficha muestra las fotos y el CBU).
+- **Antes de tocarlo**: grep del front por esos 6 nombres en `features/cadetes/` y
+  `features/dashboard/`. Ya se verificó que no están en `cadetes.component.ts`, pero hay que
+  confirmarlo sobre el árbol entero antes de mergear.
 
-**Ojo con `ordenColaEspera` y `maxViajesSimultaneos`**: los usa el modal de "Asignar" del
-dashboard para ordenar candidatos y validar. Si el listado los necesita, van en el resumen
-(por eso están en la lista de arriba). Hay que verificarlo antes de sacarlos.
+**El ahorro en bytes es modesto** (unas URLs contra imágenes de megabytes). El motivo real
+para hacerlo es otro: que un dato de cobro y cuatro fotos no viajen donde no se usan, y que
+nadie las renderice por accidente. Es higiene, no performance.
 
 ### El resto: auditar, no adivinar
 
@@ -180,7 +205,7 @@ Números esperados, para saber si funcionó:
 | --- | --- | --- |
 | 1 | **Helper de imágenes + miniaturas del panel** | Es el 90% del ahorro, es de bajo riesgo (si el helper falla, devuelve la URL original), y arregla las fotos ya subidas sin migrar nada |
 | 2 | Helper en la app (Coil) | Mismo patrón, otro repo |
-| 3 | `CadeteResumenResponse` + revisar el front | Ahorro menor que las fotos, pero además **saca datos personales** del listado |
+| 3 | Sacar 6 campos del listado de cadetes (`fromListado()`) | Ahorro en bytes modesto — es higiene de datos, no performance. Va después de las fotos, que son el 90% del ahorro real |
 | 4 | Auditoría del resto de los endpoints | Requiere medir primero; sin medición es adivinar |
 
 ## 6. Decisiones abiertas
