@@ -59,7 +59,15 @@ public class WhatsappGatewayAuthInterceptor implements ChannelInterceptor {
             return message;
         }
 
-        boolean esDestinoWhatsapp = DESTINOS_GATEWAY.contains(accessor.getDestination());
+        // Los frames sin destino (DISCONNECT, heart-beat, ACK) no son destinos del gateway y
+        // tienen que pasar de largo. El guard no es cosmético: DESTINOS_GATEWAY es un
+        // Set.of(...) — inmutable — y los sets inmutables de Java tiran NullPointerException
+        // con null, a diferencia de un HashSet que devolvería false. Sin esto, un DISCONNECT
+        // rompía el preSend y la excepción tumbaba la sesión STOMP entera.
+        String destino = accessor.getDestination();
+        if (destino == null) return message;
+
+        boolean esDestinoWhatsapp = DESTINOS_GATEWAY.contains(destino);
         if (!esDestinoWhatsapp) return message;
 
         boolean autorizado = accessor.getSessionAttributes() != null
