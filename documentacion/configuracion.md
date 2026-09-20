@@ -17,8 +17,12 @@ Para una instalación nueva, en este orden:
    pedido" no sugiere ningún precio.
 4. **Rutas**: OSRM ya funciona solo, sin cargar nada. GraphHopper/OpenRouteService son
    opcionales, solo mejoran la precisión de la distancia real.
-5. Opcional: SMS gateway, WhatsApp gateway, Firebase (push), SMTP de mail — cada uno se
-   degrada solo si se deja sin configurar, no rompen nada.
+5. **SMS gateway** — ⚠️ si vas a usar la página pública `/pedir`, esto **no es opcional**:
+   el cliente tiene que confirmar su teléfono con un código que sale por SMS, y con
+   `SMS_ENABLED=false` el código nunca llega (la página queda inutilizable, sin error
+   visible). Ver "Verificación del teléfono" en `frontend.md`.
+6. Opcional: WhatsApp gateway, Firebase (push), SMTP de mail — estos sí se degradan solos
+   si se dejan sin configurar, no rompen nada.
 
 ## Variables de servidor (`.env` / `application.yml`)
 
@@ -145,11 +149,17 @@ finalizar un pedido desde la app (exige foto + nombre de quién recibió).
 
 ## Servicios de servidor opcionales
 
-Estos NO se cargan desde el panel — son variables de servidor (ver tabla más arriba). Todos se
-degradan solos si quedan sin configurar, no rompen nada:
+Estos NO se cargan desde el panel — son variables de servidor (ver tabla más arriba). Salvo
+el SMS, todos se degradan solos si quedan sin configurar, no rompen nada:
 
 - **SMS gateway** (`SMS_GATEWAY_URL`/`_USER`/`_PASSWORD`, `SMS_ENABLED`): usa el proyecto
-  android-sms-gateway corriendo en un celular con chip.
+  android-sms-gateway corriendo en un celular con chip. **Es el único de esta lista que no
+  es realmente opcional**: `VerificacionTelefonoService` lo usa para el código de 6 dígitos
+  que exige la página pública `/pedir`, y `SmsGatewayService` trata "deshabilitado" como
+  envío exitoso (loguea y devuelve `true` a propósito, para no ensuciar las alertas de
+  fallos) — o sea que apagado, el cliente nunca recibe el código y no hay forma de cargar
+  un pedido desde la web. También se usa para los SMS de confirmación de pedido y los links
+  de seguimiento.
 - **WhatsApp gateway** (`WHATSAPP_GATEWAY_TOKEN`): gateway propio (Baileys + chip descartable)
   corriendo en una PC, se conecta al backend por WebSocket con este token — ver
   [`whatsapp-gateway.md`](./whatsapp-gateway.md) para instalarlo y emparejar un chip.

@@ -70,10 +70,14 @@ app/src/main/java/com/cadeteria/cadete/
 │   └── repository/  Une remote+local para cada pantalla (CadeteRepository, CloudinaryUploader…)
 ├── location/        Foreground service de ubicación (ver arriba)
 ├── push/            Notificaciones (FCM + notificaciones locales)
-├── realtime/        Cliente WebSocket/STOMP (chat, avisos, cambios de pedido en vivo)
+├── realtime/        Cliente WebSocket/STOMP (chat, avisos, cambios de pedido en vivo).
+│                    `StompClient.kt` está **escrito a mano** sobre el WebSocket de OkHttp
+│                    (CONNECT/SUBSCRIBE/MESSAGE/heart-beat, sin SEND) en vez de usar una
+│                    librería STOMP de terceros
 ├── widget/          Widget de pantalla de inicio (toggle Libre/Ocupado)
-└── ui/              Una carpeta por pantalla (home, viaje, chat, historial, perfil, ayuda,
-                     onboarding, login, servidor) + common/theme compartidos
+└── ui/              Una carpeta por pantalla (home, viaje, chat, historial, perfil, avisos,
+                     ayuda, onboarding, login, recuperarpassword, servidor, navigation) +
+                     common/theme compartidos
 ```
 
 ## Notas

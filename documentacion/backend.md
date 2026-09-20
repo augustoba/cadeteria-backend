@@ -23,7 +23,15 @@ Al arrancar contra una base vacía, corren en orden (`config/*Seeder.java`, cada
 1. `DataSeeder` — parametrías base (estados de pedido/cadete, tipos de vehículo, resultados de
    oferta), admin inicial, y toda la configuración por defecto (ver `configuracion.md`).
 2. `DemoCadeteZonaSeeder` — si no hay ningún cadete/zona cargado, siembra una zona y 2 cadetes
-   de ejemplo (usuario `jperez` / contraseña `cadete123`) para no arrancar con el panel vacío.
+   de ejemplo (contraseña `cadete123`) para no arrancar con el panel vacío.
+
+   ⚠️ **Inconsistencia conocida**: los siembra con usuario `jperez` / `mgomez`, pero el login
+   de cadete exige que el usuario sea el DNI (`^[0-9]{1,8}$`, `CadeteDtos.REGEX_USERNAME_DNI`)
+   desde 2026-09-12. El login en sí no valida formato (hace un `findByUsername` pelado, así
+   que `jperez` todavía entra), pero son usuarios que **el propio panel rechaza si los editás**.
+   Los DNIs ya están cargados (`30111222` / `30222333`) — el fix pendiente es usarlos como
+   username. Los otros seeders (`DemoPedidoSeeder`, `DemoExtrasSeeder`) ya prefieren el DNI
+   `11111111` y caen a "cualquier cadete" si no existe, así que no se rompen.
 3. `DemoPedidoSeeder` — 8 pedidos de ejemplo cubriendo todos los estados del ciclo de vida,
    asignados al cadete demo. Se recrean en cada reinicio (no se acumulan).
 4. `DemoExtrasSeeder` — chat interno, solicitudes de pedido (flujo "pedido por WhatsApp"),
@@ -67,6 +75,10 @@ src/main/java/com/cadeteria/backend/
   cada entidad (estados, turnos, topes de viajes, pago semanal/crédito, roles de admin).
 - **`WebSocketPublisher`** — pushea eventos en vivo al panel y a la app del cadete (nuevo
   pedido, cambio de estado, ubicación, chat) vía STOMP.
+- **`VerificacionTelefonoService`** — anti-abuso de la página pública `/pedir`: código de 6
+  dígitos por SMS (10 min, 5 intentos, 3 pedidos cada 10 min por teléfono) que se canjea por
+  un token de un solo uso; `SolicitudPedidoService.crear()` lo exige y lo consume. Ver el
+  aviso sobre SMS deshabilitado en `frontend.md`.
 - **`WhatsappGatewayService`** / **`SmsGatewayService`** / **`FcmService`** / **`EmailService`**
   / **`WebPushService`** — todas siguen el mismo criterio: si no están configuradas, se loguea
   y no rompen el flujo (ver "Servicios opcionales" en `configuracion.md`).

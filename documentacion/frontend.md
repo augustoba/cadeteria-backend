@@ -30,25 +30,44 @@ src/app/
 
 ### Pantallas (`features/`)
 
-| Carpeta | Pantalla |
-| --- | --- |
-| `dashboard` | Pedidos del día (lista/kanban), cadetes libres, alertas |
-| `pedidos` | Alta de pedido nuevo, detalle |
-| `cadetes` | ABM de cadetes, ficha con estadísticas, solicitudes de alta |
-| `zonas` | ABM de zonas (círculo o polígono dibujado a mano en el mapa) |
-| `clientes` | Ficha de cliente por teléfono (tarifa especial, cuenta corriente) |
-| `pedir` | Página **pública** sin login — el cliente carga su propio pedido, y la bandeja de "Pedidos web" que el admin revisa/cotiza |
-| `mapa` | Mapa en vivo de cadetes y pedidos |
-| `metricas` | Gráficos y tablas de Métricas (por cadete, por zona, por hora) |
-| `pagos` | Pagos semanales / crédito por cadete |
-| `chat` | Chat interno admin ↔ cadete |
-| `incidencias` | Tickets/reclamos, generales o ligados a un pedido/cadete |
-| `configuracion` | Toda la configuración editable — ver `configuracion.md` en esta misma carpeta |
-| `usuarios` | Roles de admin |
-| `seguimiento` | Página pública de seguimiento de un pedido (el link que recibe el cliente) |
-| `hoja-ruta` | Hoja de ruta imprimible de los pedidos de un cadete |
-| `registro-cadete` | Formulario público de alta de cadete por link |
-| `login` | Login de admin |
+| Carpeta | Ruta | Pantalla |
+| --- | --- | --- |
+| `dashboard` | `/` | Pedidos del día (lista/kanban), cadetes libres, alertas |
+| `pedidos` | `/pedidos/nuevo` | Alta de pedido nuevo, detalle |
+| `cadetes` | `/cadetes`, `/cadetes/:id`, `/cadetes/:id/ficha`, `/cadetes/solicitudes` | ABM de cadetes, ficha con estadísticas, solicitudes de alta |
+| `zonas` | `/zonas` | ABM de zonas (círculo o polígono dibujado a mano en el mapa) |
+| `clientes` | `/clientes`, `/clientes/:telefono` | Listado y ficha de cliente por teléfono (tarifa especial, cuenta corriente) |
+| `pedir` | `/pedir`, `/confirmar-pedido/:token`, `/solicitudes-pedido` | Página **pública** sin login — el cliente carga su propio pedido (con verificación del teléfono, ver abajo), la página pública de confirmación, y la bandeja de "Pedidos web" que el admin revisa/cotiza |
+| `mapa` | `/mapa` | Mapa en vivo de cadetes y pedidos |
+| `metricas` | `/metricas` | Gráficos y tablas de Métricas (por cadete, por zona, por hora) |
+| `pagos` | `/pagos` | Pagos semanales / crédito por cadete |
+| `chat` | `/chat` | Chat interno admin ↔ cadete |
+| `whatsapp` | `/whatsapp` | Panel del gateway de WhatsApp: chips, mensajes enviados (entregado/leído), respuestas de clientes. Solo `ROLE_ADMIN_DUENO` |
+| `incidencias` | `/incidencias` | Tickets/reclamos, generales o ligados a un pedido/cadete |
+| `configuracion` | `/configuracion` | Toda la configuración editable — ver `configuracion.md` en esta misma carpeta |
+| `usuarios` | `/usuarios` | Cuentas de admin |
+| `roles` | `/roles` | Roles y permisos de admin |
+| `seguimiento` | `/seguimiento/:token` | Página pública de seguimiento de un pedido (el link que recibe el cliente) |
+| `hoja-ruta` | `/hoja-ruta/:cadeteId` | Hoja de ruta imprimible de los pedidos de un cadete |
+| `registro-cadete` | `/registro-cadete/:token` | Formulario público de alta de cadete por link |
+| `login` | `/login` | Login de admin |
+
+> `features/auth/` y `features/layout/` existen pero están **vacías** y sin referencias en
+> `app.routes.ts` — carpetas muertas, no pantallas.
+
+### Verificación del teléfono en la página pública
+
+El cliente que carga un pedido en `/pedir` **no puede enviarlo sin confirmar antes que el
+teléfono es suyo**: pide un código de 6 dígitos a `/api/publico/verificacion-telefono/enviar`
+(que sale por SMS), lo confirma con `/verificar`, y el token de un solo uso resultante es lo
+que `POST /api/publico/solicitudes-pedido` exige en el campo `verificacionToken` (default
+`@NotBlank`). Es anti-abuso: sin esto cualquiera podía cargar pedidos falsos a nombre de un
+número ajeno. Ver `VerificacionTelefonoService` en `backend.md`.
+
+**Ojo con SMS deshabilitado**: si `SMS_ENABLED=false` (el default) el código no llega nunca
+— `SmsGatewayService` loguea "SMS gateway deshabilitado" y devuelve `true` a propósito (no
+cuenta como fallo), así que la página pública queda **inutilizable** en la práctica. Para
+que `/pedir` funcione hay que tener el gateway de SMS configurado.
 
 ## Convenciones
 

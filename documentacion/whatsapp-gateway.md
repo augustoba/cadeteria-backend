@@ -65,14 +65,43 @@ GET /api/admin/whatsapp/estado   → si el gateway está conectado en este momen
 Guía paso a paso completa (con qué mirar en cada paso, y cómo probar que nada se pierde si se
 apaga la PC) en el `README.md` de este repo.
 
+## Panel admin (`/whatsapp`, agregado 2026-09-16)
+
+El panel tiene una pantalla propia (commit `440b017` de `admin-front`), con 3 pestañas:
+
+- **Chips** — estado de cada chip (VINCULANDO/CONECTADO/DESCONECTADO/BANEADO), el código de
+  pairing de 8 dígitos en vivo mientras vincula, y un form para **cargar un chip nuevo sin
+  tocar la consola** (`POST /api/admin/whatsapp/chips` → el backend publica
+  `/topic/whatsapp/vincular-chip` → el gateway pide el pairing code → lo devuelve por
+  `onCodigo` → aparece en la tarjeta del chip sin refrescar).
+- **Mensajes enviados** — tabla con estado, chip usado, entregado ✓ y leído ✓✓, más un form
+  de prueba manual que reusa `/test`.
+- **Respuestas de clientes** — lo que contestan, vía los listeners `messages.upsert` de cada
+  chip.
+
+El panel no mergea eventos puntuales: ante cualquier evento de `/topic/whatsapp/panel`
+recarga las 3 listas (mismo patrón que `ChatService` con `/queue/admin/chat`).
+
+**Todo `/api/admin/whatsapp/**` está restringido a `ROLE_ADMIN_DUENO`**, no `ADMIN` genérico
+— expone teléfonos y contenido de mensajes de clientes. En el panel, el item de nav
+"WhatsApp" va con `soloDueno: true`.
+
 ## Pendiente (a propósito, fuera de este prototipo)
 
-- Conectar el envío real a los eventos del negocio (pedido creado, cadete asignado, etc.) —
-  `WhatsappGatewayService.enviar()` existe y funciona, pero hoy nadie lo llama desde el flujo
-  real de pedidos, solo se dispara a mano con `/api/admin/whatsapp/test`.
-- Indicador visual en el panel (hoy solo existe el endpoint `GET /estado`, sin UI).
+- **Conectar el envío real a los eventos del negocio** (pedido creado, cadete asignado,
+  etc.) — sigue siendo lo más grande que falta: `WhatsappGatewayService.enviar()` existe y
+  funciona, pero hoy nadie lo llama desde el flujo real de pedidos, solo se dispara a mano
+  con `/api/admin/whatsapp/test` o desde el form de prueba del panel.
 - Comprar y emparejar el resto de los chips (10-15 según lo hablado).
 - Variar un poco el texto entre envíos (acordado, no implementado todavía).
+- El `Map` en memoria `waMessageId -> mensajeId` del gateway se pierde si reinicia — el
+  mensaje ya quedó `ENVIADO` en la base igual, no es crítico, pero un reinicio pierde la
+  trazabilidad de entrega/lectura de lo que estaba en vuelo.
+
+## Si agregás un `@MessageMapping` nuevo de WhatsApp
+
+No olvidar sumarlo a `WhatsappGatewayAuthInterceptor.DESTINOS_GATEWAY` — si no, el gateway
+no puede llamarlo (se descarta en silencio, sin error visible).
 
 ## Documentación relacionada
 
