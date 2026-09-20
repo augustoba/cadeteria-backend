@@ -810,6 +810,12 @@ public class PedidoService {
         reembolsarComisionSiCorresponde(pedido, cadete);
         liberarCadete(cadete);
         pedido.setCadeteAsignado(null);
+        // La marca de asignación se va con el cadete. Si sobrevive, el panel dibuja la línea
+        // "Asignado <hora>" del timeline (el `@if (p.asignadoEn)` de dashboard.component.ts) y
+        // el nombre no aparece porque vive en otro bloque que sin cadete no se renderiza: el
+        // pedido se ve asignado a nadie.
+        pedido.setAsignadoEn(null);
+        pedido.setAsignadoPorUsername(null);
         pedido.setEstado(estado("SIN_ASIGNAR"));
         repo.save(pedido);
 
@@ -1084,6 +1090,10 @@ public class PedidoService {
             ofertar(pedido, siguiente.get());
         } else {
             pedido.setCadeteAsignado(null);
+            // Mismo motivo que en quitarCadete: sin esto el pedido queda "asignado a nadie"
+            // en el panel.
+            pedido.setAsignadoEn(null);
+            pedido.setAsignadoPorUsername(null);
             pedido.setEstado(estado("SIN_ASIGNAR"));
             repo.save(pedido);
             publisher.publicarPedido(PedidoResponse.from(pedido));
