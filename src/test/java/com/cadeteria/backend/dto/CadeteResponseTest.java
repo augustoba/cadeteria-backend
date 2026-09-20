@@ -22,22 +22,27 @@ class CadeteResponseTest {
         c.setDni("30111222");
         c.setFotoUrl("https://res.cloudinary.com/demo/image/upload/v1/foto.jpg");
         c.setFotoVehiculoUrl("https://res.cloudinary.com/demo/image/upload/v1/vehiculo.jpg");
+        c.setFotoCarnetUrl("https://res.cloudinary.com/demo/image/upload/v1/carnet.jpg");
+        c.setFotoTarjetaVerdeUrl("https://res.cloudinary.com/demo/image/upload/v1/tarjeta.jpg");
         c.setCbu("0170099220000067797370");
+        c.setAliasCbu("juan.moto.cadete");
         return c;
     }
 
     @Test
     void fromListadoVaciaFotosYDatosDeCobro() {
-        CadeteResponse r = CadeteResponse.fromListado(cadeteConTodo());
+        CadeteResponse r = CadeteResponse.fromListado(cadeteConTodo(), null, 0);
         assertNull(r.fotoUrl());
         assertNull(r.fotoVehiculoUrl());
+        assertNull(r.fotoCarnetUrl());
+        assertNull(r.fotoTarjetaVerdeUrl());
         assertNull(r.cbu());
         assertNull(r.aliasCbu());
     }
 
     @Test
     void fromListadoConservaLoQueElListadoSiUsa() {
-        CadeteResponse r = CadeteResponse.fromListado(cadeteConTodo());
+        CadeteResponse r = CadeteResponse.fromListado(cadeteConTodo(), null, 0);
         assertNotNull(r.nombre());
         assertNotNull(r.apellido());
         assertNotNull(r.dni());

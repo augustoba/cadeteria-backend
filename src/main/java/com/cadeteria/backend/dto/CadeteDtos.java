@@ -134,14 +134,6 @@ public final class CadeteDtos {
                     r.creditoDisponible(), r.notasInternas(),
                     r.ultimaVersionApp(), r.ultimaVersionAppEn());
         }
-
-        /**
-         * Conveniencia para los llamadores que no recalculan la calificación, igual que
-         * {@link #from(Cadete)} — el listado del panel siempre pasa promedio y cantidad reales.
-         */
-        public static CadeteResponse fromListado(Cadete c) {
-            return fromListado(c, null, 0);
-        }
     }
 
     /**
