@@ -55,7 +55,7 @@ public class CadeteController {
 
     @GetMapping("/api/admin/cadetes")
     public List<CadeteResponse> list() {
-        return service.findAll().stream().map(service::toResponse).toList();
+        return service.listarParaPanel();
     }
 
     @GetMapping("/api/admin/cadetes/{id}")

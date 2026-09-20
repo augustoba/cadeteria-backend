@@ -67,4 +67,16 @@ public interface PedidoRepository extends JpaRepository<Pedido, String> {
 
     /** Página del historial de un cliente (antes traía todo y recortaba en Java a 30, ver ClienteService.ficha). */
     List<Pedido> findByClienteTelefonoOrderByCreadoEnDesc(String clienteTelefono, Pageable pageable);
+
+    /**
+     * Calificación agrupada por cadete — una sola query para todo el listado del panel. Antes
+     * era una query POR cadete (`CadeteService.toResponse`), o sea N queries por carga.
+     */
+    @Query("""
+            select p.cadeteAsignado.id, avg(p.calificacionEstrellas), count(p)
+            from Pedido p
+            where p.calificacionEstrellas is not null and p.cadeteAsignado is not null
+            group by p.cadeteAsignado.id
+            """)
+    List<Object[]> calificacionPorCadete();
 }

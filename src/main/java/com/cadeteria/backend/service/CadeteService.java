@@ -32,7 +32,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -117,6 +119,27 @@ public class CadeteService {
         Double promedio = calificados.isEmpty() ? null
                 : calificados.stream().mapToInt(Pedido::getCalificacionEstrellas).average().orElse(0);
         return CadeteResponse.from(c, promedio, calificados.size());
+    }
+
+    /**
+     * Listado del panel: una sola query para las calificaciones (antes era una por cadete) y el
+     * DTO sin las fotos ni los datos de cobro, que el listado no muestra.
+     */
+    @Transactional(readOnly = true)
+    public List<CadeteResponse> listarParaPanel() {
+        Map<String, double[]> calificaciones = new HashMap<>();
+        for (Object[] fila : pedidoRepo.calificacionPorCadete()) {
+            calificaciones.put((String) fila[0],
+                    new double[]{ ((Number) fila[1]).doubleValue(), ((Number) fila[2]).longValue() });
+        }
+        return repo.findAll().stream()
+                .map(c -> {
+                    double[] cal = calificaciones.get(c.getId());
+                    return CadeteResponse.fromListado(c,
+                            cal == null ? null : cal[0],
+                            cal == null ? 0L : (long) cal[1]);
+                })
+                .toList();
     }
 
     @Transactional(readOnly = true)

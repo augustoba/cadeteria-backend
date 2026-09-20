@@ -101,6 +101,47 @@ public final class CadeteDtos {
                     c.getCreditoDisponible(), c.getNotasInternas(),
                     c.getUltimaVersionApp(), c.getUltimaVersionAppEn());
         }
+
+        /**
+         * Para el listado del panel: el listado no muestra fotos ni datos de cobro, así que no
+         * tienen por qué viajar en cada carga. Mismo criterio que {@code PedidoResponse.fromResumen()},
+         * que saca las paradas del listado de pedidos.
+         *
+         * Para la ficha ({@code GET /api/cadetes/{id}}) y el perfil propio
+         * ({@code GET /api/cadetes/me}) se sigue usando {@link #from}, que manda todo — ahí las
+         * fotos y el CBU sí se muestran.
+         */
+        public static CadeteResponse fromListado(Cadete c, Double calificacionPromedio, long calificacionCantidad) {
+            CadeteResponse r = from(c, calificacionPromedio, calificacionCantidad);
+            return new CadeteResponse(
+                    r.id(), r.nombre(), r.apellido(), r.dni(), r.telefono(), r.email(),
+                    null,                                    // fotoUrl
+                    r.tipoVehiculo(), r.vehiculoColor(), r.vehiculoPatente(),
+                    r.vehiculoMarca(), r.vehiculoModelo(), r.vehiculoAnio(),
+                    null,                                    // fotoVehiculoUrl
+                    null,                                    // fotoCarnetUrl
+                    null,                                    // fotoTarjetaVerdeUrl
+                    r.username(), r.activo(), r.estado(),
+                    r.lat(), r.lng(), r.ubicacionActualizadaEn(), r.zonaActual(),
+                    r.montoMaximoTransportado(), r.maxViajesSimultaneos(),
+                    r.maxViajesDiarios(), r.maxViajesSemanales(), r.ordenColaEspera(),
+                    null,                                    // cbu
+                    null,                                    // aliasCbu
+                    r.turnoInicio(), r.turnoFin(),
+                    r.calificacionPromedio(), r.calificacionCantidad(),
+                    r.modalidadPago(), r.habilitadoPago(), r.pagoSemanalMontoPagado(), r.pagoSemanalVenceEn(),
+                    r.montoSemanalActual(),
+                    r.creditoDisponible(), r.notasInternas(),
+                    r.ultimaVersionApp(), r.ultimaVersionAppEn());
+        }
+
+        /**
+         * Conveniencia para los llamadores que no recalculan la calificación, igual que
+         * {@link #from(Cadete)} — el listado del panel siempre pasa promedio y cantidad reales.
+         */
+        public static CadeteResponse fromListado(Cadete c) {
+            return fromListado(c, null, 0);
+        }
     }
 
     /**
