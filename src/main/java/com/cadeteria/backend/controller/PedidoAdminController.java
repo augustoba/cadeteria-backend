@@ -11,6 +11,7 @@ import com.cadeteria.backend.dto.PedidoDtos.FinalizarRequest;
 import com.cadeteria.backend.dto.PedidoDtos.PedidoRequest;
 import com.cadeteria.backend.dto.PedidoDtos.PedidoResponse;
 import com.cadeteria.backend.dto.PedidoDtos.PuntoTrayectoResponse;
+import com.cadeteria.backend.dto.PedidoDtos.QuitarRequest;
 import com.cadeteria.backend.model.Pedido;
 import com.cadeteria.backend.service.PdfComprobanteService;
 import com.cadeteria.backend.service.PedidoService;
@@ -160,10 +161,16 @@ public class PedidoAdminController {
         return PedidoResponse.from(service.reasignar(id, req.cadeteId(), auth.getName()));
     }
 
-    /** Boton "Quitar" del panel: desasigna sin anular el pedido. */
+    /**
+     * Boton "Quitar" del panel: desasigna sin anular el pedido. Sin body (o con
+     * devolverComision=null), devuelve la comisión al cadete PORCENTAJE — mismo
+     * comportamiento de siempre; el panel manda explícitamente false cuando el admin elige
+     * no devolverla.
+     */
     @PostMapping("/{id}/quitar")
-    public PedidoResponse quitar(@PathVariable String id) {
-        return PedidoResponse.from(service.quitarCadete(id));
+    public PedidoResponse quitar(@PathVariable String id, @RequestBody(required = false) QuitarRequest req) {
+        boolean devolverComision = req == null || req.devolverComision() == null || req.devolverComision();
+        return PedidoResponse.from(service.quitarCadete(id, devolverComision));
     }
 
     /** Boton "Anular". */

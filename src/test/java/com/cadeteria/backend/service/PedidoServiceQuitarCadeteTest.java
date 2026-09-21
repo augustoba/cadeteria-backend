@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
@@ -80,7 +81,7 @@ class PedidoServiceQuitarCadeteTest {
     void quitarCadeteBorraLaMarcaDeAsignacion() {
         Pedido pedido = pedidoAsignado();
 
-        service.quitarCadete("p1");
+        service.quitarCadete("p1", true);
 
         assertNull(pedido.getCadeteAsignado(), "el cadete tiene que quedar desasignado");
         assertNull(pedido.getAsignadoEn(),
@@ -92,9 +93,41 @@ class PedidoServiceQuitarCadeteTest {
     void unPedidoDesasignadoNoConservaEstadoDeAsignacion() {
         Pedido pedido = pedidoAsignado();
 
-        service.quitarCadete("p1");
+        service.quitarCadete("p1", true);
 
         assertNotNull(pedido.getEstado(), "el estado se reemplaza por SIN_ASIGNAR, no se vacia");
         assertNull(pedido.getAsignadoEn());
+    }
+
+    @Test
+    void conDevolverComisionFalseNoLeDevuelveElCreditoAlCadetePorcentaje() {
+        Pedido pedido = pedidoAsignado();
+        Cadete cadete = pedido.getCadeteAsignado();
+        cadete.setModalidadPago("PORCENTAJE");
+        cadete.setCreditoDisponible(new java.math.BigDecimal("500"));
+        pedido.setComisionDescontada(new java.math.BigDecimal("350"));
+
+        service.quitarCadete("p1", false);
+
+        assertEquals(new java.math.BigDecimal("500"), cadete.getCreditoDisponible(),
+                "sin devolverComision, el saldo no cambia: la comision ya cobrada queda cobrada");
+        assertEquals(new java.math.BigDecimal("350"), pedido.getComisionDescontada(),
+                "y el pedido sigue marcando cuanto se le cobro, no se limpia");
+    }
+
+    @Test
+    void conDevolverComisionTrueLeDevuelveElCreditoAlCadetePorcentaje() {
+        Pedido pedido = pedidoAsignado();
+        Cadete cadete = pedido.getCadeteAsignado();
+        cadete.setModalidadPago("PORCENTAJE");
+        cadete.setCreditoDisponible(new java.math.BigDecimal("500"));
+        pedido.setComisionDescontada(new java.math.BigDecimal("350"));
+        when(cadeteRepo.save(any(Cadete.class))).thenAnswer(i -> i.getArgument(0));
+
+        service.quitarCadete("p1", true);
+
+        assertEquals(new java.math.BigDecimal("850"), cadete.getCreditoDisponible(),
+                "con devolverComision, se le acredita de vuelta lo que se le habia descontado");
+        assertNull(pedido.getComisionDescontada(), "y se limpia la marca de comision descontada");
     }
 }

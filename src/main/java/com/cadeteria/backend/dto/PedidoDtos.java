@@ -135,6 +135,9 @@ public final class PedidoDtos {
 
     public record AsignarRequest(@NotBlank String cadeteId) {}
 
+    /** Boton "Quitar": si no se manda, se devuelve la comisión (comportamiento de siempre). */
+    public record QuitarRequest(Boolean devolverComision) {}
+
     /** Agrupar pedidos de la misma zona en una sola oferta a un cadete (ronda 4, punto 61). */
     public record AsignarLoteRequest(@NotBlank String cadeteId, @NotEmpty List<String> pedidoIds) {}
 

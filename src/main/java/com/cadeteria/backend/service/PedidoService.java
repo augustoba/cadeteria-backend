@@ -799,15 +799,23 @@ public class PedidoService {
         return pedido;
     }
 
-    /** Boton "Quitar": desasigna manualmente sin anular el pedido, vuelve a SIN_ASIGNAR. */
-    public Pedido quitarCadete(String pedidoId) {
+    /**
+     * Boton "Quitar": desasigna manualmente sin anular el pedido, vuelve a SIN_ASIGNAR.
+     * {@code devolverComision} solo importa para un cadete PORCENTAJE con comisión ya
+     * descontada en este pedido — por default se devuelve (comportamiento de siempre), pero
+     * el admin puede elegir no hacerlo (ej. el cadete ya había aceptado y el motivo de
+     * quitarlo no le corresponde a la cadetería devolverle nada).
+     */
+    public Pedido quitarCadete(String pedidoId, boolean devolverComision) {
         Pedido pedido = get(pedidoId);
         Cadete cadete = pedido.getCadeteAsignado();
         if (cadete == null) {
             throw new BadRequestException("El pedido no tiene cadete asignado.");
         }
         cerrarOfertaPendienteSiExiste(pedido, cadete, "QUITADO_ADMIN");
-        reembolsarComisionSiCorresponde(pedido, cadete);
+        if (devolverComision) {
+            reembolsarComisionSiCorresponde(pedido, cadete);
+        }
         liberarCadete(cadete);
         pedido.setCadeteAsignado(null);
         // La marca de asignación se va con el cadete. Si sobrevive, el panel dibuja la línea
@@ -1085,10 +1093,28 @@ public class PedidoService {
         fcmService.enviar(cadeteQueNoAcepto.getFcmToken(), "Viaje quitado",
                 "Se te quito el viaje", Map.of("tipo", "VIAJE_QUITADO", "pedidoId", pedido.getId()));
 
+        Pedido pedidoAOfertar = pedido;
         Optional<Cadete> siguiente = buscarCandidato(pedido);
+
+        // Si el único/mejor candidato para ESTE pedido es justo el que acaba de rechazarlo
+        // (o dejarlo vencer), antes de devolvérselo en el acto probamos si hay otro pedido
+        // SIN_ASIGNAR — más viejo primero — para el que también sea candidato. Evita el
+        // rebote de "siempre el mismo pedido" cuando hay otros esperando (pendiente #1,
+        // sesión 2026-09-20). Solo con asignación automática prendida: si está apagada, los
+        // demás SIN_ASIGNAR son la cola manual del admin, no hay que tocarlos.
+        if (siguiente.map(c -> c.getId().equals(cadeteQueNoAcepto.getId())).orElse(false)
+                && configuracionService.getBoolean("asignacion_automatica", false)) {
+            Optional<Pedido> alternativo = buscarPedidoAlternativoPara(cadeteQueNoAcepto, pedido);
+            if (alternativo.isPresent()) {
+                pedidoAOfertar = alternativo.get();
+                siguiente = Optional.of(cadeteQueNoAcepto);
+            }
+        }
+
         if (siguiente.isPresent()) {
-            ofertar(pedido, siguiente.get());
-        } else {
+            ofertar(pedidoAOfertar, siguiente.get());
+        }
+        if (pedidoAOfertar != pedido || siguiente.isEmpty()) {
             pedido.setCadeteAsignado(null);
             // Mismo motivo que en quitarCadete: sin esto el pedido queda "asignado a nadie"
             // en el panel.
@@ -1098,6 +1124,24 @@ public class PedidoService {
             repo.save(pedido);
             publisher.publicarPedido(PedidoResponse.from(pedido));
         }
+    }
+
+    /**
+     * Entre los pedidos SIN_ASIGNAR más viejos que {@code pedidoAExcluir} (a él lo excluye
+     * siempre: es el que el cadete acaba de rechazar/dejar vencer), busca el primero para el
+     * que {@code cadete} sea candidato válido según {@link #buscarCandidato}.
+     */
+    private Optional<Pedido> buscarPedidoAlternativoPara(Cadete cadete, Pedido pedidoAExcluir) {
+        List<Pedido> otros = repo.findByEstadoIdInOrderByCreadoEnDesc(List.of("SIN_ASIGNAR")).stream()
+                .filter(p -> !p.getId().equals(pedidoAExcluir.getId()))
+                .sorted(Comparator.comparing(Pedido::getCreadoEn))
+                .toList();
+        for (Pedido otro : otros) {
+            if (buscarCandidato(otro).map(c -> c.getId().equals(cadete.getId())).orElse(false)) {
+                return Optional.of(otro);
+            }
+        }
+        return Optional.empty();
     }
 
     /**
