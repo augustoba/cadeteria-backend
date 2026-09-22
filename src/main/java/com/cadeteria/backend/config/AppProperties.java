@@ -257,6 +257,12 @@ public class AppProperties {
         private String openRouteServiceUrl = "https://api.heigit.org/openrouteservice";
         /** Geoapify para el proxy de direcciones de "/pedir" (mejora 2026-09-17) — ver GeocodingProxyService. Vacío = solo Nominatim. */
         private String geoapifyKey = "";
+        /**
+         * LocationIQ para el mismo proxy (spec-geocoding-cache.md, Fase 1) — antes solo estaba en
+         * el front (`geocoding.service.ts`), expuesta en el bundle. Default: la misma key gratuita
+         * que ya usaba el front, movida acá. Vacío = no se consulta.
+         */
+        private String locationIqKey = "pk.117f16f1d630ef90773656ffa29db89f";
 
         public String getNominatimUrl() {
             return nominatimUrl;
@@ -280,6 +286,14 @@ public class AppProperties {
 
         public void setGeoapifyKey(String geoapifyKey) {
             this.geoapifyKey = geoapifyKey;
+        }
+
+        public String getLocationIqKey() {
+            return locationIqKey;
+        }
+
+        public void setLocationIqKey(String locationIqKey) {
+            this.locationIqKey = locationIqKey;
         }
     }
 

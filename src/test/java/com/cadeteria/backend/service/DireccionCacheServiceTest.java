@@ -1,0 +1,166 @@
+package com.cadeteria.backend.service;
+
+import com.cadeteria.backend.model.CuadraCoords;
+import com.cadeteria.backend.model.DireccionAlias;
+import com.cadeteria.backend.repository.CuadraCoordsRepository;
+import com.cadeteria.backend.repository.DireccionAliasRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+/**
+ * Cubre el corazón del diseño de la cache (spec §5-5.4): hit por cuadra+canónica+localidad sin
+ * llamar a nadie, aprendizaje de variantes nuevas solo con resultados reales, no duplicar filas
+ * de coordenadas cuando otra variante ya cacheó la misma cuadra, y no resolver en silencio una
+ * calle que existe en más de una localidad.
+ */
+class DireccionCacheServiceTest {
+
+    private static final String SMT = "San Miguel de Tucumán";
+
+    private DireccionAliasRepository aliasRepository;
+    private CuadraCoordsRepository coordsRepository;
+    private DireccionCacheService service;
+
+    @BeforeEach
+    void setUp() {
+        aliasRepository = mock(DireccionAliasRepository.class);
+        coordsRepository = mock(CuadraCoordsRepository.class);
+        service = new DireccionCacheService(aliasRepository, coordsRepository);
+    }
+
+    @Test
+    void esMissSiNoHayAliasGuardado() {
+        when(aliasRepository.findByVarianteNorm("av peron")).thenReturn(Optional.empty());
+
+        DireccionCacheService.ResultadoCache resultado = service.buscar("Av. Perón", 1502);
+
+        assertNull(resultado);
+        verify(coordsRepository, never()).findByCalleCanonicaAndCuadra(any(), any(Integer.class));
+    }
+
+    @Test
+    void esMissSiElAliasExistePeroNoHayCoordenadasDeEsaCuadra() {
+        DireccionAlias alias = alias("av peron", "presidente peron");
+        when(aliasRepository.findByVarianteNorm("av peron")).thenReturn(Optional.of(alias));
+        when(coordsRepository.findByCalleCanonicaAndCuadra("presidente peron", 1500)).thenReturn(List.of());
+
+        assertNull(service.buscar("Av. Perón", 1502));
+    }
+
+    @Test
+    void esHitYSumaUnaConfirmacionSinLlamarANadieMas() {
+        DireccionAlias alias = alias("av peron", "presidente peron");
+        CuadraCoords coords = coords("presidente peron", SMT, 1500, -26.81, -65.20, 2);
+        when(aliasRepository.findByVarianteNorm("av peron")).thenReturn(Optional.of(alias));
+        when(coordsRepository.findByCalleCanonicaAndCuadra("presidente peron", 1500)).thenReturn(List.of(coords));
+
+        DireccionCacheService.ResultadoCache resultado = service.buscar("Av. Perón", 1502);
+
+        assertEquals("presidente peron", resultado.calleCanonica());
+        assertEquals(1500, resultado.cuadra());
+        assertEquals(3, coords.getConfirmaciones());
+        verify(coordsRepository).save(coords);
+    }
+
+    @Test
+    void esMissSiLaMismaCalleYCuadraEstaCacheadaParaDosLocalidadesDistintas() {
+        // "Rivadavia 500" existe tanto en San Miguel de Tucumán como en Lules — sin la localidad
+        // en el texto no se puede saber cuál corresponde, así que no se puede resolver en silencio.
+        DireccionAlias alias = alias("rivadavia", "rivadavia");
+        CuadraCoords enSmt = coords("rivadavia", SMT, 500, -26.81, -65.20, 1);
+        CuadraCoords enLules = coords("rivadavia", "Lules", 500, -26.90, -65.35, 1);
+        when(aliasRepository.findByVarianteNorm("rivadavia")).thenReturn(Optional.of(alias));
+        when(coordsRepository.findByCalleCanonicaAndCuadra("rivadavia", 500)).thenReturn(List.of(enSmt, enLules));
+
+        assertNull(service.buscar("Rivadavia", 500));
+    }
+
+    @Test
+    void guardarCreaAliasYCoordenadasNuevasEnUnMissCompleto() {
+        when(aliasRepository.findByVarianteNorm("av peron")).thenReturn(Optional.empty());
+        when(coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra("presidente peron", SMT, 1500)).thenReturn(Optional.empty());
+
+        service.guardar("Av. Perón", 1502, "Presidente Perón", SMT, -26.81, -65.20, true, "nominatim");
+
+        verify(aliasRepository).save(any(DireccionAlias.class));
+        verify(coordsRepository).save(any(CuadraCoords.class));
+    }
+
+    @Test
+    void guardarNoDuplicaElAliasSiOtraBusquedaYaLoCreo() {
+        when(aliasRepository.findByVarianteNorm("av peron")).thenReturn(Optional.of(alias("av peron", "presidente peron")));
+        when(coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra("presidente peron", SMT, 1500)).thenReturn(Optional.empty());
+
+        service.guardar("Av. Perón", 1502, "Presidente Perón", SMT, -26.81, -65.20, true, "nominatim");
+
+        verify(aliasRepository, never()).save(any());
+    }
+
+    @Test
+    void guardarSumaConfirmacionEnVezDeDuplicarLaCuadraYaCacheadaPorOtraVariante() {
+        when(aliasRepository.findByVarianteNorm("peron")).thenReturn(Optional.empty());
+        CuadraCoords existente = coords("presidente peron", SMT, 1500, -26.81, -65.20, 1);
+        when(coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra("presidente peron", SMT, 1500)).thenReturn(Optional.of(existente));
+
+        service.guardar("Perón", 1502, "Presidente Perón", SMT, -26.81, -65.20, true, "geoapify");
+
+        assertEquals(2, existente.getConfirmaciones());
+        verify(coordsRepository).save(existente);
+        verify(coordsRepository, times(1)).save(any());
+    }
+
+    @Test
+    void guardarNoConfundeLaMismaCalleEnDosLocalidadesDistintas() {
+        // Ya hay una fila de "Rivadavia 500" en Lules; un geocode nuevo de "Rivadavia 500" en San
+        // Miguel de Tucumán tiene que crear SU PROPIA fila, no sumarle confirmación a la de Lules.
+        when(aliasRepository.findByVarianteNorm("rivadavia")).thenReturn(Optional.of(alias("rivadavia", "rivadavia")));
+        when(coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra("rivadavia", SMT, 500)).thenReturn(Optional.empty());
+
+        service.guardar("Rivadavia", 500, "Rivadavia", SMT, -26.81, -65.20, true, "geoapify");
+
+        verify(coordsRepository).save(any(CuadraCoords.class));
+    }
+
+    @Test
+    void noGuardaNadaSiElProveedorNoDevolvioCalleCanonica() {
+        service.guardar("Av. Perón", 1502, "  ", SMT, -26.81, -65.20, true, "nominatim");
+
+        verify(aliasRepository, never()).save(any());
+        verify(coordsRepository, never()).save(any());
+    }
+
+    private DireccionAlias alias(String varianteNorm, String calleCanonica) {
+        DireccionAlias a = new DireccionAlias();
+        a.setId("a1");
+        a.setVarianteNorm(varianteNorm);
+        a.setLocalidad(SMT);
+        a.setCalleCanonica(calleCanonica);
+        return a;
+    }
+
+    private CuadraCoords coords(String calleCanonica, String localidad, int cuadra, double lat, double lng, int confirmaciones) {
+        CuadraCoords c = new CuadraCoords();
+        c.setId("c1");
+        c.setCalleCanonica(calleCanonica);
+        c.setLocalidad(localidad);
+        c.setCuadra(cuadra);
+        c.setLat(lat);
+        c.setLng(lng);
+        c.setApproximate(true);
+        c.setProveedor("nominatim");
+        c.setConfirmaciones(confirmaciones);
+        return c;
+    }
+}

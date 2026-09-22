@@ -75,10 +75,11 @@ que `/pedir` funcione hay que tener el gateway de SMS configurado.
 - Estado con `signal`/`computed` (no NgRx ni servicios con `BehaviorSubject`).
 - Mapas con Leaflet (`shared/mapa-picker.component.ts` para elegir/dibujar puntos, círculos y
   polígonos).
-- Geocodificación de direcciones (autocompletar) combina varias fuentes gratuitas (Nominatim,
-  Photon, y opcionalmente Geoapify/LocationIQ si se cargan sus keys en
-  `core/services/geocoding.service.ts` — a diferencia de las keys de rutas del backend, estas
-  quedan hardcodeadas en el código porque no son sensibles y no varían por cliente).
+- Geocodificación de direcciones (autocompletar): el front **no** llama a ningún proveedor
+  directo (2026-09-21) — `core/services/geocoding-publico.service.ts` pasa siempre por el
+  backend (`GeocodingProxyService`, ver `spec-geocoding-cache.md`), que combina Nominatim,
+  Geoapify y LocationIQ detrás de una cache compartida. No hay ninguna API key de geocoding en
+  el bundle del front.
 - La cotización automática de precio (`core/services/cotizacion.service.ts`) llama al backend
   (`/api/publico/cotizar`) — toda la lógica de precio vive en el backend, el front solo la
   muestra y permite sobreescribirla.

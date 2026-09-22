@@ -38,6 +38,7 @@ public class ApiKeyPoolService {
     /** Límite diario publicado del plan gratuito de cada proveedor, para estimar "restante" cuando la API no lo informa. */
     private static final Map<String, Integer> LIMITE_DIARIO_ESTIMADO = Map.of(
             "geoapify", 3000,
+            "locationiq", 5000,
             "graphhopper", 500,
             "openrouteservice", 2500
     );

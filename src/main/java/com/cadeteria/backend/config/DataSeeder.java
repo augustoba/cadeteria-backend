@@ -109,6 +109,11 @@ public class DataSeeder implements CommandLineRunner {
         if (configuracionRepo.count() > 0) return;
         configuracionRepo.save(config("tiempo_limite_aceptacion_seg", "120"));
         configuracionRepo.save(config("frecuencia_ubicacion_seg", "45"));
+        // Enriquecimiento pasivo de la cache de direcciones con el GPS de los cadetes (spec-geocoding-cache.md
+        // §12) — 0 = apagado. Default de producción: 1200 seg (20 min), para una flota de decenas de
+        // cadetes reales; bajarlo (ej. 30 seg) solo tiene sentido probando con pocas cuentas a la vez
+        // (ver MapeoCallesCadetesService).
+        configuracionRepo.save(config("mapeo_calles_cadetes_intervalo_seg", "1200"));
         // Numero correlativo de pedidos, para mostrar en vez del UUID interno.
         configuracionRepo.save(config("proximo_numero_pedido", "1500000"));
         // Apagada por defecto: hasta que el admin la prenda a mano, asignar sigue siendo

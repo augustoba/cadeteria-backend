@@ -1,6 +1,6 @@
 # Pendientes
 
-Última actualización: 2026-09-20.
+Última actualización: 2026-09-21.
 
 > El backlog largo (las 11 rondas de propuestas) vive en `MEJORAS-PROPUESTAS.md`, en la raíz
 > del proyecto. **Ese archivo está fuera de cualquier repo git**, así que no viaja con el
@@ -87,3 +87,46 @@ de ofertas mezcla corridas y engaña — se presta a diagnosticar mal un bug, co
   disco). Solo hace falta setear `ANDROID_HOME`.
 - `documentacion/frontend.md` menciona `features/auth/` y `features/layout/` como si fueran
   pantallas: están **vacías y sin referencias** en `app.routes.ts`.
+
+## 8. Evaluar autoalojar el motor de ruteo (en vez de depender de OSRM/GraphHopper/ORS gratuitos)
+
+**El contexto.** El precio de un pedido se calcula por **distancia real de calle** (no línea
+recta) vía `RutaService`, que hoy encadena 3 fuentes gratuitas de terceros, en orden: **OSRM**
+(demo pública `router.project-osrm.org`, sin key, sin límite de cupo, pero — dice el propio
+comentario del código — "sin garantía de disponibilidad: servidor comunitario"), **GraphHopper**
+(500 req/día con key propia) y **OpenRouteService** (2.500 req/día con key propia). Si las tres
+fallan, cae a Haversine (línea recta), que subestima bastante en una ciudad con avenidas
+cortadas, ríos y rodeos — y eso pega directo en el precio sugerido al cliente.
+
+**Por qué se plantea autoalojar (surgió de una sugerencia externa, 2026-09-21).** Las tres son
+motores de ruteo **open source de verdad**, no solo "con capa gratis": OSRM (licencia BSD),
+GraphHopper (núcleo Apache 2.0; la API paga es un servicio aparte sobre el mismo motor) y
+OpenRouteService (motor propio, también open source, corriendo sobre datos de OpenStreetMap). Se
+pueden correr en un servidor propio con un extracto de OSM de Tucumán/Argentina, sin depender de
+ningún límite de cupo diario ni de que un tercero mantenga el servicio arriba.
+
+**Por qué NO es prioridad hoy, aunque la idea es válida:**
+- **No resuelve un problema de costo, porque hoy no hay ninguno.** Al volumen actual
+  (~70 viajes/día) el cupo gratis de GraphHopper + OpenRouteService sobra de sobra — nunca se
+  llega a pagar nada por ruteo, autoalojar no ahorra un peso que hoy se esté gastando.
+- **El único punto débil real es confiabilidad, no plata**, y ya está cubierto: si OSRM (la
+  demo pública, sin garantía) se cae, el sistema **ya** prueba GraphHopper y después
+  OpenRouteService solo, y si las tres fallan cae a línea recta sin romper nada
+  (`RutaService.resumenSiDisponible` está diseñado para degradar, nunca tirar error). El "riesgo"
+  que resolvería autoalojar ya tiene un colchón de 2 fuentes más atrás.
+- **Autoalojar cambia un costo de $0/mantenimiento por un costo de infraestructura +
+  mantenimiento recurrente**, no es "gratis y listo": hay que bajar y procesar el extracto de OSM
+  de Argentina/Tucumán, correr el motor (contenedor Docker corriendo 24/7, con su propia RAM/disco),
+  y sobre todo **mantenerlo actualizado a mano** cada vez que se abre una calle o cambia un
+  sentido — algo que hoy OSRM/GraphHopper/ORS le regalan al proyecto gratis, sin que nadie de acá
+  tenga que tocar nada.
+- **Es la misma decisión, con el mismo veredicto, que ya está anotada para el geocoding** en
+  `spec-geocoding-cache.md` §3.4 ("Pelias/Nominatim propio... gratis y sin límites, pero hay que
+  instalarlo y mantenerlo... solo si se quiere costo cero total aceptando el mantenimiento"). Acá
+  aplica el mismo razonamiento, para ruteo en vez de geocoding.
+
+**Cuándo reconsiderarlo:** si el volumen de pedidos crece un orden de magnitud (varios
+cientos/miles de viajes/día) y empieza a pisarse el free tier de GraphHopper/ORS, o si en la
+práctica OSRM público empieza a fallar seguido y se nota en cotizaciones cayendo a línea recta
+con más frecuencia de la esperada. Ninguna de las dos cosas pasa hoy — por eso queda anotado como
+pendiente a evaluar, no como tarea a hacer ya.

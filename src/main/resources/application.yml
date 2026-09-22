@@ -62,6 +62,8 @@ app:
     # Mismo key gratuito de Geoapify que ya usaba el front (ver admin-front geocoding.service.ts) —
     # movido acá para el proxy de "/pedir" (GeocodingProxyService) y así no viajar expuesto en el bundle.
     geoapify-key: ${GEOAPIFY_KEY:273798db51844ff6b761f6d09f7358e3}
+    # Idem con LocationIQ (spec-geocoding-cache.md, Fase 1) — misma key que ya usaba el front.
+    location-iq-key: ${LOCATIONIQ_KEY:pk.117f16f1d630ef90773656ffa29db89f}
   fcm:
     credenciales-path: ${FCM_CREDENTIALS_PATH:}
   # SMTP para el mail de alta de cadete (ronda 7) — host vacio = deshabilitado, se loguea y no rompe el alta.

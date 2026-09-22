@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/** Buscador de direcciones para la página pública "/pedir" — ver GeocodingProxyService. */
+/** Buscador de direcciones — usado por "/pedir" y por el panel admin. Ver GeocodingProxyService. */
 @RestController
 @RequestMapping("/api/publico/direcciones")
 public class GeocodingProxyController {
