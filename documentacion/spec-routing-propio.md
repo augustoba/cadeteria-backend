@@ -113,7 +113,7 @@ calles reales).
 | Cómo lee/escribe los datos | **Conexión directa a la misma base MySQL** (`cadeteria`, `localhost:3306`, mismas credenciales `DB_USER`/`DB_PASSWORD` que ya usa el backend) — lee `pedido`, `pedido_ubicacion`, `tipo_vehiculo`; escribe solo en la tabla nueva `pedido_ruta_matcheada`, que este servicio crea y es dueño de ella | Evita agregar **cualquier** endpoint nuevo al backend — cero cambios de código Java, ni de infraestructura de auth (`/api/interno/` no existe todavía y no hace falta crearlo para esto). Es consistente con la instrucción del dueño de no tocar el backend hasta verificar que funciona. |
 | Stack | Node.js | Mismo stack que `whatsapp-gateway/` — reutiliza la convención ya establecida del proyecto para procesos standalone, sin sumar un segundo runtime distinto (ej. Python) sin necesidad. |
 | Disparo | Polling con intervalo propio (`setInterval`, configurable por variable de entorno) | Equivalente al patrón `@Scheduled` + `ConfiguracionService` del backend (`MapeoCallesCadetesService`), pero como este servicio no vive en el backend, no tiene acceso a la tabla `configuracion` — se configura por entorno, como ya hace `whatsapp-gateway` con sus propias variables. |
-| Qué procesa | Pedidos recién `ENTREGADO` (o estado final) con puntos en `pedido_ubicacion` sin procesar todavía | Solo tiene sentido matchear un recorrido completo, no uno en curso. |
+| Qué procesa | Pedidos recién `FINALIZADO` (estado terminal exitoso real en `estado_pedido` — corrección 2026-09-22, se llamaba `ENTREGADO` en versiones previas de este documento y ese estado no existe) con puntos en `pedido_ubicacion` sin procesar todavía | Solo tiene sentido matchear un recorrido completo, no uno en curso. |
 | Dónde guarda el resultado | Tabla nueva `pedido_ruta_matcheada` (pedido_id, distancia_m, duracion_s, geometria_geojson, confianza, procesado_en) — creada por este servicio (`CREATE TABLE IF NOT EXISTS` al arrancar, no vía Hibernate) | **En paralelo** al cálculo naive existente en `MetricasService` — no lo reemplaza todavía. Permite comparar ambos antes de confiar en el matching. |
 | Consumidores | **Ninguno por ahora.** El backend no lee esta tabla ni sabe que existe. | Es justamente el requisito del dueño: construir sin linkear hasta verificar que funciona bien. |
 | Fuera de alcance en esta fase | Agregación por tramo de calle (construir el grafo de tiempos "propio" que reemplazaría a `RutaService`) | Necesita mucho más volumen de datos acumulado del que hay hoy — queda documentado como paso siguiente (ver §6), no se implementa ahora. |
@@ -121,11 +121,11 @@ calles reales).
 ### 4.2 Flujo
 
 ```
-Pedido pasa a ENTREGADO (en el backend, sin cambios)
+Pedido pasa a FINALIZADO (en el backend, sin cambios)
         │
         ▼
 traza-matching/ (proceso Node aparte) hace polling cada N segundos:
-  SELECT pedidos ENTREGADO recientes sin fila en pedido_ruta_matcheada
+  SELECT pedidos FINALIZADO recientes sin fila en pedido_ruta_matcheada
         │
         ▼
 Por cada uno: SELECT sus puntos en pedido_ubicacion, ordenados por capturado_en
@@ -141,7 +141,9 @@ INSERT distancia_m, duracion_s, geometria_geojson, confianza en pedido_ruta_matc
 ### 4.3 Verificación
 
 - Comparar, para los mismos pedidos, el "km real" naive de `MetricasService` contra la distancia
-  matcheada — debería ser igual o menor (la línea recta entre puntos sobreestima en curvas).
+  matcheada — debería ser igual o mayor (la línea recta entre puntos GPS nunca sobreestima
+  respecto a seguir la calle real; corrección 2026-09-22, la versión previa de este punto lo
+  tenía invertido).
 - Revisar visualmente algunas geometrías matcheadas (por ejemplo pegándolas en geojson.io) para
   confirmar que siguen calles reales y no saltan de forma rara.
 - Vigilar la **calidad del match** que devuelve OSRM (confidence score) — trazas con pings muy
@@ -177,9 +179,14 @@ INSERT distancia_m, duracion_s, geometria_geojson, confianza en pedido_ruta_matc
 - [ ] Repo `traza-matching/` (Node.js) con conexión directa a MySQL y creación de
       `pedido_ruta_matcheada` (`CREATE TABLE IF NOT EXISTS`, no vía Hibernate/backend).
 - [ ] Polling configurable por variable de entorno, misma idea que `MapeoCallesCadetesService`.
-- [ ] Llamada a `/match` del motor propio (Subproyecto A) para pedidos `ENTREGADO` sin procesar.
+- [ ] Llamada a `/match` del motor propio (Subproyecto A) para pedidos `FINALIZADO` sin procesar.
 - [ ] **Hito:** tabla poblándose sola con cada pedido entregado, comparable contra el km naive de
       `MetricasService` — sin ningún cambio en el repo del backend.
+
+**Estado real (2026-09-22): ambas fases completas y verificadas en vivo** — ver
+`routing/README.md` y `traza-matching/README.md` para el detalle de la verificación end-to-end
+(motor propio corriendo, pipeline matcheando pedidos de prueba con distancia mayor a la naive
+haversine, como se esperaba).
 
 **Fase C (futura, fuera de este alcance) — Agregación por tramo**
 - [ ] Con volumen suficiente acumulado, agregar por tramo de calle para construir el grafo de
