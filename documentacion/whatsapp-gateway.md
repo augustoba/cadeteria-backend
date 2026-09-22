@@ -103,6 +103,69 @@ recarga las 3 listas (mismo patrón que `ChatService` con `/queue/admin/chat`).
 No olvidar sumarlo a `WhatsappGatewayAuthInterceptor.DESTINOS_GATEWAY` — si no, el gateway
 no puede llamarlo (se descarta en silencio, sin error visible).
 
+## Automatizar la toma de pedidos (idea en evaluación, 2026-09-21)
+
+Distinto del gateway de arriba (que solo **manda avisos**, "pedido confirmado"/"pedido
+entregado", y por eso no importa qué número use): la idea nueva es que un bot **tome pedidos**
+conversando por WhatsApp — saluda según la hora, muestra un menú (1 hacer pedido, 2 calcular
+costo, 3 consultar pedido confirmado, 4 otro), pide origen/destino/si lleva dinero, calcula el
+precio con `CotizacionService` y pide confirmación antes de crear la `SolicitudPedido`.
+
+**Por qué esto es un problema distinto**: para que el cliente le escriba al bot, tiene que ser
+el número real de la cadetería (el que ya usan hace ~8 años), no un chip descartable — nadie le
+va a escribir a un número desconocido para pedir un viaje. Eso invalida usar Baileys ahí tal
+cual: un ban en el número real significa perder el canal con toda la base de clientes, no es
+"perder un chip".
+
+**Opciones evaluadas y por qué se descartó la API oficial:**
+
+- **API oficial (ej. Zernio, WABA por debajo)**: sin riesgo de ban porque es el canal
+  sancionado, pero **Meta empieza a cobrar mensajes de servicio (dentro de la ventana de
+  24hs) a partir del 1° de octubre de 2026** — hasta ahora eran gratis. Con la tarifa de
+  "utility" para Argentina (~$0,012/msj) y el volumen estimado (~200 chats/día × 6 msjs +
+  notificaciones ≈ 27.000 salientes/mes), el costo salta a **~$300+/mes**. Se descartó por
+  precio, no por capacidad técnica.
+- **Baileys en el número real**: gratis, pero reimplementa el protocolo de WhatsApp desde
+  cero — deja una huella distinta a un cliente oficial, más fácil de detectar. Riesgo
+  inaceptable para el número que sostiene el negocio.
+- **`whatsapp-web.js` (Puppeteer manejando un Chrome real con WhatsApp Web) — opción
+  elegida para evaluar**: como corre sobre el cliente web oficial de Meta (no una
+  reimplementación), el riesgo de detección es estructuralmente menor que Baileys. Se
+  descartó originalmente frente a Baileys por ser más pesado (necesita Chromium), pero esa
+  razón solo aplicaba al escenario de 10-15 chips simultáneos — para un solo número real en
+  una PC dedicada, el peso deja de ser un problema.
+
+**Por qué el riesgo de ban es bajo en este caso puntual** (no es una garantía general, es
+específico de este número): cuenta con ~8 años de antigüedad e historial limpio, ya maneja
+picos de 300 chats/día a mano sin inconvientes, y el tráfico siempre es solicitado por el
+cliente (nadie recibe algo no pedido → sin denuncias). Para reforzarlo, el diseño evita generar
+texto nuevo con IA en los tramos fijos: el saludo y el menú reusan el **texto literal de las
+plantillas de respuesta rápida que la cuenta ya usa hace años** (`/1` buen día, `/2` buenas
+tardes, etc. — es solo texto guardado en la app, no hay diferencia para el que lo recibe entre
+"alguien tipeó `/1`" y "alguien pegó el mismo texto"), y se le agrega el contenido dinámico
+(menú, precio calculado, confirmación) a continuación del mismo texto de siempre. DeepSeek
+queda acotado a **interpretar** lo que escribe el cliente (elegir opción si no tipea el número,
+extraer direcciones en lenguaje natural) — nunca a generar el saludo ni el texto fijo.
+
+**Costo estimado con este diseño**: prácticamente $0 salvo DeepSeek. No hay cargo de Meta (no
+pasa por la API oficial), no hay Zernio, y la geocodificación de direcciones ya usa
+Nominatim/OSM (gratis) vía `GeocodingService`. Con ~200 chats/día y solo 1-2 llamadas de IA por
+chat (extraer direcciones; el menú y sí/no se matchean con reglas simples, sin gastar tokens),
+DeepSeek V4.1 Flash queda en **~$1-2/mes**.
+
+**Reuso de lo que ya existe en el backend** (no haría falta un flujo paralelo):
+`CotizacionController`/`CotizacionService` (`/api/publico/cotizar`) ya calcula el precio
+sugerido a partir de lat/lng + monto declarado; `SolicitudPedidoService` ya tiene el flujo
+completo de "se crea una Solicitud → se confirma → nace el Pedido real", pensado para la
+página pública `/pedir`. Dos decisiones sin cerrar todavía si se avanza con esto: (1) si el bot
+autoconfirma con el precio sugerido o si igual pasa por revisión de un admin (hoy el flujo de
+`/pedir` NO autoconfirma), y (2) si se exige el `verificacionToken` por SMS que hoy pide
+`SolicitudPedidoService.crear()`, dado que el número ya está verificado por el solo hecho de
+escribir por WhatsApp.
+
+**Estado: idea evaluada y discutida, nada implementado todavía.** Se decidió no tocar código
+hasta probarlo / validarlo más.
+
 ## Documentación relacionada
 
 - [`configuracion.md`](./configuracion.md) — `WHATSAPP_GATEWAY_TOKEN` y el resto de las
