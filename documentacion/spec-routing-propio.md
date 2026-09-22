@@ -1,6 +1,12 @@
 # Motor de ruteo propio y matching de trazas GPS — Documento de diseño
 
 > **Estado:** Diseño aprobado 2026-09-22, implementación no arrancada.
+> **Corrección 2026-09-22 (ubicación):** los dos subproyectos NO viven dentro del repo del backend
+> (`cadeteria/`) — van como carpetas propias en la raíz del workspace (`C:\proyectos\cadeteria\`),
+> mismo patrón que `whatsapp-gateway/` (repo Git propio, proceso standalone). Esto además simplifica
+> el Subproyecto B: en vez de ser un job embebido en el backend Spring, es un servicio Node.js
+> aparte que lee/escribe **directo en la misma base MySQL** — así el backend sigue con **cero
+> cambios de código**, ni siquiera un endpoint nuevo. Detalle en §3.2 y §4.
 > **Alcance:** dos subproyectos independientes, standalone, **sin linkear al backend todavía**.
 > El backend actual sigue pidiendo distancia/ruta a OSRM público/GraphHopper/OpenRouteService
 > (`RutaService`) hasta que se verifique que lo propio funciona bien.
@@ -61,15 +67,17 @@ motor para convertir las trazas crudas en distancia real por calle.
 
 ### 3.2 Estructura
 
-Carpeta nueva **`routing/`** en la raíz del repo, standalone, fuera de `src/`:
+Carpeta nueva **`routing/`**, repo Git propio en la raíz del workspace
+(`C:\proyectos\cadeteria\routing\`, hermana de `cadeteria/`, `whatsapp-gateway/`, etc.) — **no**
+dentro del repo del backend:
 
 ```
-routing/
-  docker-compose.routing.yml   # levanta osrm-backend, puerto 5000
+routing/                       (repo Git propio)
+  docker-compose.routing.yml   # levanta osrm-backend, puertos 5000 (car) y 5001 (bicycle)
   scripts/
-    descargar-extracto.sh      # baja el .pbf de Argentina (Geofabrik)
-    recortar-tucuman.sh        # osmium extract con bbox de la provincia
-    preparar-osrm.sh           # osrm-extract + osrm-partition + osrm-customize
+    01-descargar-extracto.sh   # baja el .pbf de Argentina (Geofabrik)
+    02-recortar-tucuman.sh     # osmium extract con bbox de la provincia
+    03-preparar-perfil.sh      # osrm-extract + osrm-partition + osrm-customize, por perfil
   data/                        # .pbf y .osrm.* generados (gitignored, pesan GB)
   README.md                    # cómo levantarlo, probarlo con curl, y reconstruirlo
 ```
@@ -101,28 +109,33 @@ calles reales).
 
 | Punto | Decisión | Por qué |
 |---|---|---|
-| Disparo | Job programado (estilo `MapeoCallesCadetesService`), intervalo configurable desde Configuración | Mismo patrón ya validado en el código; no requiere cambios en la app de cadetes. |
-| Qué procesa | Pedidos recién `ENTREGADO` (o estado final) con puntos en `PedidoUbicacion` sin procesar todavía | Solo tiene sentido matchear un recorrido completo, no uno en curso. |
-| Dónde guarda el resultado | Tabla nueva `pedido_ruta_matcheada` (pedido, distanciaM, duracionS, geometría, calidad del match, timestamp) | **En paralelo** al cálculo naive existente en `MetricasService` — no lo reemplaza todavía. Permite comparar ambos antes de confiar en el matching. |
-| Consumidores | **Ninguno por ahora.** No se lee desde `CotizacionService`, `RutaService` ni `MetricasService`. | Es justamente el requisito del dueño: construir sin linkear hasta verificar que funciona bien. |
+| Dónde vive | Carpeta/repo propio **`traza-matching/`** en la raíz del workspace (hermana de `routing/`, `cadeteria/`, `whatsapp-gateway/`) — **no** dentro del backend | Corrección 2026-09-22: mismo patrón que `whatsapp-gateway` (proceso standalone), no un job embebido en el Spring Boot del backend. |
+| Cómo lee/escribe los datos | **Conexión directa a la misma base MySQL** (`cadeteria`, `localhost:3306`, mismas credenciales `DB_USER`/`DB_PASSWORD` que ya usa el backend) — lee `pedido`, `pedido_ubicacion`, `tipo_vehiculo`; escribe solo en la tabla nueva `pedido_ruta_matcheada`, que este servicio crea y es dueño de ella | Evita agregar **cualquier** endpoint nuevo al backend — cero cambios de código Java, ni de infraestructura de auth (`/api/interno/` no existe todavía y no hace falta crearlo para esto). Es consistente con la instrucción del dueño de no tocar el backend hasta verificar que funciona. |
+| Stack | Node.js | Mismo stack que `whatsapp-gateway/` — reutiliza la convención ya establecida del proyecto para procesos standalone, sin sumar un segundo runtime distinto (ej. Python) sin necesidad. |
+| Disparo | Polling con intervalo propio (`setInterval`, configurable por variable de entorno) | Equivalente al patrón `@Scheduled` + `ConfiguracionService` del backend (`MapeoCallesCadetesService`), pero como este servicio no vive en el backend, no tiene acceso a la tabla `configuracion` — se configura por entorno, como ya hace `whatsapp-gateway` con sus propias variables. |
+| Qué procesa | Pedidos recién `ENTREGADO` (o estado final) con puntos en `pedido_ubicacion` sin procesar todavía | Solo tiene sentido matchear un recorrido completo, no uno en curso. |
+| Dónde guarda el resultado | Tabla nueva `pedido_ruta_matcheada` (pedido_id, distancia_m, duracion_s, geometria_geojson, confianza, procesado_en) — creada por este servicio (`CREATE TABLE IF NOT EXISTS` al arrancar, no vía Hibernate) | **En paralelo** al cálculo naive existente en `MetricasService` — no lo reemplaza todavía. Permite comparar ambos antes de confiar en el matching. |
+| Consumidores | **Ninguno por ahora.** El backend no lee esta tabla ni sabe que existe. | Es justamente el requisito del dueño: construir sin linkear hasta verificar que funciona bien. |
 | Fuera de alcance en esta fase | Agregación por tramo de calle (construir el grafo de tiempos "propio" que reemplazaría a `RutaService`) | Necesita mucho más volumen de datos acumulado del que hay hoy — queda documentado como paso siguiente (ver §6), no se implementa ahora. |
 
 ### 4.2 Flujo
 
 ```
-Pedido pasa a ENTREGADO
+Pedido pasa a ENTREGADO (en el backend, sin cambios)
         │
         ▼
-Job periódico encuentra pedidos con PedidoUbicacion sin matchear
+traza-matching/ (proceso Node aparte) hace polling cada N segundos:
+  SELECT pedidos ENTREGADO recientes sin fila en pedido_ruta_matcheada
         │
         ▼
-Arma la lista de puntos (lat, lng, timestamp) ordenada por capturadoEn
+Por cada uno: SELECT sus puntos en pedido_ubicacion, ordenados por capturado_en
         │
         ▼
-POST http://localhost:5000/match/v1/driving/{puntos}  (motor propio, Subproyecto A)
+POST http://localhost:5000/match/v1/driving/{puntos}   (perfil car)
+POST http://localhost:5001/match/v1/driving/{puntos}   (perfil bicycle, según tipo_vehiculo)
         │
         ▼
-Guarda distanciaM, duracionS, geometría y calidad del match en pedido_ruta_matcheada
+INSERT distancia_m, duracion_s, geometria_geojson, confianza en pedido_ruta_matcheada
 ```
 
 ### 4.3 Verificación
@@ -139,11 +152,14 @@ Guarda distanciaM, duracionS, geometría y calidad del match en pedido_ruta_matc
 
 ## 5. Qué NO cambia con este trabajo
 
-- `RutaService`, `CotizacionService` y `MetricasService` siguen funcionando exactamente igual que
-  hoy. El backend real sigue pidiendo distancia a OSRM público/GraphHopper/ORS.
+- **Cero cambios en el repo del backend (`cadeteria/`).** Ni un archivo — `RutaService`,
+  `CotizacionService` y `MetricasService` siguen funcionando exactamente igual que hoy, y no se
+  agrega ningún endpoint nuevo. El backend real sigue pidiendo distancia a OSRM público/
+  GraphHopper/ORS.
 - No hay ningún cambio de comportamiento visible para el cliente, el cadete ni el admin.
-- Todo lo de este documento es **infraestructura y datos en paralelo**, verificable de forma
-  aislada, para decidir más adelante — con datos reales en la mano — si vale la pena linkearlo.
+- Todo lo de este documento vive en dos carpetas/repos nuevos y standalone (`routing/`,
+  `traza-matching/`), verificable de forma aislada, para decidir más adelante — con datos reales
+  en la mano — si vale la pena linkearlo.
 
 ---
 
@@ -158,11 +174,12 @@ Guarda distanciaM, duracionS, geometría y calidad del match en pedido_ruta_matc
 - [ ] **Hito:** motor propio respondiendo en `localhost:5000`, verificado contra OSRM público.
 
 **Fase B — Pipeline de matching**
-- [ ] Tabla `pedido_ruta_matcheada`.
-- [ ] `TrazaMatchingService` (job programado, config de intervalo en Configuración).
-- [ ] Llamada a `/match` del motor propio para pedidos `ENTREGADO` sin procesar.
+- [ ] Repo `traza-matching/` (Node.js) con conexión directa a MySQL y creación de
+      `pedido_ruta_matcheada` (`CREATE TABLE IF NOT EXISTS`, no vía Hibernate/backend).
+- [ ] Polling configurable por variable de entorno, misma idea que `MapeoCallesCadetesService`.
+- [ ] Llamada a `/match` del motor propio (Subproyecto A) para pedidos `ENTREGADO` sin procesar.
 - [ ] **Hito:** tabla poblándose sola con cada pedido entregado, comparable contra el km naive de
-      `MetricasService`.
+      `MetricasService` — sin ningún cambio en el repo del backend.
 
 **Fase C (futura, fuera de este alcance) — Agregación por tramo**
 - [ ] Con volumen suficiente acumulado, agregar por tramo de calle para construir el grafo de
