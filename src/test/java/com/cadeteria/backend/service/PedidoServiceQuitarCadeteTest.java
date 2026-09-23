@@ -51,7 +51,7 @@ class PedidoServiceQuitarCadeteTest {
                 mock(PedidoUbicacionRepository.class), mock(PedidoComentarioRepository.class),
                 mock(PedidoPrecioLogRepository.class), mock(WebPushService.class),
                 mock(PedidoParadaRepository.class), mock(MovimientoCreditoRepository.class),
-                mock(IncidenciaRepository.class), new AppProperties());
+                mock(IncidenciaRepository.class), mock(PedidoCadeteExcluidoRepository.class), new AppProperties());
 
         when(estadoPedidoRepo.findById("SIN_ASIGNAR")).thenReturn(Optional.of(new EstadoPedido()));
         when(ofertaRepo.findFirstByPedidoIdAndCadeteIdAndResultadoId(any(), any(), any()))

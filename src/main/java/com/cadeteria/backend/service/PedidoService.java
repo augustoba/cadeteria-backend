@@ -9,6 +9,7 @@ import com.cadeteria.backend.model.Cadete;
 import com.cadeteria.backend.model.EstadoPedido;
 import com.cadeteria.backend.model.OfertaPedido;
 import com.cadeteria.backend.model.Pedido;
+import com.cadeteria.backend.model.PedidoCadeteExcluido;
 import com.cadeteria.backend.model.PedidoComentario;
 import com.cadeteria.backend.model.PedidoPrecioLog;
 import com.cadeteria.backend.model.PedidoParada;
@@ -22,6 +23,7 @@ import com.cadeteria.backend.repository.MovimientoCreditoRepository;
 import com.cadeteria.backend.repository.EstadoPedidoRepository;
 import com.cadeteria.backend.repository.OfertaPedidoRepository;
 import com.cadeteria.backend.repository.PedidoRepository;
+import com.cadeteria.backend.repository.PedidoCadeteExcluidoRepository;
 import com.cadeteria.backend.repository.PedidoComentarioRepository;
 import com.cadeteria.backend.repository.PedidoPrecioLogRepository;
 import com.cadeteria.backend.repository.PedidoParadaRepository;
@@ -78,6 +80,7 @@ public class PedidoService {
     private final PedidoParadaRepository pedidoParadaRepo;
     private final MovimientoCreditoRepository movimientoCreditoRepo;
     private final IncidenciaRepository incidenciaRepo;
+    private final PedidoCadeteExcluidoRepository pedidoCadeteExcluidoRepo;
     private final String frontBaseUrlSeguimiento;
 
     public PedidoService(PedidoRepository repo, CadeteRepository cadeteRepo, EstadoPedidoRepository estadoPedidoRepo,
@@ -87,10 +90,12 @@ public class PedidoService {
                           PedidoUbicacionRepository pedidoUbicacionRepo, PedidoComentarioRepository pedidoComentarioRepo,
                           PedidoPrecioLogRepository pedidoPrecioLogRepo, WebPushService webPushService,
                           PedidoParadaRepository pedidoParadaRepo, MovimientoCreditoRepository movimientoCreditoRepo,
-                          IncidenciaRepository incidenciaRepo, AppProperties props) {
+                          IncidenciaRepository incidenciaRepo, PedidoCadeteExcluidoRepository pedidoCadeteExcluidoRepo,
+                          AppProperties props) {
         this.repo = repo;
         this.movimientoCreditoRepo = movimientoCreditoRepo;
         this.incidenciaRepo = incidenciaRepo;
+        this.pedidoCadeteExcluidoRepo = pedidoCadeteExcluidoRepo;
         this.cadeteRepo = cadeteRepo;
         this.estadoPedidoRepo = estadoPedidoRepo;
         this.resultadoOfertaRepo = resultadoOfertaRepo;
@@ -437,6 +442,10 @@ public class PedidoService {
      * no cuánto quiere darle de una el sistema). Un cadete sin ubicación cargada no es
      * candidato — no hay con qué calcular la distancia.
      * <p>
+     * Al cadete al que se le "Quitó" este pedido puntual sin reasignarlo a nadie tampoco se
+     * le vuelve a ofrecer (ver {@link PedidoCadeteExcluido}) — mismo criterio de "urgente" de
+     * arriba para no dejarlo flotando si total no hay nadie más.
+     * <p>
      * Si {@code pedido.isRequiereMoto()}, solo entran cadetes en MOTO. Si no, entran motos y
      * bicis por igual, pero a una bici se la excluye si el viaje (origen→destino) supera
      * {@code distancia_maxima_bici_km}, o si su distancia actual hasta el origen supera
@@ -461,6 +470,7 @@ public class PedidoService {
                 .filter(c -> "LIBRE".equals(c.getEstado().getId()))
                 .filter(this::puedeRecibirViajes)
                 .filter(c -> pedidoUrgente || rechazosPorCadete.getOrDefault(c.getId(), 0L) < maxRechazos)
+                .filter(c -> pedidoUrgente || !pedidoCadeteExcluidoRepo.existsByPedidoIdAndCadeteId(pedido.getId(), c.getId()))
                 .filter(c -> !pedido.isRequiereMoto() || "MOTO".equals(c.getTipoVehiculo().getId()))
                 .filter(c -> !"BICI".equals(c.getTipoVehiculo().getId())
                         || (dentroDeTopeDeViajeBici(pedido) && dentroDeTopeDeRetiroBici(c, pedido)))
@@ -788,6 +798,13 @@ public class PedidoService {
      * descontada en este pedido — por default se devuelve (comportamiento de siempre), pero
      * el admin puede elegir no hacerlo (ej. el cadete ya había aceptado y el motivo de
      * quitarlo no le corresponde a la cadetería devolverle nada).
+     * <p>
+     * A diferencia de {@link #reasignar}, acá el pedido queda SIN_ASIGNAR sin nadie más
+     * esperando — por eso el cadete que se le acaba de sacar queda excluido de volver a ser
+     * candidato de la asignación automática para ESTE pedido puntual (mejora 2026-09-23,
+     * pedida por el dueño: si no, el sistema se lo podía volver a ofrecer solo). No es un
+     * rechazo real (no lo hizo el cadete), así que no toca {@code OfertaPedido} ni su tasa de
+     * rechazo — ver {@link PedidoCadeteExcluido}.
      */
     public Pedido quitarCadete(String pedidoId, boolean devolverComision) {
         Pedido pedido = get(pedidoId);
@@ -799,6 +816,7 @@ public class PedidoService {
         if (devolverComision) {
             reembolsarComisionSiCorresponde(pedido, cadete);
         }
+        excluirCadeteDelPedidoSiCorresponde(pedido, cadete);
         liberarCadete(cadete);
         pedido.setCadeteAsignado(null);
         // La marca de asignación se va con el cadete. Si sobrevive, el panel dibuja la línea
@@ -816,6 +834,16 @@ public class PedidoService {
         fcmService.enviar(cadete.getFcmToken(), "Viaje quitado",
                 "Se te quito el viaje", Map.of("tipo", "VIAJE_QUITADO", "pedidoId", pedido.getId()));
         return pedido;
+    }
+
+    /** Idempotente: si ya estaba excluido (ej. doble click) no duplica la fila. */
+    private void excluirCadeteDelPedidoSiCorresponde(Pedido pedido, Cadete cadete) {
+        if (pedidoCadeteExcluidoRepo.existsByPedidoIdAndCadeteId(pedido.getId(), cadete.getId())) return;
+        PedidoCadeteExcluido excluido = new PedidoCadeteExcluido();
+        excluido.setId(UUID.randomUUID().toString());
+        excluido.setPedido(pedido);
+        excluido.setCadete(cadete);
+        pedidoCadeteExcluidoRepo.save(excluido);
     }
 
     /** Boton "Anular": cancela el pedido en cualquier estado activo. Motivo ("CLIENTE"/"OTRO") es para métricas. */

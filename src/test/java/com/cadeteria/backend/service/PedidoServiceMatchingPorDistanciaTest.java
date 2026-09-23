@@ -64,7 +64,7 @@ class PedidoServiceMatchingPorDistanciaTest {
                 mock(PedidoUbicacionRepository.class), mock(PedidoComentarioRepository.class),
                 mock(PedidoPrecioLogRepository.class), mock(WebPushService.class),
                 mock(PedidoParadaRepository.class), mock(MovimientoCreditoRepository.class),
-                mock(IncidenciaRepository.class), new AppProperties());
+                mock(IncidenciaRepository.class), mock(PedidoCadeteExcluidoRepository.class), new AppProperties());
 
         moto = new TipoVehiculo();
         moto.setId("MOTO");
