@@ -45,8 +45,7 @@ class PedidoServiceQuitarCadeteTest {
         estadoPedidoRepo = mock(EstadoPedidoRepository.class);
 
         service = new PedidoService(
-                repo, cadeteRepo, mock(ZonaRepository.class), mock(TipoVehiculoRepository.class),
-                estadoPedidoRepo, mock(ResultadoOfertaRepository.class), ofertaRepo,
+                repo, cadeteRepo, estadoPedidoRepo, mock(ResultadoOfertaRepository.class), ofertaRepo,
                 mock(EstadoCadeteRepository.class), mock(ConfiguracionService.class),
                 mock(WebSocketPublisher.class), mock(FcmService.class), mock(SmsGatewayService.class),
                 mock(PedidoUbicacionRepository.class), mock(PedidoComentarioRepository.class),

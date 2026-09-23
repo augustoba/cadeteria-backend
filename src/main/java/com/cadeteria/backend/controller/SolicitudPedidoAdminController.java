@@ -35,14 +35,14 @@ public class SolicitudPedidoAdminController {
     @PostMapping("/{id}/confirmar-directo")
     public PedidoResponse confirmarDirecto(@PathVariable String id, @Valid @RequestBody RevisarSolicitudRequest req) {
         return PedidoResponse.from(
-                service.confirmarDirecto(id, req.zonaId(), req.tipoVehiculoRequeridoId(), req.precio(), req.montoDeclarado()));
+                service.confirmarDirecto(id, req.requiereMoto(), req.precio(), req.montoDeclarado()));
     }
 
     /** Le manda la cotización por SMS con un link — el cliente confirma solo, sin llamar. */
     @PostMapping("/{id}/cotizar")
     public SolicitudPedidoResponse cotizar(@PathVariable String id, @Valid @RequestBody RevisarSolicitudRequest req) {
         return SolicitudPedidoResponse.from(
-                service.cotizar(id, req.zonaId(), req.tipoVehiculoRequeridoId(), req.precio(), req.montoDeclarado()));
+                service.cotizar(id, req.requiereMoto(), req.precio(), req.montoDeclarado()));
     }
 
     @PostMapping("/{id}/rechazar")

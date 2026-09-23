@@ -66,8 +66,7 @@ class PedidoServiceReasignacionTest {
         configuracionService = mock(ConfiguracionService.class);
 
         service = new PedidoService(
-                repo, cadeteRepo, mock(ZonaRepository.class), mock(TipoVehiculoRepository.class),
-                estadoPedidoRepo, resultadoOfertaRepo, ofertaRepo,
+                repo, cadeteRepo, estadoPedidoRepo, resultadoOfertaRepo, ofertaRepo,
                 mock(EstadoCadeteRepository.class), configuracionService,
                 mock(WebSocketPublisher.class), mock(FcmService.class), mock(SmsGatewayService.class),
                 mock(PedidoUbicacionRepository.class), mock(PedidoComentarioRepository.class),
@@ -91,6 +90,8 @@ class PedidoServiceReasignacionTest {
         cadete.setEstado(libre);
         cadete.setTipoVehiculo(moto);
         cadete.setZonaActual(zona);
+        cadete.setLat(-26.8135);
+        cadete.setLng(-65.2245);
 
         when(estadoPedidoRepo.findById("SIN_ASIGNAR")).thenReturn(Optional.of(estadoPedido("SIN_ASIGNAR")));
         when(estadoPedidoRepo.findById("PENDIENTE")).thenReturn(Optional.of(estadoPedido("PENDIENTE")));
@@ -108,7 +109,9 @@ class PedidoServiceReasignacionTest {
         p.setId(id);
         p.setEstado(estadoPedido("PENDIENTE"));
         p.setZona(zona);
-        p.setTipoVehiculoRequerido(moto);
+        p.setRequiereMoto(true);
+        p.setOrigenLat(-26.8135);
+        p.setOrigenLng(-65.2245);
         p.setCreadoEn(creadoEn);
         when(repo.findById(id)).thenReturn(Optional.of(p));
         return p;

@@ -26,8 +26,7 @@ public final class PedidoDtos {
             @NotNull BigDecimal precio,
             BigDecimal montoDeclarado,
             String detalle,
-            @NotBlank String zonaId,
-            @NotBlank String tipoVehiculoRequeridoId,
+            boolean requiereMoto,
             boolean programado,
             Instant fechaProgramada,
             /** Paradas intermedias, en orden (ronda 3, punto 38) — null o vacío si el pedido es simple. */
@@ -56,7 +55,7 @@ public final class PedidoDtos {
             String origenDireccion, Double origenLat, Double origenLng,
             String destinoDireccion, Double destinoLat, Double destinoLng,
             BigDecimal precio, BigDecimal montoDeclarado, String detalle,
-            LookupResponse zona, LookupResponse tipoVehiculoRequerido, LookupResponse estado,
+            boolean requiereMoto, LookupResponse estado,
             CadeteResumen cadeteAsignado,
             boolean programado, Instant fechaProgramada,
             Instant creadoEn, Instant asignadoEn,
@@ -100,8 +99,7 @@ public final class PedidoDtos {
                     p.getOrigenDireccion(), p.getOrigenLat(), p.getOrigenLng(),
                     p.getDestinoDireccion(), p.getDestinoLat(), p.getDestinoLng(),
                     p.getPrecio(), p.getMontoDeclarado(), p.getDetalle(),
-                    LookupResponse.from(p.getZona()), LookupResponse.from(p.getTipoVehiculoRequerido()),
-                    LookupResponse.from(p.getEstado()),
+                    p.isRequiereMoto(), LookupResponse.from(p.getEstado()),
                     CadeteResumen.from(p.getCadeteAsignado()),
                     p.isProgramado(), p.getFechaProgramada(),
                     p.getCreadoEn(), p.getAsignadoEn(), p.getVistoEn(),
@@ -138,7 +136,7 @@ public final class PedidoDtos {
     /** Boton "Quitar": si no se manda, se devuelve la comisión (comportamiento de siempre). */
     public record QuitarRequest(Boolean devolverComision) {}
 
-    /** Agrupar pedidos de la misma zona en una sola oferta a un cadete (ronda 4, punto 61). */
+    /** Agrupar pedidos con orígenes cercanos en una sola oferta a un cadete (ronda 4, punto 61). */
     public record AsignarLoteRequest(@NotBlank String cadeteId, @NotEmpty List<String> pedidoIds) {}
 
     /** Boton "Anular": motivo "CLIENTE" u "OTRO" (para métricas), null si no se especifica. */

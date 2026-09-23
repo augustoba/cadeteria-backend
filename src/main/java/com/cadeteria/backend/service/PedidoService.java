@@ -14,8 +14,6 @@ import com.cadeteria.backend.model.PedidoPrecioLog;
 import com.cadeteria.backend.model.PedidoParada;
 import com.cadeteria.backend.model.PedidoUbicacion;
 import com.cadeteria.backend.model.ResultadoOferta;
-import com.cadeteria.backend.model.TipoVehiculo;
-import com.cadeteria.backend.model.Zona;
 import com.cadeteria.backend.config.AppProperties;
 import com.cadeteria.backend.repository.CadeteRepository;
 import com.cadeteria.backend.repository.EstadoCadeteRepository;
@@ -29,8 +27,6 @@ import com.cadeteria.backend.repository.PedidoPrecioLogRepository;
 import com.cadeteria.backend.repository.PedidoParadaRepository;
 import com.cadeteria.backend.repository.PedidoUbicacionRepository;
 import com.cadeteria.backend.repository.ResultadoOfertaRepository;
-import com.cadeteria.backend.repository.TipoVehiculoRepository;
-import com.cadeteria.backend.repository.ZonaRepository;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -67,8 +63,6 @@ public class PedidoService {
 
     private final PedidoRepository repo;
     private final CadeteRepository cadeteRepo;
-    private final ZonaRepository zonaRepo;
-    private final TipoVehiculoRepository tipoVehiculoRepo;
     private final EstadoPedidoRepository estadoPedidoRepo;
     private final ResultadoOfertaRepository resultadoOfertaRepo;
     private final OfertaPedidoRepository ofertaRepo;
@@ -86,8 +80,7 @@ public class PedidoService {
     private final IncidenciaRepository incidenciaRepo;
     private final String frontBaseUrlSeguimiento;
 
-    public PedidoService(PedidoRepository repo, CadeteRepository cadeteRepo, ZonaRepository zonaRepo,
-                          TipoVehiculoRepository tipoVehiculoRepo, EstadoPedidoRepository estadoPedidoRepo,
+    public PedidoService(PedidoRepository repo, CadeteRepository cadeteRepo, EstadoPedidoRepository estadoPedidoRepo,
                           ResultadoOfertaRepository resultadoOfertaRepo, OfertaPedidoRepository ofertaRepo,
                           EstadoCadeteRepository estadoCadeteRepo, ConfiguracionService configuracionService,
                           WebSocketPublisher publisher, FcmService fcmService, SmsGatewayService smsGatewayService,
@@ -99,8 +92,6 @@ public class PedidoService {
         this.movimientoCreditoRepo = movimientoCreditoRepo;
         this.incidenciaRepo = incidenciaRepo;
         this.cadeteRepo = cadeteRepo;
-        this.zonaRepo = zonaRepo;
-        this.tipoVehiculoRepo = tipoVehiculoRepo;
         this.estadoPedidoRepo = estadoPedidoRepo;
         this.resultadoOfertaRepo = resultadoOfertaRepo;
         this.ofertaRepo = ofertaRepo;
@@ -339,11 +330,6 @@ public class PedidoService {
     // --- Alta ---
 
     public Pedido crear(PedidoRequest req) {
-        Zona zona = zonaRepo.findById(req.zonaId())
-                .orElseThrow(() -> ResourceNotFoundException.of("Zona", req.zonaId()));
-        TipoVehiculo tipo = tipoVehiculoRepo.findById(req.tipoVehiculoRequeridoId())
-                .orElseThrow(() -> ResourceNotFoundException.of("Tipo de vehiculo", req.tipoVehiculoRequeridoId()));
-
         boolean esProgramado = req.programado() && req.fechaProgramada() != null
                 && req.fechaProgramada().isAfter(Instant.now());
 
@@ -362,8 +348,7 @@ public class PedidoService {
         p.setPrecio(req.precio());
         p.setMontoDeclarado(req.montoDeclarado() == null ? BigDecimal.ZERO : req.montoDeclarado());
         p.setDetalle(req.detalle());
-        p.setZona(zona);
-        p.setTipoVehiculoRequerido(tipo);
+        p.setRequiereMoto(req.requiereMoto());
         p.setProgramado(esProgramado);
         p.setFechaProgramada(esProgramado ? req.fechaProgramada() : null);
         p.setEstado(estado(esProgramado ? "PROGRAMADO" : "SIN_ASIGNAR"));
@@ -409,7 +394,7 @@ public class PedidoService {
                 original.getOrigenDireccion(), original.getOrigenLat(), original.getOrigenLng(),
                 original.getDestinoDireccion(), original.getDestinoLat(), original.getDestinoLng(),
                 original.getPrecio(), null, "Repetición del pedido #" + original.getNumero(),
-                original.getZona().getId(), original.getTipoVehiculoRequerido().getId(),
+                original.isRequiereMoto(),
                 false, null, null);
         return crear(req);
     }
@@ -439,33 +424,27 @@ public class PedidoService {
     }
 
     /**
-     * Primero busca candidato dentro de la zona del pedido (o una aledaña). Un cadete que
-     * ya rechazó ESTE pedido puntual "max_rechazos_por_pedido" veces (default 3) queda
-     * afuera de él — salvo que el pedido ya lleve "minutos_pedido_urgente_reintentar"
-     * minutos (default 30) sin poder asignarse, en cuyo caso se ignora ese límite para que
-     * un pedido que todos rechazan no quede flotando para siempre. Una oferta vencida sin
-     * respuesta ("no lo vio") NO cuenta como rechazo ni lo excluye, pero sí lo manda al
-     * final de la cola: se prueba primero con cadetes a los que nunca se les ofreció este
-     * pedido. Tampoco se le ofrece a un cadete que ya tiene "asignacion_automatica_max_viajes_cadete"
-     * viajes sin terminar encima (independiente de su propio tope maxViajesSimultaneos,
-     * que es cuánto puede cargar él, no cuánto quiere darle de una el sistema).
+     * El elegible más cercano por GPS en línea recta al origen del pedido — sin zona, el
+     * matching es 100% distancia. Un cadete que ya rechazó ESTE pedido puntual
+     * "max_rechazos_por_pedido" veces (default 3) queda afuera de él — salvo que el pedido
+     * ya lleve "minutos_pedido_urgente_reintentar" minutos (default 30) sin poder asignarse,
+     * en cuyo caso se ignora ese límite para que un pedido que todos rechazan no quede
+     * flotando para siempre. Una oferta vencida sin respuesta ("no lo vio") NO cuenta como
+     * rechazo ni lo excluye, pero sí lo manda al final de la cola: se prueba primero con
+     * cadetes a los que nunca se les ofreció este pedido. Tampoco se le ofrece a un cadete
+     * que ya tiene "asignacion_automatica_max_viajes_cadete" viajes sin terminar encima
+     * (independiente de su propio tope maxViajesSimultaneos, que es cuánto puede cargar él,
+     * no cuánto quiere darle de una el sistema). Un cadete sin ubicación cargada no es
+     * candidato — no hay con qué calcular la distancia.
      * <p>
-     * Si nadie matchea zona (ej. todavía no hay zonas cargadas para donde está el cadete,
-     * o el pedido cayó en una zona sin cadetes cerca), en vez de dejarlo sin nadie se lo
-     * ofrece igual al elegible más cercano por GPS en línea recta al origen del pedido. Un
-     * cadete sin ubicación cargada todavía no entra en este fallback porque no hay con qué
-     * calcular la distancia.
-     * <p>
-     * Si el pedido requiere BICI y el viaje (origen→destino) supera {@code distancia_maxima_bici_km},
-     * no se ofrece a nadie automáticamente — una bici no puede cubrir esa distancia. Es un
-     * límite de la ASIGNACIÓN AUTOMÁTICA nomás; el admin puede seguir asignando a mano si le
-     * parece razonable en el caso puntual.
+     * Si {@code pedido.isRequiereMoto()}, solo entran cadetes en MOTO. Si no, entran motos y
+     * bicis por igual, pero a una bici se la excluye si el viaje (origen→destino) supera
+     * {@code distancia_maxima_bici_km}, o si su distancia actual hasta el origen supera
+     * {@code distancia_maxima_bici_retiro_km} (0 en cualquiera de las dos = sin límite). Estos
+     * dos topes son un límite de la ASIGNACIÓN AUTOMÁTICA nomás; el admin puede seguir
+     * asignando a mano si le parece razonable en el caso puntual.
      */
     private Optional<Cadete> buscarCandidato(Pedido pedido) {
-        if (viajeSuperaTopeDeBici(pedido)) {
-            return Optional.empty();
-        }
-        Set<String> zonasCompatibles = zonasCompatibles(pedido.getZona());
         List<OfertaPedido> ofertasPrevias = ofertaRepo.findByPedidoId(pedido.getId());
         Set<String> yaIntentados = ofertasPrevias.stream().map(o -> o.getCadete().getId()).collect(Collectors.toSet());
         Map<String, Long> rechazosPorCadete = ofertasPrevias.stream()
@@ -482,7 +461,9 @@ public class PedidoService {
                 .filter(c -> "LIBRE".equals(c.getEstado().getId()))
                 .filter(this::puedeRecibirViajes)
                 .filter(c -> pedidoUrgente || rechazosPorCadete.getOrDefault(c.getId(), 0L) < maxRechazos)
-                .filter(c -> c.getTipoVehiculo().getId().equals(pedido.getTipoVehiculoRequerido().getId()))
+                .filter(c -> !pedido.isRequiereMoto() || "MOTO".equals(c.getTipoVehiculo().getId()))
+                .filter(c -> !"BICI".equals(c.getTipoVehiculo().getId())
+                        || (dentroDeTopeDeViajeBici(pedido) && dentroDeTopeDeRetiroBici(c, pedido)))
                 .filter(c -> dentroDeTopes(c, pedido))
                 .filter(c -> cantidadPedidosPendientes(c) < maxViajesAsignacion)
                 .filter(this::dentroDeTurno)
@@ -501,11 +482,6 @@ public class PedidoService {
         }
         prioridad = prioridad.thenComparing(Cadete::getOrdenColaEspera);
 
-        Optional<Cadete> enZona = elegibles.stream()
-                .filter(c -> c.getZonaActual() != null && zonasCompatibles.contains(c.getZonaActual().getId()))
-                .min(prioridad);
-        if (enZona.isPresent()) return enZona;
-
         return elegibles.stream()
                 .filter(c -> c.getLat() != null && c.getLng() != null)
                 .min(Comparator.comparing((Cadete c) -> yaIntentados.contains(c.getId()))
@@ -515,13 +491,22 @@ public class PedidoService {
                         .thenComparing(Cadete::getOrdenColaEspera));
     }
 
-    private boolean viajeSuperaTopeDeBici(Pedido pedido) {
-        if (!"BICI".equals(pedido.getTipoVehiculoRequerido().getId())) return false;
+    /** true si NO hay tope, o el viaje (origen→destino) no lo supera. Solo aplica a candidatos BICI. */
+    private boolean dentroDeTopeDeViajeBici(Pedido pedido) {
         BigDecimal topeKm = configuracionService.getBigDecimal("distancia_maxima_bici_km", BigDecimal.ZERO);
-        if (topeKm.signum() <= 0) return false; // 0 o sin cargar = sin límite
+        if (topeKm.signum() <= 0) return true; // 0 o sin cargar = sin límite
         double distanciaViaje = GeocodingService.distanciaKm(
                 pedido.getOrigenLat(), pedido.getOrigenLng(), pedido.getDestinoLat(), pedido.getDestinoLng());
-        return distanciaViaje > topeKm.doubleValue();
+        return distanciaViaje <= topeKm.doubleValue();
+    }
+
+    /** true si NO hay tope, o la distancia del cadete al origen no lo supera. Solo aplica a candidatos BICI. */
+    private boolean dentroDeTopeDeRetiroBici(Cadete cadete, Pedido pedido) {
+        if (cadete.getLat() == null || cadete.getLng() == null) return false;
+        BigDecimal topeKm = configuracionService.getBigDecimal("distancia_maxima_bici_retiro_km", BigDecimal.ZERO);
+        if (topeKm.signum() <= 0) return true;
+        double distancia = GeocodingService.distanciaKm(cadete.getLat(), cadete.getLng(), pedido.getOrigenLat(), pedido.getOrigenLng());
+        return distancia <= topeKm.doubleValue();
     }
 
     /**
@@ -565,12 +550,6 @@ public class PedidoService {
             return !ahora.isBefore(inicio) && ahora.isBefore(fin);
         }
         return !ahora.isBefore(inicio) || ahora.isBefore(fin);
-    }
-
-    private Set<String> zonasCompatibles(Zona zona) {
-        Set<String> ids = zona.getZonasAledanas().stream().map(Zona::getId).collect(Collectors.toSet());
-        ids.add(zona.getId());
-        return ids;
     }
 
     private boolean dentroDeTopes(Cadete cadete, Pedido nuevoPedido) {
@@ -686,11 +665,12 @@ public class PedidoService {
     }
 
     /**
-     * Agrupar pedidos de la misma zona (o zonas aledañas) en una sola oferta a un cadete
-     * (ronda 4, punto 61) — para repartos que van al mismo lado, en vez de asignarlos uno
-     * por uno. Reusa `ofertar()` pedido por pedido (el cadete sigue viendo/aceptando cada
-     * uno por separado en la app, sin ningún cambio ahí); requiere que el cadete tenga
-     * "Máx. viajes simultáneos" configurado en 2 o más si el lote tiene más de un pedido.
+     * Agrupar pedidos con orígenes cercanos entre sí (dentro de "distancia_maxima_lote_km",
+     * default 3) en una sola oferta a un cadete (ronda 4, punto 61) — para repartos que van
+     * al mismo lado, en vez de asignarlos uno por uno. Reusa `ofertar()` pedido por pedido
+     * (el cadete sigue viendo/aceptando cada uno por separado en la app, sin ningún cambio
+     * ahí); requiere que el cadete tenga "Máx. viajes simultáneos" configurado en 2 o más si
+     * el lote tiene más de un pedido.
      */
     public List<Pedido> asignarLote(List<String> pedidoIds, String cadeteId, String adminUsername) {
         if (pedidoIds == null || pedidoIds.isEmpty()) {
@@ -705,13 +685,16 @@ public class PedidoService {
             throw new BadRequestException("El cadete todavia no pago la cuota semanal — no se le puede asignar.");
         }
         List<Pedido> pedidos = pedidoIds.stream().map(this::get).toList();
-        Set<String> zonasCompatibles = zonasCompatibles(pedidos.get(0).getZona());
+        BigDecimal topeLoteKm = configuracionService.getBigDecimal("distancia_maxima_lote_km", BigDecimal.valueOf(3));
+        Pedido primero = pedidos.get(0);
         for (Pedido p : pedidos) {
             if (!"SIN_ASIGNAR".equals(p.getEstado().getId())) {
                 throw new BadRequestException("El pedido #" + p.getNumero() + " ya tiene una asignacion en curso.");
             }
-            if (!zonasCompatibles.contains(p.getZona().getId())) {
-                throw new BadRequestException("Todos los pedidos del lote tienen que ser de la misma zona (o zonas aledañas).");
+            double distancia = GeocodingService.distanciaKm(
+                    primero.getOrigenLat(), primero.getOrigenLng(), p.getOrigenLat(), p.getOrigenLng());
+            if (distancia > topeLoteKm.doubleValue()) {
+                throw new BadRequestException("Todos los pedidos del lote tienen que tener orígenes cercanos entre sí.");
             }
         }
         for (Pedido p : pedidos) {

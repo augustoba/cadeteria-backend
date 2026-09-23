@@ -135,6 +135,6 @@ public class PedidoCadeteController {
         }
         Pedido pedido = service.get(id);
         return rutaService.calcularRuta(cadete.getLat(), cadete.getLng(),
-                pedido.getDestinoLat(), pedido.getDestinoLng(), pedido.getTipoVehiculoRequerido().getId());
+                pedido.getDestinoLat(), pedido.getDestinoLng(), cadete.getTipoVehiculo().getId());
     }
 }

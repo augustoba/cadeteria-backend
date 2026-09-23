@@ -7,11 +7,7 @@ import com.cadeteria.backend.dto.PedidoDtos.PedidoRequest;
 import com.cadeteria.backend.dto.SolicitudPedidoDtos.SolicitudPedidoRequest;
 import com.cadeteria.backend.model.Pedido;
 import com.cadeteria.backend.model.SolicitudPedido;
-import com.cadeteria.backend.model.TipoVehiculo;
-import com.cadeteria.backend.model.Zona;
 import com.cadeteria.backend.repository.SolicitudPedidoRepository;
-import com.cadeteria.backend.repository.TipoVehiculoRepository;
-import com.cadeteria.backend.repository.ZonaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,8 +31,6 @@ import java.util.UUID;
 public class SolicitudPedidoService {
 
     private final SolicitudPedidoRepository repo;
-    private final ZonaRepository zonaRepo;
-    private final TipoVehiculoRepository tipoVehiculoRepo;
     private final PedidoService pedidoService;
     private final SmsGatewayService smsGatewayService;
     private final WebSocketPublisher publisher;
@@ -46,15 +40,12 @@ public class SolicitudPedidoService {
 
     private static final ZoneId ZONA_ART = ZoneId.of("America/Argentina/Buenos_Aires");
 
-    public SolicitudPedidoService(SolicitudPedidoRepository repo, ZonaRepository zonaRepo,
-                                   TipoVehiculoRepository tipoVehiculoRepo, PedidoService pedidoService,
+    public SolicitudPedidoService(SolicitudPedidoRepository repo, PedidoService pedidoService,
                                    SmsGatewayService smsGatewayService, WebSocketPublisher publisher,
                                    VerificacionTelefonoService verificacionTelefonoService,
                                    ConfiguracionService configuracionService,
                                    AppProperties props) {
         this.repo = repo;
-        this.zonaRepo = zonaRepo;
-        this.tipoVehiculoRepo = tipoVehiculoRepo;
         this.pedidoService = pedidoService;
         this.smsGatewayService = smsGatewayService;
         this.publisher = publisher;
@@ -140,15 +131,11 @@ public class SolicitudPedidoService {
     }
 
     /** El admin ya tiene el precio acordado (ej. lo charló por teléfono) — crea el pedido ya mismo. */
-    public Pedido confirmarDirecto(String id, String zonaId, String tipoVehiculoId, BigDecimal precio, BigDecimal montoDeclarado) {
+    public Pedido confirmarDirecto(String id, boolean requiereMoto, BigDecimal precio, BigDecimal montoDeclarado) {
         SolicitudPedido s = exigirPendiente(id);
-        Zona zona = zonaRepo.findById(zonaId).orElseThrow(() -> ResourceNotFoundException.of("Zona", zonaId));
-        TipoVehiculo tipo = tipoVehiculoRepo.findById(tipoVehiculoId)
-                .orElseThrow(() -> ResourceNotFoundException.of("Tipo de vehiculo", tipoVehiculoId));
-        Pedido pedido = crearPedidoDesde(s, zona, tipo, precio, montoDeclarado);
+        Pedido pedido = crearPedidoDesde(s, requiereMoto, precio, montoDeclarado);
 
-        s.setZona(zona);
-        s.setTipoVehiculoRequerido(tipo);
+        s.setRequiereMoto(requiereMoto);
         s.setPrecio(precio);
         s.setEstado("CONFIRMADA");
         s.setPedidoCreadoId(pedido.getId());
@@ -159,13 +146,9 @@ public class SolicitudPedidoService {
     }
 
     /** El admin no tiene un precio ya charlado — le manda una cotización, el cliente confirma solo con el link. */
-    public SolicitudPedido cotizar(String id, String zonaId, String tipoVehiculoId, BigDecimal precio, BigDecimal montoDeclarado) {
+    public SolicitudPedido cotizar(String id, boolean requiereMoto, BigDecimal precio, BigDecimal montoDeclarado) {
         SolicitudPedido s = exigirPendiente(id);
-        Zona zona = zonaRepo.findById(zonaId).orElseThrow(() -> ResourceNotFoundException.of("Zona", zonaId));
-        TipoVehiculo tipo = tipoVehiculoRepo.findById(tipoVehiculoId)
-                .orElseThrow(() -> ResourceNotFoundException.of("Tipo de vehiculo", tipoVehiculoId));
-        s.setZona(zona);
-        s.setTipoVehiculoRequerido(tipo);
+        s.setRequiereMoto(requiereMoto);
         s.setPrecio(precio);
         s.setMontoDeclarado(montoDeclarado);
         s.setEstado("COTIZADO");
@@ -186,7 +169,7 @@ public class SolicitudPedidoService {
         if (!"COTIZADO".equals(s.getEstado())) {
             throw new BadRequestException("Esta solicitud no tiene una cotización esperando confirmación.");
         }
-        Pedido pedido = crearPedidoDesde(s, s.getZona(), s.getTipoVehiculoRequerido(), s.getPrecio(), s.getMontoDeclarado());
+        Pedido pedido = crearPedidoDesde(s, s.isRequiereMoto(), s.getPrecio(), s.getMontoDeclarado());
         s.setEstado("CONFIRMADA");
         s.setPedidoCreadoId(pedido.getId());
         repo.save(s);
@@ -210,7 +193,7 @@ public class SolicitudPedidoService {
         return s;
     }
 
-    private Pedido crearPedidoDesde(SolicitudPedido s, Zona zona, TipoVehiculo tipo, BigDecimal precio, BigDecimal montoDeclarado) {
+    private Pedido crearPedidoDesde(SolicitudPedido s, boolean requiereMoto, BigDecimal precio, BigDecimal montoDeclarado) {
         StringBuilder detalle = new StringBuilder();
         if (s.isRetornaAlOrigen()) detalle.append("🔁 Retorna al origen. ");
         if (s.isLlevaDinero()) detalle.append("💵 Lleva dinero. ");
@@ -221,7 +204,7 @@ public class SolicitudPedidoService {
                 s.getOrigenDireccion(), s.getOrigenLat(), s.getOrigenLng(),
                 s.getDestinoDireccion(), s.getDestinoLat(), s.getDestinoLng(),
                 precio, montoDeclarado, detalle.length() == 0 ? null : detalle.toString().trim(),
-                zona.getId(), tipo.getId(), false, null, null);
+                requiereMoto, false, null, null);
         return pedidoService.crear(req);
     }
 
