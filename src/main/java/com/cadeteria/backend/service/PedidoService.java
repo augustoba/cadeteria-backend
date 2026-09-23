@@ -451,7 +451,8 @@ public class PedidoService {
         if (viajeSuperaTopeDeBici(pedido)) {
             return Optional.empty();
         }
-        Set<String> zonasCompatibles = zonasCompatibles(pedido.getZona());
+        // Interim: Task 2 elimina esta etapa de matching por zona por completo.
+        Set<String> zonasCompatibles = pedido.getZona() == null ? Set.of() : zonasCompatibles(pedido.getZona());
         List<OfertaPedido> ofertasPrevias = ofertaRepo.findByPedidoId(pedido.getId());
         Set<String> yaIntentados = ofertasPrevias.stream().map(o -> o.getCadete().getId()).collect(Collectors.toSet());
         Map<String, Long> rechazosPorCadete = ofertasPrevias.stream()
@@ -693,12 +694,14 @@ public class PedidoService {
             throw new BadRequestException("El cadete todavia no pago la cuota semanal — no se le puede asignar.");
         }
         List<Pedido> pedidos = pedidoIds.stream().map(this::get).toList();
-        Set<String> zonasCompatibles = zonasCompatibles(pedidos.get(0).getZona());
+        // Interim: Task 3 reemplaza este chequeo por cercania de origenes.
+        Zona zonaPrimero = pedidos.get(0).getZona();
+        Set<String> zonasCompatibles = zonaPrimero == null ? null : zonasCompatibles(zonaPrimero);
         for (Pedido p : pedidos) {
             if (!"SIN_ASIGNAR".equals(p.getEstado().getId())) {
                 throw new BadRequestException("El pedido #" + p.getNumero() + " ya tiene una asignacion en curso.");
             }
-            if (!zonasCompatibles.contains(p.getZona().getId())) {
+            if (zonasCompatibles != null && (p.getZona() == null || !zonasCompatibles.contains(p.getZona().getId()))) {
                 throw new BadRequestException("Todos los pedidos del lote tienen que ser de la misma zona (o zonas aledañas).");
             }
         }
