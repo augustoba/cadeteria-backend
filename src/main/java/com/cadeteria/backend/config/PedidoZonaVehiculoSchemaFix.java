@@ -8,6 +8,8 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 /**
  * Pedido.zona y Pedido.tipoVehiculoRequerido dejaron de ser obligatorios
  * (documentacion/spec-asignacion-por-distancia.md) — con `ddl-auto: update`, Hibernate
@@ -41,6 +43,7 @@ public class PedidoZonaVehiculoSchemaFix implements CommandLineRunner {
     @Override
     public void run(String... args) {
         alterSiAplica("ALTER TABLE pedido MODIFY COLUMN zona_id VARCHAR(255) NULL");
+        dropForeignKeysSiAplica("pedido", "tipo_vehiculo_requerido_id");
         alterSiAplica("ALTER TABLE pedido MODIFY COLUMN tipo_vehiculo_requerido_id VARCHAR(255) NULL");
         try {
             int actualizados = jdbcTemplate.update(
@@ -59,6 +62,29 @@ public class PedidoZonaVehiculoSchemaFix implements CommandLineRunner {
             jdbcTemplate.execute(sql);
         } catch (DataAccessException e) {
             log.warn("No se aplico '{}' (no hace falta en este entorno/dialecto): {}", sql, e.getMessage());
+        }
+    }
+
+    /**
+     * MySQL no deja hacer MODIFY COLUMN a nullable si la columna sigue participando de una
+     * foreign key (error 1832) — y como {@code tipo_vehiculo_requerido_id} queda huérfana (ya
+     * no la mapea ninguna entidad), no hace falta que seguir arrastrando esa FK. El nombre de
+     * la constraint lo generó Hibernate solo (no es fijo entre entornos), así que se busca en
+     * information_schema en vez de hardcodearlo.
+     */
+    private void dropForeignKeysSiAplica(String tabla, String columna) {
+        try {
+            List<String> nombres = jdbcTemplate.queryForList(
+                    "SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE "
+                            + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? "
+                            + "AND REFERENCED_TABLE_NAME IS NOT NULL",
+                    String.class, tabla, columna);
+            for (String nombre : nombres) {
+                alterSiAplica("ALTER TABLE " + tabla + " DROP FOREIGN KEY " + nombre);
+            }
+        } catch (DataAccessException e) {
+            log.warn("No se pudieron buscar las FK de {}.{} (no hace falta en este entorno/dialecto): {}",
+                    tabla, columna, e.getMessage());
         }
     }
 }
