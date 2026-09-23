@@ -425,34 +425,27 @@ public class PedidoService {
     }
 
     /**
-     * Primero busca candidato dentro de la zona del pedido (o una aledaña). Un cadete que
-     * ya rechazó ESTE pedido puntual "max_rechazos_por_pedido" veces (default 3) queda
-     * afuera de él — salvo que el pedido ya lleve "minutos_pedido_urgente_reintentar"
-     * minutos (default 30) sin poder asignarse, en cuyo caso se ignora ese límite para que
-     * un pedido que todos rechazan no quede flotando para siempre. Una oferta vencida sin
-     * respuesta ("no lo vio") NO cuenta como rechazo ni lo excluye, pero sí lo manda al
-     * final de la cola: se prueba primero con cadetes a los que nunca se les ofreció este
-     * pedido. Tampoco se le ofrece a un cadete que ya tiene "asignacion_automatica_max_viajes_cadete"
-     * viajes sin terminar encima (independiente de su propio tope maxViajesSimultaneos,
-     * que es cuánto puede cargar él, no cuánto quiere darle de una el sistema).
+     * El elegible más cercano por GPS en línea recta al origen del pedido — sin zona, el
+     * matching es 100% distancia. Un cadete que ya rechazó ESTE pedido puntual
+     * "max_rechazos_por_pedido" veces (default 3) queda afuera de él — salvo que el pedido
+     * ya lleve "minutos_pedido_urgente_reintentar" minutos (default 30) sin poder asignarse,
+     * en cuyo caso se ignora ese límite para que un pedido que todos rechazan no quede
+     * flotando para siempre. Una oferta vencida sin respuesta ("no lo vio") NO cuenta como
+     * rechazo ni lo excluye, pero sí lo manda al final de la cola: se prueba primero con
+     * cadetes a los que nunca se les ofreció este pedido. Tampoco se le ofrece a un cadete
+     * que ya tiene "asignacion_automatica_max_viajes_cadete" viajes sin terminar encima
+     * (independiente de su propio tope maxViajesSimultaneos, que es cuánto puede cargar él,
+     * no cuánto quiere darle de una el sistema). Un cadete sin ubicación cargada no es
+     * candidato — no hay con qué calcular la distancia.
      * <p>
-     * Si nadie matchea zona (ej. todavía no hay zonas cargadas para donde está el cadete,
-     * o el pedido cayó en una zona sin cadetes cerca), en vez de dejarlo sin nadie se lo
-     * ofrece igual al elegible más cercano por GPS en línea recta al origen del pedido. Un
-     * cadete sin ubicación cargada todavía no entra en este fallback porque no hay con qué
-     * calcular la distancia.
-     * <p>
-     * Si el pedido requiere BICI y el viaje (origen→destino) supera {@code distancia_maxima_bici_km},
-     * no se ofrece a nadie automáticamente — una bici no puede cubrir esa distancia. Es un
-     * límite de la ASIGNACIÓN AUTOMÁTICA nomás; el admin puede seguir asignando a mano si le
-     * parece razonable en el caso puntual.
+     * Si {@code pedido.isRequiereMoto()}, solo entran cadetes en MOTO. Si no, entran motos y
+     * bicis por igual, pero a una bici se la excluye si el viaje (origen→destino) supera
+     * {@code distancia_maxima_bici_km}, o si su distancia actual hasta el origen supera
+     * {@code distancia_maxima_bici_retiro_km} (0 en cualquiera de las dos = sin límite). Estos
+     * dos topes son un límite de la ASIGNACIÓN AUTOMÁTICA nomás; el admin puede seguir
+     * asignando a mano si le parece razonable en el caso puntual.
      */
     private Optional<Cadete> buscarCandidato(Pedido pedido) {
-        if (viajeSuperaTopeDeBici(pedido)) {
-            return Optional.empty();
-        }
-        // Interim: Task 2 elimina esta etapa de matching por zona por completo.
-        Set<String> zonasCompatibles = pedido.getZona() == null ? Set.of() : zonasCompatibles(pedido.getZona());
         List<OfertaPedido> ofertasPrevias = ofertaRepo.findByPedidoId(pedido.getId());
         Set<String> yaIntentados = ofertasPrevias.stream().map(o -> o.getCadete().getId()).collect(Collectors.toSet());
         Map<String, Long> rechazosPorCadete = ofertasPrevias.stream()
@@ -469,8 +462,9 @@ public class PedidoService {
                 .filter(c -> "LIBRE".equals(c.getEstado().getId()))
                 .filter(this::puedeRecibirViajes)
                 .filter(c -> pedidoUrgente || rechazosPorCadete.getOrDefault(c.getId(), 0L) < maxRechazos)
-                // Interim: Task 2 reemplaza este método completo con el matching por distancia.
                 .filter(c -> !pedido.isRequiereMoto() || "MOTO".equals(c.getTipoVehiculo().getId()))
+                .filter(c -> !"BICI".equals(c.getTipoVehiculo().getId())
+                        || (dentroDeTopeDeViajeBici(pedido) && dentroDeTopeDeRetiroBici(c, pedido)))
                 .filter(c -> dentroDeTopes(c, pedido))
                 .filter(c -> cantidadPedidosPendientes(c) < maxViajesAsignacion)
                 .filter(this::dentroDeTurno)
@@ -489,11 +483,6 @@ public class PedidoService {
         }
         prioridad = prioridad.thenComparing(Cadete::getOrdenColaEspera);
 
-        Optional<Cadete> enZona = elegibles.stream()
-                .filter(c -> c.getZonaActual() != null && zonasCompatibles.contains(c.getZonaActual().getId()))
-                .min(prioridad);
-        if (enZona.isPresent()) return enZona;
-
         return elegibles.stream()
                 .filter(c -> c.getLat() != null && c.getLng() != null)
                 .min(Comparator.comparing((Cadete c) -> yaIntentados.contains(c.getId()))
@@ -503,14 +492,22 @@ public class PedidoService {
                         .thenComparing(Cadete::getOrdenColaEspera));
     }
 
-    private boolean viajeSuperaTopeDeBici(Pedido pedido) {
-        // Interim: Task 2 reemplaza este método completo con el matching por distancia.
-        if (pedido.isRequiereMoto()) return false;
+    /** true si NO hay tope, o el viaje (origen→destino) no lo supera. Solo aplica a candidatos BICI. */
+    private boolean dentroDeTopeDeViajeBici(Pedido pedido) {
         BigDecimal topeKm = configuracionService.getBigDecimal("distancia_maxima_bici_km", BigDecimal.ZERO);
-        if (topeKm.signum() <= 0) return false; // 0 o sin cargar = sin límite
+        if (topeKm.signum() <= 0) return true; // 0 o sin cargar = sin límite
         double distanciaViaje = GeocodingService.distanciaKm(
                 pedido.getOrigenLat(), pedido.getOrigenLng(), pedido.getDestinoLat(), pedido.getDestinoLng());
-        return distanciaViaje > topeKm.doubleValue();
+        return distanciaViaje <= topeKm.doubleValue();
+    }
+
+    /** true si NO hay tope, o la distancia del cadete al origen no lo supera. Solo aplica a candidatos BICI. */
+    private boolean dentroDeTopeDeRetiroBici(Cadete cadete, Pedido pedido) {
+        if (cadete.getLat() == null || cadete.getLng() == null) return false;
+        BigDecimal topeKm = configuracionService.getBigDecimal("distancia_maxima_bici_retiro_km", BigDecimal.ZERO);
+        if (topeKm.signum() <= 0) return true;
+        double distancia = GeocodingService.distanciaKm(cadete.getLat(), cadete.getLng(), pedido.getOrigenLat(), pedido.getOrigenLng());
+        return distancia <= topeKm.doubleValue();
     }
 
     /**
