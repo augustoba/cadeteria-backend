@@ -50,7 +50,7 @@ public class PedidoZonaVehiculoSchemaFix implements CommandLineRunner {
                 log.info("Esquema: {} pedido(s) viejo(s) migrado(s) a requiere_moto.", actualizados);
             }
         } catch (DataAccessException e) {
-            log.debug("Sin tipo_vehiculo_requerido_id para migrar (esquema nuevo, ej. H2 en tests): {}", e.getMessage());
+            log.warn("Sin tipo_vehiculo_requerido_id para migrar (esquema nuevo, ej. H2 en tests): {}", e.getMessage());
         }
     }
 
@@ -58,7 +58,7 @@ public class PedidoZonaVehiculoSchemaFix implements CommandLineRunner {
         try {
             jdbcTemplate.execute(sql);
         } catch (DataAccessException e) {
-            log.debug("No se aplico '{}' (no hace falta en este entorno/dialecto): {}", sql, e.getMessage());
+            log.warn("No se aplico '{}' (no hace falta en este entorno/dialecto): {}", sql, e.getMessage());
         }
     }
 }

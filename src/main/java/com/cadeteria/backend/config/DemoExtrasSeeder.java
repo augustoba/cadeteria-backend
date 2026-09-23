@@ -219,7 +219,7 @@ public class DemoExtrasSeeder implements CommandLineRunner {
         cotizada.setDetalle("Envío de repuestos");
         cotizada.setEstado("COTIZADO");
         cotizada.setTokenConfirmacion(UUID.randomUUID().toString());
-        cotizada.setRequiereMoto(moto != null);
+        cotizada.setRequiereMoto(moto != null && "MOTO".equals(moto.getId()));
         cotizada.setPrecio(new BigDecimal("1350.00"));
         cotizada.setCreadoEn(ahora.minus(40, ChronoUnit.MINUTES));
         solicitudPedidoRepo.save(cotizada);

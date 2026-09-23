@@ -165,6 +165,7 @@ public class MetricasService {
 
         for (Pedido p : pedidoRepo.findByCreadoEnBetween(desde, hasta)) {
             Zona zona = p.getZona();
+            if (zona == null) continue;
             zonas.putIfAbsent(zona.getId(), zona);
             cantidad.merge(zona.getId(), 1L, Long::sum);
             if ("FINALIZADO".equals(p.getEstado().getId())) {
