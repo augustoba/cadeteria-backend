@@ -47,12 +47,23 @@ public class Cadete {
     @Column(length = 500)
     private String fotoVehiculoUrl;
 
-    /** Documentacion del cadete/vehiculo, subida igual que fotoVehiculoUrl. */
+    /**
+     * Documentacion del cadete/vehiculo, subida igual que fotoVehiculoUrl. Frente y dorso por
+     * separado (mejora 2026-09-23, pedida por el dueño): los dos lados tienen datos relevantes.
+     * Los "dorso" son opcionales solo por compatibilidad con cadetes ya dados de alta antes de
+     * este cambio (nunca cargaron ese lado) — para un alta nueva el front los exige igual.
+     */
     @Column(length = 500)
     private String fotoCarnetUrl;
 
     @Column(length = 500)
+    private String fotoCarnetDorsoUrl;
+
+    @Column(length = 500)
     private String fotoTarjetaVerdeUrl;
+
+    @Column(length = 500)
+    private String fotoTarjetaVerdeDorsoUrl;
 
     /** Para que el cliente le transfiera (spec: pago por transferencia) — el cadete los carga solo desde la app. */
     private String cbu;
@@ -315,12 +326,28 @@ public class Cadete {
         this.fotoCarnetUrl = fotoCarnetUrl;
     }
 
+    public String getFotoCarnetDorsoUrl() {
+        return fotoCarnetDorsoUrl;
+    }
+
+    public void setFotoCarnetDorsoUrl(String fotoCarnetDorsoUrl) {
+        this.fotoCarnetDorsoUrl = fotoCarnetDorsoUrl;
+    }
+
     public String getFotoTarjetaVerdeUrl() {
         return fotoTarjetaVerdeUrl;
     }
 
     public void setFotoTarjetaVerdeUrl(String fotoTarjetaVerdeUrl) {
         this.fotoTarjetaVerdeUrl = fotoTarjetaVerdeUrl;
+    }
+
+    public String getFotoTarjetaVerdeDorsoUrl() {
+        return fotoTarjetaVerdeDorsoUrl;
+    }
+
+    public void setFotoTarjetaVerdeDorsoUrl(String fotoTarjetaVerdeDorsoUrl) {
+        this.fotoTarjetaVerdeDorsoUrl = fotoTarjetaVerdeDorsoUrl;
     }
 
     public String getCbu() {

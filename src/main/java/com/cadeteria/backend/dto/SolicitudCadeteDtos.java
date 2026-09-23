@@ -30,7 +30,9 @@ public final class SolicitudCadeteDtos {
             String fotoUrl,
             String fotoVehiculoUrl,
             String fotoCarnetUrl,
+            String fotoCarnetDorsoUrl,
             String fotoTarjetaVerdeUrl,
+            String fotoTarjetaVerdeDorsoUrl,
             @NotBlank @Pattern(regexp = CadeteDtos.REGEX_USERNAME_DNI, message = CadeteDtos.MENSAJE_USERNAME_DNI) String usernamePropuesto
     ) {}
 
@@ -39,7 +41,8 @@ public final class SolicitudCadeteDtos {
             String nombre, String apellido, String dni, String telefono, String email,
             LookupResponse tipoVehiculo, String vehiculoColor, String vehiculoPatente,
             String vehiculoMarca, String vehiculoModelo,
-            String fotoUrl, String fotoVehiculoUrl, String fotoCarnetUrl, String fotoTarjetaVerdeUrl,
+            String fotoUrl, String fotoVehiculoUrl, String fotoCarnetUrl, String fotoCarnetDorsoUrl,
+            String fotoTarjetaVerdeUrl, String fotoTarjetaVerdeDorsoUrl,
             String usernamePropuesto, String motivoRechazo, String cadeteCreadoId
     ) {
         public static SolicitudResponse from(SolicitudCadete s) {
@@ -48,7 +51,8 @@ public final class SolicitudCadeteDtos {
                     s.getNombre(), s.getApellido(), s.getDni(), s.getTelefono(), s.getEmail(),
                     LookupResponse.from(s.getTipoVehiculo()), s.getVehiculoColor(), s.getVehiculoPatente(),
                     s.getVehiculoMarca(), s.getVehiculoModelo(),
-                    s.getFotoUrl(), s.getFotoVehiculoUrl(), s.getFotoCarnetUrl(), s.getFotoTarjetaVerdeUrl(),
+                    s.getFotoUrl(), s.getFotoVehiculoUrl(), s.getFotoCarnetUrl(), s.getFotoCarnetDorsoUrl(),
+                    s.getFotoTarjetaVerdeUrl(), s.getFotoTarjetaVerdeDorsoUrl(),
                     s.getUsernamePropuesto(), s.getMotivoRechazo(), s.getCadeteCreadoId());
         }
     }

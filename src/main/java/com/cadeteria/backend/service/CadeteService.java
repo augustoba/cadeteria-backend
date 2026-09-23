@@ -570,7 +570,9 @@ public class CadeteService {
         c.setVehiculoAnio(req.vehiculoAnio());
         c.setFotoVehiculoUrl(blankToNull(req.fotoVehiculoUrl()));
         c.setFotoCarnetUrl(blankToNull(req.fotoCarnetUrl()));
+        c.setFotoCarnetDorsoUrl(blankToNull(req.fotoCarnetDorsoUrl()));
         c.setFotoTarjetaVerdeUrl(blankToNull(req.fotoTarjetaVerdeUrl()));
+        c.setFotoTarjetaVerdeDorsoUrl(blankToNull(req.fotoTarjetaVerdeDorsoUrl()));
         c.setUsername(req.username().trim());
         c.setMontoMaximoTransportado(req.montoMaximoTransportado());
         c.setMaxViajesSimultaneos(req.maxViajesSimultaneos());

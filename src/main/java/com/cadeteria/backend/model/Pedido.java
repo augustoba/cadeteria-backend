@@ -60,6 +60,15 @@ public class Pedido {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal montoDeclarado = BigDecimal.ZERO;
 
+    /**
+     * Declarado por el cliente al pedir (mejora 2026-09-23): transporta objetos de valor
+     * (no dinero en efectivo, que ya se cubre con montoDeclarado) — solo informativo, no
+     * afecta el tope de 5.2 ni la asignación, se muestra en el seguimiento público como
+     * confirmación de lo declarado.
+     */
+    @Column(nullable = false)
+    private boolean llevaValores = false;
+
     @Column(length = 1000)
     private String detalle;
 
@@ -295,6 +304,14 @@ public class Pedido {
 
     public void setMontoDeclarado(BigDecimal montoDeclarado) {
         this.montoDeclarado = montoDeclarado;
+    }
+
+    public boolean isLlevaValores() {
+        return llevaValores;
+    }
+
+    public void setLlevaValores(boolean llevaValores) {
+        this.llevaValores = llevaValores;
     }
 
     public String getDetalle() {

@@ -32,7 +32,9 @@ public final class CadeteDtos {
             Integer vehiculoAnio,
             String fotoVehiculoUrl,
             String fotoCarnetUrl,
+            String fotoCarnetDorsoUrl,
             String fotoTarjetaVerdeUrl,
+            String fotoTarjetaVerdeDorsoUrl,
             @NotBlank @Pattern(regexp = REGEX_USERNAME_DNI, message = MENSAJE_USERNAME_DNI) String username,
             String password,
             BigDecimal montoMaximoTransportado,
@@ -53,7 +55,7 @@ public final class CadeteDtos {
             String id, String nombre, String apellido, String dni, String telefono, String email, String fotoUrl,
             LookupResponse tipoVehiculo, String vehiculoColor, String vehiculoPatente,
             String vehiculoMarca, String vehiculoModelo, Integer vehiculoAnio, String fotoVehiculoUrl,
-            String fotoCarnetUrl, String fotoTarjetaVerdeUrl,
+            String fotoCarnetUrl, String fotoCarnetDorsoUrl, String fotoTarjetaVerdeUrl, String fotoTarjetaVerdeDorsoUrl,
             String username, boolean activo, LookupResponse estado,
             Double lat, Double lng, Instant ubicacionActualizadaEn, LookupResponse zonaActual,
             BigDecimal montoMaximoTransportado, Integer maxViajesSimultaneos,
@@ -89,7 +91,7 @@ public final class CadeteDtos {
                     c.getId(), c.getNombre(), c.getApellido(), c.getDni(), c.getTelefono(), c.getEmail(), c.getFotoUrl(),
                     LookupResponse.from(c.getTipoVehiculo()), c.getVehiculoColor(), c.getVehiculoPatente(),
                     c.getVehiculoMarca(), c.getVehiculoModelo(), c.getVehiculoAnio(), c.getFotoVehiculoUrl(),
-                    c.getFotoCarnetUrl(), c.getFotoTarjetaVerdeUrl(),
+                    c.getFotoCarnetUrl(), c.getFotoCarnetDorsoUrl(), c.getFotoTarjetaVerdeUrl(), c.getFotoTarjetaVerdeDorsoUrl(),
                     c.getUsername(), c.isActivo(), LookupResponse.from(c.getEstado()),
                     c.getLat(), c.getLng(), c.getUbicacionActualizadaEn(), LookupResponse.from(c.getZonaActual()),
                     c.getMontoMaximoTransportado(), c.getMaxViajesSimultaneos(),
@@ -120,7 +122,9 @@ public final class CadeteDtos {
                     r.vehiculoMarca(), r.vehiculoModelo(), r.vehiculoAnio(),
                     null,                                    // fotoVehiculoUrl
                     null,                                    // fotoCarnetUrl
+                    null,                                    // fotoCarnetDorsoUrl
                     null,                                    // fotoTarjetaVerdeUrl
+                    null,                                    // fotoTarjetaVerdeDorsoUrl
                     r.username(), r.activo(), r.estado(),
                     r.lat(), r.lng(), r.ubicacionActualizadaEn(), r.zonaActual(),
                     r.montoMaximoTransportado(), r.maxViajesSimultaneos(),

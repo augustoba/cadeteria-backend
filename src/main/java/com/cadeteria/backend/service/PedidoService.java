@@ -352,6 +352,7 @@ public class PedidoService {
         p.setDestinoLng(req.destinoLng());
         p.setPrecio(req.precio());
         p.setMontoDeclarado(req.montoDeclarado() == null ? BigDecimal.ZERO : req.montoDeclarado());
+        p.setLlevaValores(req.llevaValores());
         p.setDetalle(req.detalle());
         p.setRequiereMoto(req.requiereMoto());
         p.setProgramado(esProgramado);
@@ -398,7 +399,7 @@ public class PedidoService {
                 original.getClienteTelefono(), original.getClienteNombre(),
                 original.getOrigenDireccion(), original.getOrigenLat(), original.getOrigenLng(),
                 original.getDestinoDireccion(), original.getDestinoLat(), original.getDestinoLng(),
-                original.getPrecio(), null, "Repetición del pedido #" + original.getNumero(),
+                original.getPrecio(), null, original.isLlevaValores(), "Repetición del pedido #" + original.getNumero(),
                 original.isRequiereMoto(),
                 false, null, null);
         return crear(req);

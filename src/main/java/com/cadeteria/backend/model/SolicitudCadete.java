@@ -58,7 +58,11 @@ public class SolicitudCadete {
     @Column(length = 500)
     private String fotoCarnetUrl;
     @Column(length = 500)
+    private String fotoCarnetDorsoUrl;
+    @Column(length = 500)
     private String fotoTarjetaVerdeUrl;
+    @Column(length = 500)
+    private String fotoTarjetaVerdeDorsoUrl;
 
     /** El postulante propone un usuario; el admin lo puede cambiar al aprobar. */
     private String usernamePropuesto;
@@ -220,12 +224,28 @@ public class SolicitudCadete {
         this.fotoCarnetUrl = fotoCarnetUrl;
     }
 
+    public String getFotoCarnetDorsoUrl() {
+        return fotoCarnetDorsoUrl;
+    }
+
+    public void setFotoCarnetDorsoUrl(String fotoCarnetDorsoUrl) {
+        this.fotoCarnetDorsoUrl = fotoCarnetDorsoUrl;
+    }
+
     public String getFotoTarjetaVerdeUrl() {
         return fotoTarjetaVerdeUrl;
     }
 
     public void setFotoTarjetaVerdeUrl(String fotoTarjetaVerdeUrl) {
         this.fotoTarjetaVerdeUrl = fotoTarjetaVerdeUrl;
+    }
+
+    public String getFotoTarjetaVerdeDorsoUrl() {
+        return fotoTarjetaVerdeDorsoUrl;
+    }
+
+    public void setFotoTarjetaVerdeDorsoUrl(String fotoTarjetaVerdeDorsoUrl) {
+        this.fotoTarjetaVerdeDorsoUrl = fotoTarjetaVerdeDorsoUrl;
     }
 
     public String getUsernamePropuesto() {

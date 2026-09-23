@@ -15,6 +15,10 @@ public final class PublicoDtos {
             String origenDireccion,
             String destinoDireccion,
             BigDecimal precio,
+            /** Lo declarado al pedir — se muestra como confirmación de lo que el cliente cargó (mejora 2026-09-23). */
+            boolean llevaDinero,
+            BigDecimal montoDeclarado,
+            boolean llevaValores,
             CadeteInfo cadete,
             boolean comprobanteDisponible,
             String entregaReceptorNombre,
@@ -44,6 +48,9 @@ public final class PublicoDtos {
                     p.getOrigenDireccion(),
                     p.getDestinoDireccion(),
                     p.getPrecio(),
+                    p.getMontoDeclarado() != null && p.getMontoDeclarado().signum() > 0,
+                    p.getMontoDeclarado(),
+                    p.isLlevaValores(),
                     CadeteInfo.from(cadete),
                     finalizado,
                     finalizado ? p.getEntregaReceptorNombre() : null,
@@ -65,6 +72,8 @@ public final class PublicoDtos {
 
     public record CadeteInfo(
             String nombre, String fotoUrl, String tipoVehiculo, String vehiculoColor, String vehiculoPatente,
+            /** Foto del vehículo (solo tiene sentido con MOTO — null en BICI). */
+            String fotoVehiculoUrl,
             /** Para que el cliente le transfiera si prefiere pagar así — el cadete los carga desde la app. */
             String cbu, String aliasCbu
     ) {
@@ -72,7 +81,8 @@ public final class PublicoDtos {
             if (c == null) return null;
             return new CadeteInfo(c.getNombre(), c.getFotoUrl(),
                     c.getTipoVehiculo() == null ? null : c.getTipoVehiculo().getNombre(),
-                    c.getVehiculoColor(), c.getVehiculoPatente(), c.getCbu(), c.getAliasCbu());
+                    c.getVehiculoColor(), c.getVehiculoPatente(), c.getFotoVehiculoUrl(),
+                    c.getCbu(), c.getAliasCbu());
         }
     }
 }

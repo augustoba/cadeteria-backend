@@ -16,6 +16,7 @@ public final class SolicitudPedidoDtos {
             @NotBlank String origenDireccion, @NotNull Double origenLat, @NotNull Double origenLng,
             @NotBlank String destinoDireccion, @NotNull Double destinoLat, @NotNull Double destinoLng,
             boolean llevaDinero, BigDecimal montoDeclarado,
+            boolean llevaValores,
             boolean retornaAlOrigen,
             @NotBlank String clienteNombre, @NotBlank String clienteTelefono,
             String detalle,
@@ -28,6 +29,7 @@ public final class SolicitudPedidoDtos {
             String origenDireccion, Double origenLat, Double origenLng,
             String destinoDireccion, Double destinoLat, Double destinoLng,
             boolean llevaDinero, BigDecimal montoDeclarado,
+            boolean llevaValores,
             boolean retornaAlOrigen,
             String clienteNombre, String clienteTelefono,
             String detalle,
@@ -40,7 +42,7 @@ public final class SolicitudPedidoDtos {
             return new SolicitudPedidoResponse(
                     s.getId(), s.getOrigenDireccion(), s.getOrigenLat(), s.getOrigenLng(),
                     s.getDestinoDireccion(), s.getDestinoLat(), s.getDestinoLng(),
-                    s.isLlevaDinero(), s.getMontoDeclarado(), s.isRetornaAlOrigen(),
+                    s.isLlevaDinero(), s.getMontoDeclarado(), s.isLlevaValores(), s.isRetornaAlOrigen(),
                     s.getClienteNombre(), s.getClienteTelefono(), s.getDetalle(), s.getEstado(),
                     s.isRequiereMoto(), s.getPrecio(),
                     s.getPedidoCreadoId(), s.getMotivoRechazo(), s.getCreadoEn());

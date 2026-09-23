@@ -39,6 +39,10 @@ public class SolicitudPedido {
     @Column(precision = 12, scale = 2)
     private BigDecimal montoDeclarado;
 
+    /** Declarado por el cliente (mejora 2026-09-23) — ver Pedido.llevaValores. */
+    @Column(nullable = false)
+    private boolean llevaValores;
+
     @Column(nullable = false)
     private boolean retornaAlOrigen;
 
@@ -143,6 +147,14 @@ public class SolicitudPedido {
 
     public void setMontoDeclarado(BigDecimal montoDeclarado) {
         this.montoDeclarado = montoDeclarado;
+    }
+
+    public boolean isLlevaValores() {
+        return llevaValores;
+    }
+
+    public void setLlevaValores(boolean llevaValores) {
+        this.llevaValores = llevaValores;
     }
 
     public boolean isRetornaAlOrigen() {

@@ -103,7 +103,9 @@ public class SolicitudCadeteService {
         s.setFotoUrl(blankToNull(req.fotoUrl()));
         s.setFotoVehiculoUrl(blankToNull(req.fotoVehiculoUrl()));
         s.setFotoCarnetUrl(blankToNull(req.fotoCarnetUrl()));
+        s.setFotoCarnetDorsoUrl(blankToNull(req.fotoCarnetDorsoUrl()));
         s.setFotoTarjetaVerdeUrl(blankToNull(req.fotoTarjetaVerdeUrl()));
+        s.setFotoTarjetaVerdeDorsoUrl(blankToNull(req.fotoTarjetaVerdeDorsoUrl()));
         s.setUsernamePropuesto(req.usernamePropuesto().trim());
         s.setEstado("EN_REVISION");
         s.setEnviadaEn(Instant.now());
@@ -138,7 +140,8 @@ public class SolicitudCadeteService {
                 s.getNombre(), s.getApellido(), s.getDni(), s.getTelefono(), s.getEmail(), s.getFotoUrl(),
                 s.getTipoVehiculo().getId(), s.getVehiculoColor(), s.getVehiculoPatente(),
                 s.getVehiculoMarca(), s.getVehiculoModelo(), null, s.getFotoVehiculoUrl(), s.getFotoCarnetUrl(),
-                s.getFotoTarjetaVerdeUrl(), username.trim(), passwordTemporal,
+                s.getFotoCarnetDorsoUrl(), s.getFotoTarjetaVerdeUrl(), s.getFotoTarjetaVerdeDorsoUrl(),
+                username.trim(), passwordTemporal,
                 null, null, null, null, null, null,
                 modalidadPago == null || modalidadPago.isBlank() ? "SEMANAL" : modalidadPago, null);
         Cadete cadete = cadeteService.create(cadeteReq);
