@@ -48,6 +48,9 @@ public class GeocodingProxyService {
 
     private static final String NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
     private static final String NOMINATIM_REVERSE_URL = "https://nominatim.openstreetmap.org/reverse";
+    /** Nominatim exige identificar al cliente (User-Agent propio) — sin esto responde 403 siempre,
+     *  ver https://operations.osmfoundation.org/policies/nominatim/. */
+    private static final String NOMINATIM_USER_AGENT = "CadeteriaBackend/1.0 (+https://github.com/augustoba/cadeteria-backend)";
     private static final String GEOAPIFY_URL = "https://api.geoapify.com/v1/geocode/search";
     private static final String LOCATIONIQ_URL = "https://us1.locationiq.com/v1/search";
     public static final String PROVEEDOR_GEOAPIFY = "geoapify";
@@ -125,6 +128,7 @@ public class GeocodingProxyService {
         try {
             Map<String, Object> p = restClient.get().uri(url)
                     .header("Accept", "application/json")
+                    .header("User-Agent", NOMINATIM_USER_AGENT)
                     .retrieve()
                     .body(new ParameterizedTypeReference<Map<String, Object>>() {});
             nominatimOk = true;
@@ -163,6 +167,7 @@ public class GeocodingProxyService {
         try {
             List<Map<String, Object>> data = restClient.get().uri(url)
                     .header("Accept", "application/json")
+                    .header("User-Agent", NOMINATIM_USER_AGENT)
                     .retrieve()
                     .body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
             nominatimOk = true;
