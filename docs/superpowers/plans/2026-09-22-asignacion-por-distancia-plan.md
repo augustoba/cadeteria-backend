@@ -1,16 +1,16 @@
-# Asignación por distancia (sin zona) + tope de BICI al retiro — Implementation Plan
+# Asignación por distancia (sin zona) + tope de BICI al retiro — Plan de implementación
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Para agentes que ejecuten esto:** SUB-SKILL REQUERIDA: usar superpowers:subagent-driven-development (recomendado) o superpowers:executing-plans para implementar este plan tarea por tarea. Los pasos usan sintaxis de checkbox (`- [ ]`) para el seguimiento.
 
-**Goal:** Reemplazar el matching de pedidos por zona por matching 100% por distancia GPS, agregar un tope de distancia cadete-BICI→retiro, y pasar `tipoVehiculoRequerido` de un desplegable obligatorio MOTO/BICI a un checkbox opcional "requiere moto".
+**Objetivo:** Reemplazar el matching de pedidos por zona por matching 100% por distancia GPS, agregar un tope de distancia cadete-BICI→retiro, y pasar `tipoVehiculoRequerido` de un desplegable obligatorio MOTO/BICI a un checkbox opcional "requiere moto".
 
-**Architecture:** `Pedido`/`SolicitudPedido` pierden el campo obligatorio de vehículo (pasa a `boolean requiereMoto`); `Pedido.zona` y `SolicitudPedido.zona` dejan de usarse (el primero solo se relaja en el esquema, el segundo se deja de mapear). `PedidoService.buscarCandidato` cae siempre en su fallback de distancia GPS existente, con dos topes nuevos aplicados solo a candidatos BICI. `asignarLote` reemplaza su chequeo "misma zona" por cercanía entre orígenes. Front (`admin-front`) y `cadete-app` siguen el contrato nuevo.
+**Arquitectura:** `Pedido`/`SolicitudPedido` pierden el campo obligatorio de vehículo (pasa a `boolean requiereMoto`); `Pedido.zona` y `SolicitudPedido.zona` dejan de usarse (el primero solo se relaja en el esquema, el segundo se deja de mapear). `PedidoService.buscarCandidato` cae siempre en su fallback de distancia GPS existente, con dos topes nuevos aplicados solo a candidatos BICI. `asignarLote` reemplaza su chequeo "misma zona" por cercanía entre orígenes. Front (`admin-front`) y `cadete-app` siguen el contrato nuevo.
 
-**Tech Stack:** Spring Boot 3 / JPA (Hibernate, `ddl-auto: update`, MySQL) + JUnit 5/Mockito en el backend (`cadeteria`); Angular 19 standalone components en `admin-front`; Kotlin/Retrofit en `cadete-app`.
+**Stack tecnológico:** Spring Boot 3 / JPA (Hibernate, `ddl-auto: update`, MySQL) + JUnit 5/Mockito en el backend (`cadeteria`); Angular 19 standalone components en `admin-front`; Kotlin/Retrofit en `cadete-app`.
 
 **Spec:** `documentacion/spec-asignacion-por-distancia.md`
 
-## Global Constraints
+## Restricciones globales
 
 - `distancia_maxima_bici_km` (viaje) y `distancia_maxima_bici_retiro_km` (retiro): `0` = sin límite, mismo patrón que la config existente.
 - `distancia_maxima_lote_km`: default `3`.
@@ -21,25 +21,25 @@
 
 ---
 
-### Task 1: Núcleo — modelo, DTOs, alta de pedido y fix de esquema
+### Tarea 1: Núcleo — modelo, DTOs, alta de pedido y fix de esquema
 
-**Files:**
-- Modify: `src/main/java/com/cadeteria/backend/model/Pedido.java`
-- Modify: `src/main/java/com/cadeteria/backend/model/SolicitudPedido.java`
-- Modify: `src/main/java/com/cadeteria/backend/dto/PedidoDtos.java`
-- Modify: `src/main/java/com/cadeteria/backend/dto/SolicitudPedidoDtos.java`
-- Modify: `src/main/java/com/cadeteria/backend/service/PedidoService.java` (constructor, `crear`, `repetirPorToken` — el resto de este archivo lo toca la Task 2)
-- Modify: `src/main/java/com/cadeteria/backend/service/SolicitudPedidoService.java`
-- Modify: `src/main/java/com/cadeteria/backend/controller/SolicitudPedidoAdminController.java`
-- Create: `src/main/java/com/cadeteria/backend/config/PedidoZonaVehiculoSchemaFix.java`
-- Modify: `src/test/java/com/cadeteria/backend/service/PedidoServiceReasignacionTest.java`
-- Modify: `src/test/java/com/cadeteria/backend/service/PedidoServiceQuitarCadeteTest.java`
+**Archivos:**
+- Modificar: `src/main/java/com/cadeteria/backend/model/Pedido.java`
+- Modificar: `src/main/java/com/cadeteria/backend/model/SolicitudPedido.java`
+- Modificar: `src/main/java/com/cadeteria/backend/dto/PedidoDtos.java`
+- Modificar: `src/main/java/com/cadeteria/backend/dto/SolicitudPedidoDtos.java`
+- Modificar: `src/main/java/com/cadeteria/backend/service/PedidoService.java` (constructor, `crear`, `repetirPorToken` — el resto de este archivo lo toca la Task 2)
+- Modificar: `src/main/java/com/cadeteria/backend/service/SolicitudPedidoService.java`
+- Modificar: `src/main/java/com/cadeteria/backend/controller/SolicitudPedidoAdminController.java`
+- Crear: `src/main/java/com/cadeteria/backend/config/PedidoZonaVehiculoSchemaFix.java`
+- Modificar: `src/test/java/com/cadeteria/backend/service/PedidoServiceReasignacionTest.java`
+- Modificar: `src/test/java/com/cadeteria/backend/service/PedidoServiceQuitarCadeteTest.java`
 
 **Interfaces:**
-- Produces: `Pedido.isRequiereMoto()/setRequiereMoto(boolean)` (reemplaza `getTipoVehiculoRequerido`), `Pedido.getZona()/setZona(Zona)` sigue igual pero ya no obligatorio. `SolicitudPedido.isRequiereMoto()/setRequiereMoto(boolean)` (reemplaza zona y tipoVehiculoRequerido por completo). `PedidoDtos.PedidoRequest(..., String detalle, boolean requiereMoto, boolean programado, Instant fechaProgramada, List<ParadaRequest> paradasAdicionales)`. `PedidoDtos.PedidoResponse(..., String detalle, boolean requiereMoto, LookupResponse estado, ...)`. `SolicitudPedidoDtos.RevisarSolicitudRequest(boolean requiereMoto, BigDecimal precio, BigDecimal montoDeclarado)`. `SolicitudPedidoService.confirmarDirecto(String id, boolean requiereMoto, BigDecimal precio, BigDecimal montoDeclarado)` y `.cotizar(String id, boolean requiereMoto, BigDecimal precio, BigDecimal montoDeclarado)` (sin `zonaId`/`tipoVehiculoId`). Estas firmas las consume la Task 7/8 de front indirectamente (vía el JSON) y esta misma task en `PedidoService.crear`.
-- Consumes: nada de tasks anteriores (es la primera).
+- Produce: `Pedido.isRequiereMoto()/setRequiereMoto(boolean)` (reemplaza `getTipoVehiculoRequerido`), `Pedido.getZona()/setZona(Zona)` sigue igual pero ya no obligatorio. `SolicitudPedido.isRequiereMoto()/setRequiereMoto(boolean)` (reemplaza zona y tipoVehiculoRequerido por completo). `PedidoDtos.PedidoRequest(..., String detalle, boolean requiereMoto, boolean programado, Instant fechaProgramada, List<ParadaRequest> paradasAdicionales)`. `PedidoDtos.PedidoResponse(..., String detalle, boolean requiereMoto, LookupResponse estado, ...)`. `SolicitudPedidoDtos.RevisarSolicitudRequest(boolean requiereMoto, BigDecimal precio, BigDecimal montoDeclarado)`. `SolicitudPedidoService.confirmarDirecto(String id, boolean requiereMoto, BigDecimal precio, BigDecimal montoDeclarado)` y `.cotizar(String id, boolean requiereMoto, BigDecimal precio, BigDecimal montoDeclarado)` (sin `zonaId`/`tipoVehiculoId`). Estas firmas las consume la Task 7/8 de front indirectamente (vía el JSON) y esta misma task en `PedidoService.crear`.
+- Consume: nada de tasks anteriores (es la primera).
 
-- [ ] **Step 1: Editar `Pedido.java` — modelo**
+- [ ] **Paso 1: Editar `Pedido.java` — modelo**
 
 En `src/main/java/com/cadeteria/backend/model/Pedido.java`, reemplazar (líneas 71-77):
 
@@ -95,7 +95,7 @@ por:
 
 (El getter/setter de `zona`, líneas 320-326, no se toca.)
 
-- [ ] **Step 2: Editar `SolicitudPedido.java` — modelo**
+- [ ] **Paso 2: Editar `SolicitudPedido.java` — modelo**
 
 Reemplazar el bloque de campos (líneas 62-68):
 
@@ -148,7 +148,7 @@ por:
     }
 ```
 
-- [ ] **Step 3: Crear el runner de fix de esquema**
+- [ ] **Paso 3: Crear el runner de fix de esquema**
 
 Crear `src/main/java/com/cadeteria/backend/config/PedidoZonaVehiculoSchemaFix.java`:
 
@@ -219,7 +219,7 @@ public class PedidoZonaVehiculoSchemaFix implements CommandLineRunner {
 }
 ```
 
-- [ ] **Step 4: Editar `PedidoDtos.java` — `PedidoRequest`, `PedidoResponse`, comentario de `AsignarLoteRequest`**
+- [ ] **Paso 4: Editar `PedidoDtos.java` — `PedidoRequest`, `PedidoResponse`, comentario de `AsignarLoteRequest`**
 
 Reemplazar (líneas 17-35):
 
@@ -307,7 +307,7 @@ a:
     /** Agrupar pedidos con orígenes cercanos en una sola oferta a un cadete (ronda 4, punto 61). */
 ```
 
-- [ ] **Step 5: Reescribir `SolicitudPedidoDtos.java` completo**
+- [ ] **Paso 5: Reescribir `SolicitudPedidoDtos.java` completo**
 
 Reemplazar todo el archivo `src/main/java/com/cadeteria/backend/dto/SolicitudPedidoDtos.java` por:
 
@@ -376,7 +376,7 @@ public final class SolicitudPedidoDtos {
 }
 ```
 
-- [ ] **Step 6: Editar `PedidoService.java` — constructor y `crear`/`repetirPorToken`**
+- [ ] **Paso 6: Editar `PedidoService.java` — constructor y `crear`/`repetirPorToken`**
 
 Quitar los imports que quedan sin uso (líneas 17-18, 32-33):
 
@@ -581,7 +581,7 @@ por:
                 false, null, null);
 ```
 
-- [ ] **Step 7: Editar `SolicitudPedidoService.java`**
+- [ ] **Paso 7: Editar `SolicitudPedidoService.java`**
 
 Quitar los imports sin uso:
 
@@ -802,7 +802,7 @@ por:
     }
 ```
 
-- [ ] **Step 8: Editar `SolicitudPedidoAdminController.java`**
+- [ ] **Paso 8: Editar `SolicitudPedidoAdminController.java`**
 
 Reemplazar (líneas 34-46):
 
@@ -840,7 +840,7 @@ por:
     }
 ```
 
-- [ ] **Step 9: Arreglar `PedidoServiceReasignacionTest.java`**
+- [ ] **Paso 9: Arreglar `PedidoServiceReasignacionTest.java`**
 
 El constructor de `PedidoService` perdió `zonaRepo`/`tipoVehiculoRepo`, y el matching pasa a ser 100% por distancia GPS — el cadete y los pedidos de este test necesitan lat/lng para seguir siendo candidatos.
 
@@ -931,7 +931,7 @@ por:
 
 Y quitar, si el IDE marca sin uso, los imports `com.cadeteria.backend.repository.ZonaRepository` y `com.cadeteria.backend.repository.TipoVehiculoRepository` de este test — vía `import com.cadeteria.backend.repository.*;` esto ya está cubierto (el archivo usa el import con wildcard, no hace falta tocarlo).
 
-- [ ] **Step 10: Arreglar `PedidoServiceQuitarCadeteTest.java`**
+- [ ] **Paso 10: Arreglar `PedidoServiceQuitarCadeteTest.java`**
 
 Reemplazar (líneas 47-55):
 
@@ -960,12 +960,12 @@ por:
                 mock(IncidenciaRepository.class), new AppProperties());
 ```
 
-- [ ] **Step 11: Compilar y correr toda la suite**
+- [ ] **Paso 11: Compilar y correr toda la suite**
 
 Run: `mvnw.cmd test` (desde `C:\proyectos\cadeteria\cadeteria`)
 Expected: BUILD SUCCESS, todos los tests existentes en verde (no hay tests nuevos todavía, esta task es puramente estructural).
 
-- [ ] **Step 12: Commit**
+- [ ] **Paso 12: Commit**
 
 ```bash
 git add src/main/java/com/cadeteria/backend/model/Pedido.java src/main/java/com/cadeteria/backend/model/SolicitudPedido.java src/main/java/com/cadeteria/backend/dto/PedidoDtos.java src/main/java/com/cadeteria/backend/dto/SolicitudPedidoDtos.java src/main/java/com/cadeteria/backend/service/PedidoService.java src/main/java/com/cadeteria/backend/service/SolicitudPedidoService.java src/main/java/com/cadeteria/backend/controller/SolicitudPedidoAdminController.java src/main/java/com/cadeteria/backend/config/PedidoZonaVehiculoSchemaFix.java src/test/java/com/cadeteria/backend/service/PedidoServiceReasignacionTest.java src/test/java/com/cadeteria/backend/service/PedidoServiceQuitarCadeteTest.java
@@ -974,17 +974,17 @@ git commit -m "Pedido/SolicitudPedido: zona opcional, tipoVehiculoRequerido -> r
 
 ---
 
-### Task 2: Matching por distancia (buscarCandidato) + topes de BICI
+### Tarea 2: Matching por distancia (buscarCandidato) + topes de BICI
 
-**Files:**
-- Modify: `src/main/java/com/cadeteria/backend/service/PedidoService.java` (`buscarCandidato`, `viajeSuperaTopeDeBici`, `zonasCompatibles`)
-- Create: `src/test/java/com/cadeteria/backend/service/PedidoServiceMatchingPorDistanciaTest.java`
+**Archivos:**
+- Modificar: `src/main/java/com/cadeteria/backend/service/PedidoService.java` (`buscarCandidato`, `viajeSuperaTopeDeBici`, `zonasCompatibles`)
+- Crear: `src/test/java/com/cadeteria/backend/service/PedidoServiceMatchingPorDistanciaTest.java`
 
 **Interfaces:**
-- Consumes: `Pedido.isRequiereMoto()` y el constructor de `PedidoService` de la Task 1.
-- Produces: `PedidoService.sugerirCandidato(String pedidoId)` (ya existía, mismo nombre — ahora usa el matching nuevo). Configs nuevas: `distancia_maxima_bici_retiro_km`.
+- Consume: `Pedido.isRequiereMoto()` y el constructor de `PedidoService` de la Task 1.
+- Produce: `PedidoService.sugerirCandidato(String pedidoId)` (ya existía, mismo nombre — ahora usa el matching nuevo). Configs nuevas: `distancia_maxima_bici_retiro_km`.
 
-- [ ] **Step 1: Escribir el test que falla**
+- [ ] **Paso 1: Escribir el test que falla**
 
 Crear `src/test/java/com/cadeteria/backend/service/PedidoServiceMatchingPorDistanciaTest.java`:
 
@@ -1152,12 +1152,12 @@ class PedidoServiceMatchingPorDistanciaTest {
 }
 ```
 
-- [ ] **Step 2: Correr el test para ver que falla**
+- [ ] **Paso 2: Correr el test para ver que falla**
 
 Run: `mvnw.cmd test -Dtest=PedidoServiceMatchingPorDistanciaTest`
 Expected: FAIL — compila pero los asserts fallan (el matching viejo por zona/igualdad de vehículo todavía no fue reemplazado, así que ninguno de estos casos da lo esperado). Si no compila porque `PedidoService` ya no acepta este constructor, es porque la Task 1 no se aplicó — no seguir sin eso en verde.
 
-- [ ] **Step 3: Reescribir `buscarCandidato` y los topes de BICI en `PedidoService.java`**
+- [ ] **Paso 3: Reescribir `buscarCandidato` y los topes de BICI en `PedidoService.java`**
 
 Reemplazar el javadoc + `buscarCandidato` + `viajeSuperaTopeDeBici` completos (líneas 441-525):
 
@@ -1351,17 +1351,17 @@ Y borrar el método `zonasCompatibles` (queda sin uso en esta clase — la Task 
 
 **No borrar todavía este método si la Task 3 (asignarLote) no se hizo antes** — `asignarLote` también lo usa. Si esta Task 2 se ejecuta antes que la Task 3, dejar `zonasCompatibles` en el archivo (con una advertencia de "unused" del lado de `buscarCandidato" es aceptable temporalmente) y borrarlo recién en la Task 3, que es quien saca su otro único uso.
 
-- [ ] **Step 4: Correr el test — debe pasar**
+- [ ] **Paso 4: Correr el test — debe pasar**
 
 Run: `mvnw.cmd test -Dtest=PedidoServiceMatchingPorDistanciaTest`
 Expected: PASS (4/4).
 
-- [ ] **Step 5: Correr toda la suite**
+- [ ] **Paso 5: Correr toda la suite**
 
 Run: `mvnw.cmd test`
 Expected: BUILD SUCCESS.
 
-- [ ] **Step 6: Commit**
+- [ ] **Paso 6: Commit**
 
 ```bash
 git add src/main/java/com/cadeteria/backend/service/PedidoService.java src/test/java/com/cadeteria/backend/service/PedidoServiceMatchingPorDistanciaTest.java
@@ -1370,17 +1370,17 @@ git commit -m "Matching de pedidos: 100% por distancia GPS + tope de BICI al ret
 
 ---
 
-### Task 3: Asignación en lote por distancia (`asignarLote`)
+### Tarea 3: Asignación en lote por distancia (`asignarLote`)
 
-**Files:**
-- Modify: `src/main/java/com/cadeteria/backend/service/PedidoService.java` (`asignarLote`, borrar `zonasCompatibles` si sigue en el archivo)
-- Create: `src/test/java/com/cadeteria/backend/service/PedidoServiceAsignarLoteTest.java`
+**Archivos:**
+- Modificar: `src/main/java/com/cadeteria/backend/service/PedidoService.java` (`asignarLote`, borrar `zonasCompatibles` si sigue en el archivo)
+- Crear: `src/test/java/com/cadeteria/backend/service/PedidoServiceAsignarLoteTest.java`
 
 **Interfaces:**
-- Consumes: `PedidoService` constructor y `Pedido.setRequiereMoto` de la Task 1.
-- Produces: config nueva `distancia_maxima_lote_km` (default `3`), leída en `asignarLote`.
+- Consume: `PedidoService` constructor y `Pedido.setRequiereMoto` de la Task 1.
+- Produce: config nueva `distancia_maxima_lote_km` (default `3`), leída en `asignarLote`.
 
-- [ ] **Step 1: Escribir el test que falla**
+- [ ] **Paso 1: Escribir el test que falla**
 
 Crear `src/test/java/com/cadeteria/backend/service/PedidoServiceAsignarLoteTest.java`:
 
@@ -1499,12 +1499,12 @@ class PedidoServiceAsignarLoteTest {
 }
 ```
 
-- [ ] **Step 2: Correr el test para ver que falla**
+- [ ] **Paso 2: Correr el test para ver que falla**
 
 Run: `mvnw.cmd test -Dtest=PedidoServiceAsignarLoteTest`
 Expected: FAIL — `asignarLote` todavía llama a `pedidos.get(0).getZona()`/`p.getZona()`, que no tiene nada que ver con las coordenadas de este test (y puede tirar NPE si `zona` es null en los pedidos de prueba, ya que no se está seteando).
 
-- [ ] **Step 3: Reescribir `asignarLote` en `PedidoService.java`**
+- [ ] **Paso 3: Reescribir `asignarLote` en `PedidoService.java`**
 
 Reemplazar (líneas 707-716):
 
@@ -1574,19 +1574,19 @@ Si el método `zonasCompatibles` seguía en el archivo desde la Task 2, borrarlo
     }
 ```
 
-Y si el import `com.cadeteria.backend.model.Zona` (línea 18) o `java.util.Set` quedan sin uso en el archivo, sacarlos (`Set` probablemente lo sigan usando `zonasCompatibles` de otros métodos si quedara alguno — revisar con el propio compilador en el Step 4; si `mvnw.cmd test` no marca error por import sin usar, no hace falta tocarlo, Java no falla por imports sin uso, solo el linter podría advertir).
+Y si el import `com.cadeteria.backend.model.Zona` (línea 18) o `java.util.Set` quedan sin uso en el archivo, sacarlos (`Set` probablemente lo sigan usando `zonasCompatibles` de otros métodos si quedara alguno — revisar con el propio compilador en el Paso 4; si `mvnw.cmd test` no marca error por import sin usar, no hace falta tocarlo, Java no falla por imports sin uso, solo el linter podría advertir).
 
-- [ ] **Step 4: Correr el test — debe pasar**
+- [ ] **Paso 4: Correr el test — debe pasar**
 
 Run: `mvnw.cmd test -Dtest=PedidoServiceAsignarLoteTest`
 Expected: PASS (2/2).
 
-- [ ] **Step 5: Correr toda la suite**
+- [ ] **Paso 5: Correr toda la suite**
 
 Run: `mvnw.cmd test`
 Expected: BUILD SUCCESS.
 
-- [ ] **Step 6: Commit**
+- [ ] **Paso 6: Commit**
 
 ```bash
 git add src/main/java/com/cadeteria/backend/service/PedidoService.java src/test/java/com/cadeteria/backend/service/PedidoServiceAsignarLoteTest.java
@@ -1595,16 +1595,16 @@ git commit -m "asignarLote: agrupar por cercania de origenes en vez de zona"
 
 ---
 
-### Task 4: Seeders de demo (`DemoPedidoSeeder`, `DemoExtrasSeeder`)
+### Tarea 4: Seeders de demo (`DemoPedidoSeeder`, `DemoExtrasSeeder`)
 
-**Files:**
-- Modify: `src/main/java/com/cadeteria/backend/config/DemoPedidoSeeder.java`
-- Modify: `src/main/java/com/cadeteria/backend/config/DemoExtrasSeeder.java`
+**Archivos:**
+- Modificar: `src/main/java/com/cadeteria/backend/config/DemoPedidoSeeder.java`
+- Modificar: `src/main/java/com/cadeteria/backend/config/DemoExtrasSeeder.java`
 
 **Interfaces:**
-- Consumes: `Pedido.setRequiereMoto(boolean)` y `SolicitudPedido.setRequiereMoto(boolean)` de la Task 1.
+- Consume: `Pedido.setRequiereMoto(boolean)` y `SolicitudPedido.setRequiereMoto(boolean)` de la Task 1.
 
-- [ ] **Step 1: Editar `DemoPedidoSeeder.java`**
+- [ ] **Paso 1: Editar `DemoPedidoSeeder.java`**
 
 En el método `base(...)` (línea 256), reemplazar:
 
@@ -1620,7 +1620,7 @@ por:
         p.setRequiereMoto("MOTO".equals(tipo.getId()));
 ```
 
-- [ ] **Step 2: Editar `DemoExtrasSeeder.java`**
+- [ ] **Paso 2: Editar `DemoExtrasSeeder.java`**
 
 En `seedSolicitudesPedido(...)` (líneas 222-223), reemplazar:
 
@@ -1637,17 +1637,17 @@ por:
 
 (El parámetro `zona` del método `seedSolicitudesPedido(Zona zona, TipoVehiculo moto, Instant ahora)` queda sin uso — es aceptable dejarlo así, Java no falla por parámetros sin usar; no vale la pena encadenar la limpieza de `zonaRepo`/`zonaOpt` en este seeder de demo para esta tarea.)
 
-- [ ] **Step 3: Verificar que compila**
+- [ ] **Paso 3: Verificar que compila**
 
 Run: `mvnw.cmd compile`
 Expected: BUILD SUCCESS.
 
-- [ ] **Step 4: Levantar el backend en modo demo y verificar manualmente**
+- [ ] **Paso 4: Levantar el backend en modo demo y verificar manualmente**
 
 Run: `mvnw.cmd spring-boot:run` (con `app.demo.enabled=true`, el default de `application-local.yml` si existe, o pasar `-Dspring-boot.run.arguments=--app.demo.enabled=true`)
 Expected: en el log, "Demo: chat, solicitudes, incidencia y pagos semanales sembrados." sin excepciones; parar el proceso después de confirmarlo (Ctrl+C).
 
-- [ ] **Step 5: Commit**
+- [ ] **Paso 5: Commit**
 
 ```bash
 git add src/main/java/com/cadeteria/backend/config/DemoPedidoSeeder.java src/main/java/com/cadeteria/backend/config/DemoExtrasSeeder.java
@@ -1656,17 +1656,17 @@ git commit -m "Seeders de demo: adaptar a requiereMoto"
 
 ---
 
-### Task 5: Front — modelos + panel de Configuración (nuevos topes)
+### Tarea 5: Front — modelos + panel de Configuración (nuevos topes)
 
-**Files:**
-- Modify: `admin-front/src/app/core/models/pedido.model.ts`
-- Modify: `admin-front/src/app/core/models/solicitud-pedido.model.ts`
-- Modify: `admin-front/src/app/features/configuracion/configuracion.component.ts`
+**Archivos:**
+- Modificar: `admin-front/src/app/core/models/pedido.model.ts`
+- Modificar: `admin-front/src/app/core/models/solicitud-pedido.model.ts`
+- Modificar: `admin-front/src/app/features/configuracion/configuracion.component.ts`
 
 **Interfaces:**
-- Produces: `Pedido.requiereMoto: boolean` (reemplaza `zona`/`tipoVehiculoRequerido`), `PedidoInput.requiereMoto: boolean` (reemplaza `zonaId`/`tipoVehiculoRequeridoId`), `SolicitudPedido.requiereMoto: boolean` (reemplaza `zona`/`tipoVehiculoRequerido`), `RevisarSolicitudInput.requiereMoto: boolean` (reemplaza `zonaId`/`tipoVehiculoRequeridoId`). Estas interfaces las consumen las Tasks 6, 7 y 8.
+- Produce: `Pedido.requiereMoto: boolean` (reemplaza `zona`/`tipoVehiculoRequerido`), `PedidoInput.requiereMoto: boolean` (reemplaza `zonaId`/`tipoVehiculoRequeridoId`), `SolicitudPedido.requiereMoto: boolean` (reemplaza `zona`/`tipoVehiculoRequerido`), `RevisarSolicitudInput.requiereMoto: boolean` (reemplaza `zonaId`/`tipoVehiculoRequeridoId`). Estas interfaces las consumen las Tasks 6, 7 y 8.
 
-- [ ] **Step 1: Editar `pedido.model.ts`**
+- [ ] **Paso 1: Editar `pedido.model.ts`**
 
 Reemplazar (líneas 25-26):
 
@@ -1694,7 +1694,7 @@ por:
   requiereMoto: boolean;
 ```
 
-- [ ] **Step 2: Editar `solicitud-pedido.model.ts`**
+- [ ] **Paso 2: Editar `solicitud-pedido.model.ts`**
 
 Reemplazar (líneas 20-21):
 
@@ -1730,9 +1730,9 @@ export interface RevisarSolicitudInput {
 }
 ```
 
-Si el import `{ Lookup }` (línea 1) queda sin uso en este archivo, sacarlo (revisar con el build del Step 5 — TypeScript sí marca error por imports sin usar según la config del proyecto).
+Si el import `{ Lookup }` (línea 1) queda sin uso en este archivo, sacarlo (revisar con el build del Paso 5 — TypeScript sí marca error por imports sin usar según la config del proyecto).
 
-- [ ] **Step 3: Editar `configuracion.component.ts` — plantilla**
+- [ ] **Paso 3: Editar `configuracion.component.ts` — plantilla**
 
 Reemplazar el bloque del campo de BICI existente (líneas 145-153):
 
@@ -1778,7 +1778,7 @@ por:
               </label>
 ```
 
-- [ ] **Step 4: Editar `configuracion.component.ts` — campos, lectura y guardado**
+- [ ] **Paso 4: Editar `configuracion.component.ts` — campos, lectura y guardado**
 
 Reemplazar (línea 718):
 
@@ -1822,12 +1822,12 @@ por:
     agregarSiCambio('distancia_maxima_lote_km', String(this.distanciaMaximaLoteKm ?? 3));
 ```
 
-- [ ] **Step 5: Build**
+- [ ] **Paso 5: Build**
 
 Run: `npm run build` (desde `C:\proyectos\cadeteria\admin-front`)
 Expected: BUILD SUCCESS, sin errores de tipos (nada más referencia `zona`/`tipoVehiculoRequerido` de `Pedido`/`SolicitudPedido` todavía — eso lo rompe intencionalmente esta task; se arregla en las Tasks 6-8. Si preferís un build verde en cada task, hacer las Tasks 6-8 antes del `npm run build` final de esta task — el orden entre Task 5 y 6-8 no importa funcionalmente, son archivos disjuntos).
 
-- [ ] **Step 6: Commit**
+- [ ] **Paso 6: Commit**
 
 ```bash
 git add admin-front/src/app/core/models/pedido.model.ts admin-front/src/app/core/models/solicitud-pedido.model.ts admin-front/src/app/features/configuracion/configuracion.component.ts
@@ -1836,15 +1836,15 @@ git commit -m "Front: modelos de Pedido/SolicitudPedido a requiereMoto + topes n
 
 ---
 
-### Task 6: Front — `nuevo-pedido.component.ts` (alta directa del admin)
+### Tarea 6: Front — `nuevo-pedido.component.ts` (alta directa del admin)
 
-**Files:**
-- Modify: `admin-front/src/app/features/pedidos/nuevo-pedido.component.ts`
+**Archivos:**
+- Modificar: `admin-front/src/app/features/pedidos/nuevo-pedido.component.ts`
 
 **Interfaces:**
-- Consumes: `PedidoInput.requiereMoto: boolean` de la Task 5.
+- Consume: `PedidoInput.requiereMoto: boolean` de la Task 5.
 
-- [ ] **Step 1: Quitar el import y la inyección de `ZonaService`**
+- [ ] **Paso 1: Quitar el import y la inyección de `ZonaService`**
 
 Quitar (línea 7):
 
@@ -1858,7 +1858,7 @@ Quitar (línea 256):
   readonly zonas = inject(ZonaService);
 ```
 
-- [ ] **Step 2: Reemplazar el combo de Zona y el de Tipo de vehículo por un checkbox**
+- [ ] **Paso 2: Reemplazar el combo de Zona y el de Tipo de vehículo por un checkbox**
 
 Reemplazar (líneas 163-183):
 
@@ -1896,7 +1896,7 @@ por:
             </label>
 ```
 
-- [ ] **Step 3: Reemplazar el campo `zonaId`/`tipoVehiculoRequeridoId` por `requiereMoto`**
+- [ ] **Paso 3: Reemplazar el campo `zonaId`/`tipoVehiculoRequeridoId` por `requiereMoto`**
 
 Reemplazar (líneas 278-279):
 
@@ -1911,7 +1911,7 @@ por:
   requiereMoto = false;
 ```
 
-- [ ] **Step 4: Quitar `zonas.ensureLoaded()` y `onZonaChange`**
+- [ ] **Paso 4: Quitar `zonas.ensureLoaded()` y `onZonaChange`**
 
 Quitar de `ngOnInit` (línea 341):
 
@@ -1933,7 +1933,7 @@ Quitar el método completo `onZonaChange` (líneas 405-413):
   }
 ```
 
-- [ ] **Step 5: Simplificar la sugerencia de precio por cotización (ya no guarda `zonaId`)**
+- [ ] **Paso 5: Simplificar la sugerencia de precio por cotización (ya no guarda `zonaId`)**
 
 Reemplazar dentro de `sugerirPrecio()` (líneas 441-449):
 
@@ -1961,7 +1961,7 @@ por:
       });
 ```
 
-- [ ] **Step 6: Actualizar la validación y el payload de `guardar()`**
+- [ ] **Paso 6: Actualizar la validación y el payload de `guardar()`**
 
 Reemplazar (líneas 480-483):
 
@@ -1987,7 +1987,7 @@ por:
       requiereMoto: this.requiereMoto,
 ```
 
-- [ ] **Step 7: Actualizar los dos reseteos de formulario**
+- [ ] **Paso 7: Actualizar los dos reseteos de formulario**
 
 Reemplazar en `resetearFormularioMismoOrigen()` (líneas 546-547):
 
@@ -2004,12 +2004,12 @@ por:
 
 `resetearFormulario()` (reseteo completo, líneas 556-573) no tocaba `zonaId`/`tipoVehiculoRequeridoId` (a propósito, para no perderlos entre pedidos seguidos) — dejar `requiereMoto` fuera de este método también, sin agregar nada ahí, para mantener el mismo comportamiento.
 
-- [ ] **Step 8: Build**
+- [ ] **Paso 8: Build**
 
 Run: `npm run build`
 Expected: BUILD SUCCESS.
 
-- [ ] **Step 9: Commit**
+- [ ] **Paso 9: Commit**
 
 ```bash
 git add admin-front/src/app/features/pedidos/nuevo-pedido.component.ts
@@ -2018,15 +2018,15 @@ git commit -m "Front: alta de pedido sin zona, tipo de vehiculo como checkbox op
 
 ---
 
-### Task 7: Front — `solicitudes-pedido.component.ts` (revisión admin de "/pedir")
+### Tarea 7: Front — `solicitudes-pedido.component.ts` (revisión admin de "/pedir")
 
-**Files:**
-- Modify: `admin-front/src/app/features/pedir/solicitudes-pedido.component.ts`
+**Archivos:**
+- Modificar: `admin-front/src/app/features/pedir/solicitudes-pedido.component.ts`
 
 **Interfaces:**
-- Consumes: `RevisarSolicitudInput.requiereMoto: boolean` de la Task 5.
+- Consume: `RevisarSolicitudInput.requiereMoto: boolean` de la Task 5.
 
-- [ ] **Step 1: Quitar el import y la inyección de `ZonaService`**
+- [ ] **Paso 1: Quitar el import y la inyección de `ZonaService`**
 
 Quitar (línea 6):
 
@@ -2040,7 +2040,7 @@ Quitar (línea 204):
   readonly zonas = inject(ZonaService);
 ```
 
-- [ ] **Step 2: Reemplazar el combo de Zona y el de Vehículo por un checkbox**
+- [ ] **Paso 2: Reemplazar el combo de Zona y el de Vehículo por un checkbox**
 
 Reemplazar (líneas 77-97):
 
@@ -2076,7 +2076,7 @@ por:
                     </label>
 ```
 
-- [ ] **Step 3: Reemplazar los campos por-solicitud**
+- [ ] **Paso 3: Reemplazar los campos por-solicitud**
 
 Reemplazar (líneas 214-215):
 
@@ -2091,7 +2091,7 @@ por:
   requiereMotoSeleccionado: Record<string, boolean> = {};
 ```
 
-- [ ] **Step 4: Quitar `zonas.ensureLoaded()`**
+- [ ] **Paso 4: Quitar `zonas.ensureLoaded()`**
 
 Reemplazar `ngOnInit` (líneas 222-226):
 
@@ -2112,7 +2112,7 @@ por:
   }
 ```
 
-- [ ] **Step 5: Simplificar `datosValidos` y los payloads de `confirmarDirecto`/`cotizar`**
+- [ ] **Paso 5: Simplificar `datosValidos` y los payloads de `confirmarDirecto`/`cotizar`**
 
 Reemplazar (línea 245-247):
 
@@ -2251,12 +2251,12 @@ por:
 
 (el resto del método, con el callback de éxito después de la llave de cierre, no cambia).
 
-- [ ] **Step 6: Build**
+- [ ] **Paso 6: Build**
 
 Run: `npm run build`
 Expected: BUILD SUCCESS.
 
-- [ ] **Step 7: Commit**
+- [ ] **Paso 7: Commit**
 
 ```bash
 git add admin-front/src/app/features/pedir/solicitudes-pedido.component.ts
@@ -2265,15 +2265,15 @@ git commit -m "Front: revision de solicitudes sin zona, vehiculo como checkbox o
 
 ---
 
-### Task 8: Front — `dashboard.component.ts` (visualización + lote por distancia)
+### Tarea 8: Front — `dashboard.component.ts` (visualización + lote por distancia)
 
-**Files:**
-- Modify: `admin-front/src/app/features/dashboard/dashboard.component.ts`
+**Archivos:**
+- Modificar: `admin-front/src/app/features/dashboard/dashboard.component.ts`
 
 **Interfaces:**
-- Consumes: `Pedido.requiereMoto: boolean` de la Task 5.
+- Consume: `Pedido.requiereMoto: boolean` de la Task 5.
 
-- [ ] **Step 1: Inyectar `ConfiguracionService`**
+- [ ] **Paso 1: Inyectar `ConfiguracionService`**
 
 Agregar el import junto a los demás servicios (después de la línea 12, junto a `import { ToastService } from '../../core/services/toast.service';`):
 
@@ -2289,7 +2289,7 @@ Agregar la inyección junto a las demás (después de la línea 952, `private re
 
 Agregar `this.config.ensureLoaded();` al principio de `ngOnInit()` (línea 1134, junto a `this.cadetesSvc.ensureLoaded();`).
 
-- [ ] **Step 2: Tarjeta de sugerencia de candidato (líneas 266-281)**
+- [ ] **Paso 2: Tarjeta de sugerencia de candidato (líneas 266-281)**
 
 Reemplazar:
 
@@ -2345,7 +2345,7 @@ a:
   /** Botón "Asignar"/"Reasignar": el sistema sugiere un candidato (distancia + FIFO), el admin confirma o elige otro. */
 ```
 
-- [ ] **Step 3: Selección de lote (líneas 358-382)**
+- [ ] **Paso 3: Selección de lote (líneas 358-382)**
 
 Reemplazar:
 
@@ -2420,7 +2420,7 @@ por:
               [disabled]="pedidoIdsParaCadete.length === 0 || loteOrigenesLejos()"
 ```
 
-- [ ] **Step 4: Ficha de detalle del pedido (líneas 516-524)**
+- [ ] **Paso 4: Ficha de detalle del pedido (líneas 516-524)**
 
 Reemplazar:
 
@@ -2446,7 +2446,7 @@ por:
 
 (No tocar el bloque un poco más abajo, líneas 577-585, `p.cadeteAsignado.tipoVehiculo.nombre` — es el vehículo real del cadete asignado, no cambia.)
 
-- [ ] **Step 5: Reemplazar `loteZonaMezclada()` por `loteOrigenesLejos()`**
+- [ ] **Paso 5: Reemplazar `loteZonaMezclada()` por `loteOrigenesLejos()`**
 
 Reemplazar (líneas 1106-1111):
 
@@ -2481,7 +2481,7 @@ por:
   }
 ```
 
-- [ ] **Step 6: Actualizar la llamada en `confirmarAsignarDesdeCadete()`**
+- [ ] **Paso 6: Actualizar la llamada en `confirmarAsignarDesdeCadete()`**
 
 Reemplazar (línea 1475):
 
@@ -2495,16 +2495,16 @@ por:
     if (!c || this.pedidoIdsParaCadete.length === 0 || this.loteOrigenesLejos()) return;
 ```
 
-- [ ] **Step 7: Build**
+- [ ] **Paso 7: Build**
 
 Run: `npm run build`
 Expected: BUILD SUCCESS.
 
-- [ ] **Step 8: Verificación manual en el navegador**
+- [ ] **Paso 8: Verificación manual en el navegador**
 
 Levantar el backend (`mvnw.cmd spring-boot:run`) y el front (`npm start` en `admin-front`), abrir el dashboard, abrir el modal de "Asignar" sobre un pedido `SIN_ASIGNAR` y confirmar que ya no aparece "Zona" en la tarjeta ni en la ficha de detalle, y que el checkbox "Requiere moto" del alta funciona. Abrir "Cadetes libres" → "Asignar viaje" con 2+ pedidos y confirmar que el aviso de "orígenes cercanos" aparece/desaparece según la distancia real entre ellos.
 
-- [ ] **Step 9: Commit**
+- [ ] **Paso 9: Commit**
 
 ```bash
 git add admin-front/src/app/features/dashboard/dashboard.component.ts
@@ -2513,15 +2513,15 @@ git commit -m "Front: dashboard sin zona, lote agrupado por distancia entre orig
 
 ---
 
-### Task 9: `cadete-app` — actualizar el DTO de Pedido
+### Tarea 9: `cadete-app` — actualizar el DTO de Pedido
 
-**Files:**
-- Modify: `cadete-app/app/src/main/java/com/cadeteria/cadete/data/remote/dto/PedidoDtos.kt`
+**Archivos:**
+- Modificar: `cadete-app/app/src/main/java/com/cadeteria/cadete/data/remote/dto/PedidoDtos.kt`
 
 **Interfaces:**
-- Consumes: el contrato JSON nuevo de `PedidoResponse` (Task 1): sin `zona`, con `requiereMoto: boolean` en vez de `tipoVehiculoRequerido`.
+- Consume: el contrato JSON nuevo de `PedidoResponse` (Task 1): sin `zona`, con `requiereMoto: boolean` en vez de `tipoVehiculoRequerido`.
 
-- [ ] **Step 1: Editar el DTO**
+- [ ] **Paso 1: Editar el DTO**
 
 Reemplazar (líneas 25-26):
 
@@ -2536,12 +2536,12 @@ por:
     val requiereMoto: Boolean,
 ```
 
-- [ ] **Step 2: Verificar que compila**
+- [ ] **Paso 2: Verificar que compila**
 
 Run: `./gradlew :app:compileDebugKotlin` (desde `C:\proyectos\cadeteria\cadete-app`)
 Expected: BUILD SUCCESSFUL — ningún otro archivo construye `PedidoDto(...)` a mano ni lee `zona`/`tipoVehiculoRequerido` (son campos que solo se deserializaban del JSON y no se usaban en ninguna pantalla).
 
-- [ ] **Step 3: Commit**
+- [ ] **Paso 3: Commit**
 
 ```bash
 git add app/src/main/java/com/cadeteria/cadete/data/remote/dto/PedidoDtos.kt
