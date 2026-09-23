@@ -97,4 +97,58 @@ public class CadeteActualizacionService {
     public List<CadeteActualizacionCampo> camposDe(String actualizacionId) {
         return campoRepo.findByActualizacionId(actualizacionId);
     }
+
+    @Transactional(readOnly = true)
+    public List<CadeteActualizacionCampo> listarPendientes() {
+        return campoRepo.findByEstadoOrderByActualizacionCreadoEnDesc("PENDIENTE");
+    }
+
+    /** El admin aprueba un campo puntual — se aplica al Cadete real al toque. */
+    public CadeteActualizacionCampo aprobarCampo(String campoId, String adminUsername) {
+        CadeteActualizacionCampo campo = getCampo(campoId);
+        exigirPendiente(campo);
+        aplicarValor(campo.getActualizacion().getCadete(), campo);
+        campo.setEstado("APROBADO");
+        campo.setResueltoEn(Instant.now());
+        campo.setResueltoPorUsername(adminUsername);
+        return campoRepo.save(campo);
+    }
+
+    /** El admin rechaza un campo puntual — el Cadete real no se toca. */
+    public CadeteActualizacionCampo rechazarCampo(String campoId, String motivo, String adminUsername) {
+        CadeteActualizacionCampo campo = getCampo(campoId);
+        exigirPendiente(campo);
+        campo.setEstado("RECHAZADO");
+        campo.setMotivoRechazo(motivo == null || motivo.isBlank() ? null : motivo.trim());
+        campo.setResueltoEn(Instant.now());
+        campo.setResueltoPorUsername(adminUsername);
+        return campoRepo.save(campo);
+    }
+
+    private CadeteActualizacionCampo getCampo(String id) {
+        return campoRepo.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Actualización de cadete", id));
+    }
+
+    private void exigirPendiente(CadeteActualizacionCampo campo) {
+        if (!"PENDIENTE".equals(campo.getEstado())) {
+            throw new BadRequestException("Este campo ya fue resuelto.");
+        }
+    }
+
+    private void aplicarValor(Cadete cadete, CadeteActualizacionCampo campo) {
+        String valor = campo.getValorPropuesto();
+        switch (campo.getCampo()) {
+            case "FOTO_PERFIL" -> cadete.setFotoUrl(valor);
+            case "FOTO_VEHICULO" -> cadete.setFotoVehiculoUrl(valor);
+            case "FOTO_TARJETA_VERDE" -> cadete.setFotoTarjetaVerdeUrl(valor);
+            case "FOTO_TARJETA_VERDE_DORSO" -> cadete.setFotoTarjetaVerdeDorsoUrl(valor);
+            case "VEHICULO_MARCA" -> cadete.setVehiculoMarca(valor);
+            case "VEHICULO_MODELO" -> cadete.setVehiculoModelo(valor);
+            case "VEHICULO_COLOR" -> cadete.setVehiculoColor(valor);
+            case "VEHICULO_PATENTE" -> cadete.setVehiculoPatente(valor);
+            case "VEHICULO_ANIO" -> cadete.setVehiculoAnio(valor == null ? null : Integer.valueOf(valor));
+            default -> throw new IllegalStateException("Campo desconocido: " + campo.getCampo());
+        }
+        cadeteRepo.save(cadete);
+    }
 }
