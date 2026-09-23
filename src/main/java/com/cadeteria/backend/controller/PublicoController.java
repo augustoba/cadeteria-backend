@@ -45,7 +45,7 @@ public class PublicoController {
                 && cadete.getLat() != null && cadete.getLng() != null) {
             etaMinutos = rutaService.resumenSiDisponible(
                     cadete.getLat(), cadete.getLng(), pedido.getDestinoLat(), pedido.getDestinoLng(),
-                    pedido.getTipoVehiculoRequerido().getId()
+                    cadete.getTipoVehiculo().getId()
             ).map(RutaService.Resumen::duracionMin).orElse(null);
         }
         return SeguimientoResponse.from(pedido, etaMinutos);

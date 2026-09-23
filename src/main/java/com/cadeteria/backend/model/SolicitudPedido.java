@@ -59,13 +59,8 @@ public class SolicitudPedido {
     @Column(nullable = false, unique = true)
     private String tokenConfirmacion;
 
-    @ManyToOne
-    @JoinColumn(name = "zona_id")
-    private Zona zona;
-
-    @ManyToOne
-    @JoinColumn(name = "tipo_vehiculo_id")
-    private TipoVehiculo tipoVehiculoRequerido;
+    @Column(nullable = false)
+    private boolean requiereMoto = false;
 
     @Column(precision = 12, scale = 2)
     private BigDecimal precio;
@@ -204,20 +199,12 @@ public class SolicitudPedido {
         this.tokenConfirmacion = tokenConfirmacion;
     }
 
-    public Zona getZona() {
-        return zona;
+    public boolean isRequiereMoto() {
+        return requiereMoto;
     }
 
-    public void setZona(Zona zona) {
-        this.zona = zona;
-    }
-
-    public TipoVehiculo getTipoVehiculoRequerido() {
-        return tipoVehiculoRequerido;
-    }
-
-    public void setTipoVehiculoRequerido(TipoVehiculo tipoVehiculoRequerido) {
-        this.tipoVehiculoRequerido = tipoVehiculoRequerido;
+    public void setRequiereMoto(boolean requiereMoto) {
+        this.requiereMoto = requiereMoto;
     }
 
     public BigDecimal getPrecio() {

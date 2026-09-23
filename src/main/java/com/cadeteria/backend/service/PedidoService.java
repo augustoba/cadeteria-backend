@@ -14,7 +14,6 @@ import com.cadeteria.backend.model.PedidoPrecioLog;
 import com.cadeteria.backend.model.PedidoParada;
 import com.cadeteria.backend.model.PedidoUbicacion;
 import com.cadeteria.backend.model.ResultadoOferta;
-import com.cadeteria.backend.model.TipoVehiculo;
 import com.cadeteria.backend.model.Zona;
 import com.cadeteria.backend.config.AppProperties;
 import com.cadeteria.backend.repository.CadeteRepository;
@@ -29,8 +28,6 @@ import com.cadeteria.backend.repository.PedidoPrecioLogRepository;
 import com.cadeteria.backend.repository.PedidoParadaRepository;
 import com.cadeteria.backend.repository.PedidoUbicacionRepository;
 import com.cadeteria.backend.repository.ResultadoOfertaRepository;
-import com.cadeteria.backend.repository.TipoVehiculoRepository;
-import com.cadeteria.backend.repository.ZonaRepository;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -67,8 +64,6 @@ public class PedidoService {
 
     private final PedidoRepository repo;
     private final CadeteRepository cadeteRepo;
-    private final ZonaRepository zonaRepo;
-    private final TipoVehiculoRepository tipoVehiculoRepo;
     private final EstadoPedidoRepository estadoPedidoRepo;
     private final ResultadoOfertaRepository resultadoOfertaRepo;
     private final OfertaPedidoRepository ofertaRepo;
@@ -86,8 +81,7 @@ public class PedidoService {
     private final IncidenciaRepository incidenciaRepo;
     private final String frontBaseUrlSeguimiento;
 
-    public PedidoService(PedidoRepository repo, CadeteRepository cadeteRepo, ZonaRepository zonaRepo,
-                          TipoVehiculoRepository tipoVehiculoRepo, EstadoPedidoRepository estadoPedidoRepo,
+    public PedidoService(PedidoRepository repo, CadeteRepository cadeteRepo, EstadoPedidoRepository estadoPedidoRepo,
                           ResultadoOfertaRepository resultadoOfertaRepo, OfertaPedidoRepository ofertaRepo,
                           EstadoCadeteRepository estadoCadeteRepo, ConfiguracionService configuracionService,
                           WebSocketPublisher publisher, FcmService fcmService, SmsGatewayService smsGatewayService,
@@ -99,8 +93,6 @@ public class PedidoService {
         this.movimientoCreditoRepo = movimientoCreditoRepo;
         this.incidenciaRepo = incidenciaRepo;
         this.cadeteRepo = cadeteRepo;
-        this.zonaRepo = zonaRepo;
-        this.tipoVehiculoRepo = tipoVehiculoRepo;
         this.estadoPedidoRepo = estadoPedidoRepo;
         this.resultadoOfertaRepo = resultadoOfertaRepo;
         this.ofertaRepo = ofertaRepo;
@@ -339,11 +331,6 @@ public class PedidoService {
     // --- Alta ---
 
     public Pedido crear(PedidoRequest req) {
-        Zona zona = zonaRepo.findById(req.zonaId())
-                .orElseThrow(() -> ResourceNotFoundException.of("Zona", req.zonaId()));
-        TipoVehiculo tipo = tipoVehiculoRepo.findById(req.tipoVehiculoRequeridoId())
-                .orElseThrow(() -> ResourceNotFoundException.of("Tipo de vehiculo", req.tipoVehiculoRequeridoId()));
-
         boolean esProgramado = req.programado() && req.fechaProgramada() != null
                 && req.fechaProgramada().isAfter(Instant.now());
 
@@ -362,8 +349,7 @@ public class PedidoService {
         p.setPrecio(req.precio());
         p.setMontoDeclarado(req.montoDeclarado() == null ? BigDecimal.ZERO : req.montoDeclarado());
         p.setDetalle(req.detalle());
-        p.setZona(zona);
-        p.setTipoVehiculoRequerido(tipo);
+        p.setRequiereMoto(req.requiereMoto());
         p.setProgramado(esProgramado);
         p.setFechaProgramada(esProgramado ? req.fechaProgramada() : null);
         p.setEstado(estado(esProgramado ? "PROGRAMADO" : "SIN_ASIGNAR"));
@@ -409,7 +395,7 @@ public class PedidoService {
                 original.getOrigenDireccion(), original.getOrigenLat(), original.getOrigenLng(),
                 original.getDestinoDireccion(), original.getDestinoLat(), original.getDestinoLng(),
                 original.getPrecio(), null, "Repetición del pedido #" + original.getNumero(),
-                original.getZona().getId(), original.getTipoVehiculoRequerido().getId(),
+                original.isRequiereMoto(),
                 false, null, null);
         return crear(req);
     }
@@ -482,7 +468,8 @@ public class PedidoService {
                 .filter(c -> "LIBRE".equals(c.getEstado().getId()))
                 .filter(this::puedeRecibirViajes)
                 .filter(c -> pedidoUrgente || rechazosPorCadete.getOrDefault(c.getId(), 0L) < maxRechazos)
-                .filter(c -> c.getTipoVehiculo().getId().equals(pedido.getTipoVehiculoRequerido().getId()))
+                // Interim: Task 2 reemplaza este método completo con el matching por distancia.
+                .filter(c -> !pedido.isRequiereMoto() || "MOTO".equals(c.getTipoVehiculo().getId()))
                 .filter(c -> dentroDeTopes(c, pedido))
                 .filter(c -> cantidadPedidosPendientes(c) < maxViajesAsignacion)
                 .filter(this::dentroDeTurno)
@@ -516,7 +503,8 @@ public class PedidoService {
     }
 
     private boolean viajeSuperaTopeDeBici(Pedido pedido) {
-        if (!"BICI".equals(pedido.getTipoVehiculoRequerido().getId())) return false;
+        // Interim: Task 2 reemplaza este método completo con el matching por distancia.
+        if (pedido.isRequiereMoto()) return false;
         BigDecimal topeKm = configuracionService.getBigDecimal("distancia_maxima_bici_km", BigDecimal.ZERO);
         if (topeKm.signum() <= 0) return false; // 0 o sin cargar = sin límite
         double distanciaViaje = GeocodingService.distanciaKm(

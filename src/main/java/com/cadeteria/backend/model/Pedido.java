@@ -68,13 +68,17 @@ public class Pedido {
     private boolean programado = false;
     private Instant fechaProgramada;
 
-    @ManyToOne(optional = false)
+    @ManyToOne
     @JoinColumn(name = "zona_id")
     private Zona zona;
 
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "tipo_vehiculo_requerido_id")
-    private TipoVehiculo tipoVehiculoRequerido;
+    /**
+     * Tildado: el matching automático solo ofrece el pedido a cadetes en MOTO. Sin tildar
+     * (default): entra cualquiera, moto o bici — la bici queda sujeta a los topes de
+     * distancia (ver PedidoService.buscarCandidato).
+     */
+    @Column(nullable = false)
+    private boolean requiereMoto = false;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "estado_id")
@@ -325,12 +329,12 @@ public class Pedido {
         this.zona = zona;
     }
 
-    public TipoVehiculo getTipoVehiculoRequerido() {
-        return tipoVehiculoRequerido;
+    public boolean isRequiereMoto() {
+        return requiereMoto;
     }
 
-    public void setTipoVehiculoRequerido(TipoVehiculo tipoVehiculoRequerido) {
-        this.tipoVehiculoRequerido = tipoVehiculoRequerido;
+    public void setRequiereMoto(boolean requiereMoto) {
+        this.requiereMoto = requiereMoto;
     }
 
     public EstadoPedido getEstado() {

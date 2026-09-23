@@ -253,7 +253,7 @@ public class DemoPedidoSeeder implements CommandLineRunner {
         p.setPrecio(precio);
         p.setMontoDeclarado(montoDeclarado);
         p.setZona(zona);
-        p.setTipoVehiculoRequerido(tipo);
+        p.setRequiereMoto(tipo != null && "MOTO".equals(tipo.getId()));
         p.setCadeteAsignado(cadete);
         p.setCreadoEn(Instant.now());
         return p;

@@ -32,7 +32,7 @@ public final class SolicitudPedidoDtos {
             String clienteNombre, String clienteTelefono,
             String detalle,
             String estado,
-            LookupResponse zona, LookupResponse tipoVehiculoRequerido, BigDecimal precio,
+            boolean requiereMoto, BigDecimal precio,
             String pedidoCreadoId, String motivoRechazo,
             Instant creadoEn
     ) {
@@ -42,15 +42,14 @@ public final class SolicitudPedidoDtos {
                     s.getDestinoDireccion(), s.getDestinoLat(), s.getDestinoLng(),
                     s.isLlevaDinero(), s.getMontoDeclarado(), s.isRetornaAlOrigen(),
                     s.getClienteNombre(), s.getClienteTelefono(), s.getDetalle(), s.getEstado(),
-                    LookupResponse.from(s.getZona()), LookupResponse.from(s.getTipoVehiculoRequerido()), s.getPrecio(),
+                    s.isRequiereMoto(), s.getPrecio(),
                     s.getPedidoCreadoId(), s.getMotivoRechazo(), s.getCreadoEn());
         }
     }
 
     /** Confirmar directo (ya se acordó el precio) o mandar cotización (el cliente confirma solo) — mismos campos. */
     public record RevisarSolicitudRequest(
-            @NotBlank String zonaId, @NotBlank String tipoVehiculoRequeridoId,
-            @NotNull BigDecimal precio, BigDecimal montoDeclarado
+            boolean requiereMoto, @NotNull BigDecimal precio, BigDecimal montoDeclarado
     ) {}
 
     public record RechazarSolicitudRequest(String motivo) {}
