@@ -1,6 +1,7 @@
 package com.cadeteria.backend.service;
 
 import com.cadeteria.backend.model.ChatMensaje;
+import com.cadeteria.backend.model.Pedido;
 import com.cadeteria.backend.model.WhatsappMensaje;
 import com.cadeteria.backend.repository.ChatMensajeRepository;
 import com.cadeteria.backend.repository.PedidoRepository;
@@ -35,13 +36,16 @@ public class RetencionDatosService {
     private final ChatMensajeRepository chatRepo;
     private final PedidoRepository pedidoRepo;
     private final ConfiguracionService configuracionService;
+    private final CloudinaryService cloudinaryService;
 
     public RetencionDatosService(WhatsappMensajeRepository whatsappRepo, ChatMensajeRepository chatRepo,
-                                  PedidoRepository pedidoRepo, ConfiguracionService configuracionService) {
+                                  PedidoRepository pedidoRepo, ConfiguracionService configuracionService,
+                                  CloudinaryService cloudinaryService) {
         this.whatsappRepo = whatsappRepo;
         this.chatRepo = chatRepo;
         this.pedidoRepo = pedidoRepo;
         this.configuracionService = configuracionService;
+        this.cloudinaryService = cloudinaryService;
     }
 
     @Scheduled(cron = "0 30 3 * * *")
@@ -49,6 +53,7 @@ public class RetencionDatosService {
     public void purgarMensajesViejos() {
         purgarWhatsapp();
         purgarChat();
+        purgarImagenesPedidos();
     }
 
     private void purgarWhatsapp() {
@@ -79,5 +84,30 @@ public class RetencionDatosService {
         if (viejos.isEmpty()) return;
         chatRepo.deleteAll(viejos);
         log.info("Retención: borrados {} mensajes de chat interno más viejos que {} días.", viejos.size(), dias);
+    }
+
+    /**
+     * Borra las fotos/firma de pedidos ya terminados (mejora 2026-09-23) — nunca toca un
+     * pedido todavía abierto. Intenta borrar el archivo de Cloudinary de verdad
+     * (CloudinaryService, no-op si no hay api_key/api_secret configurados todavía) y en
+     * cualquier caso limpia la referencia en la base, para no acumular fotos de clientes
+     * para siempre sin que nadie lo haya decidido — mismo espíritu que purgarWhatsapp/Chat.
+     */
+    private void purgarImagenesPedidos() {
+        int dias = configuracionService.getInt("retencion_imagenes_pedido_dias", 60);
+        if (dias <= 0) return;
+        Instant corte = Instant.now().minus(dias, ChronoUnit.DAYS);
+        List<Pedido> candidatos = pedidoRepo.findConImagenesTerminadosAntesDe(corte);
+        if (candidatos.isEmpty()) return;
+        for (Pedido p : candidatos) {
+            cloudinaryService.borrarSiCorresponde(p.getFotoRecepcionUrl());
+            cloudinaryService.borrarSiCorresponde(p.getEntregaFotoUrl());
+            cloudinaryService.borrarSiCorresponde(p.getFirmaReceptorUrl());
+            p.setFotoRecepcionUrl(null);
+            p.setEntregaFotoUrl(null);
+            p.setFirmaReceptorUrl(null);
+        }
+        pedidoRepo.saveAll(candidatos);
+        log.info("Retención: limpiadas las imágenes de {} pedidos terminados hace más de {} días.", candidatos.size(), dias);
     }
 }

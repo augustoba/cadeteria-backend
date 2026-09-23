@@ -79,4 +79,17 @@ public interface PedidoRepository extends JpaRepository<Pedido, String> {
             group by p.cadeteAsignado.id
             """)
     List<Object[]> calificacionPorCadete();
+
+    /**
+     * Candidatos para la purga de imágenes (mejora 2026-09-23, RetencionDatosService): solo
+     * pedidos ya terminados (nunca uno abierto), con al menos una foto/firma cargada, y cuyo
+     * momento de cierre (finalizadoEn o canceladoEn, el que corresponda) es anterior al corte.
+     */
+    @Query("""
+            SELECT p FROM Pedido p
+            WHERE p.estado.id IN ('FINALIZADO', 'CANCELADO')
+              AND COALESCE(p.finalizadoEn, p.canceladoEn) < :corte
+              AND (p.fotoRecepcionUrl IS NOT NULL OR p.entregaFotoUrl IS NOT NULL OR p.firmaReceptorUrl IS NOT NULL)
+            """)
+    List<Pedido> findConImagenesTerminadosAntesDe(@Param("corte") Instant corte);
 }

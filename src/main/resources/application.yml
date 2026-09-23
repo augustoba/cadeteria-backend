@@ -73,6 +73,12 @@ app:
     username: ${MAIL_USERNAME:}
     password: ${MAIL_PASSWORD:}
     from: ${MAIL_FROM:no-reply@cadeteria.local}
+  # Admin API de Cloudinary para poder borrar archivos de verdad al purgar (ver
+  # RetencionDatosService/CloudinaryService) — api-key/api-secret vacío = el borrado
+  # queda deshabilitado (solo se limpia la referencia en la base, igual que siempre).
+  cloudinary:
+    api-key: ${CLOUDINARY_API_KEY:}
+    api-secret: ${CLOUDINARY_API_SECRET:}
 
 logging:
   level:

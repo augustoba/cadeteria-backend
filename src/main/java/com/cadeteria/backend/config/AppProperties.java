@@ -18,6 +18,7 @@ public class AppProperties {
     private Maps maps = new Maps();
     private Fcm fcm = new Fcm();
     private Mail mail = new Mail();
+    private Cloudinary cloudinary = new Cloudinary();
     private String frontBaseUrl = "http://localhost:4200";
 
     public String getFrontBaseUrl() {
@@ -106,6 +107,14 @@ public class AppProperties {
 
     public void setMail(Mail mail) {
         this.mail = mail;
+    }
+
+    public Cloudinary getCloudinary() {
+        return cloudinary;
+    }
+
+    public void setCloudinary(Cloudinary cloudinary) {
+        this.cloudinary = cloudinary;
     }
 
     public static class Jwt {
@@ -357,6 +366,35 @@ public class AppProperties {
 
         public void setFrom(String from) {
             this.from = from;
+        }
+    }
+
+    /**
+     * Credenciales de la Admin API de Cloudinary, para poder borrar archivos de verdad
+     * (mejora 2026-09-23) — el cloud_name/upload_preset ya vive en Configuración (se usa
+     * para el upload sin firmar desde el navegador), pero api_key/api_secret son
+     * sensibles y no se guardan en la base. api_key o api_secret vacío = borrado
+     * deshabilitado (la limpieza de referencias en la base sigue andando igual, ver
+     * RetencionDatosService/CloudinaryService).
+     */
+    public static class Cloudinary {
+        private String apiKey = "";
+        private String apiSecret = "";
+
+        public String getApiKey() {
+            return apiKey;
+        }
+
+        public void setApiKey(String apiKey) {
+            this.apiKey = apiKey;
+        }
+
+        public String getApiSecret() {
+            return apiSecret;
+        }
+
+        public void setApiSecret(String apiSecret) {
+            this.apiSecret = apiSecret;
         }
     }
 }
