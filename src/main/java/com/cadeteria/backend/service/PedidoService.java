@@ -14,7 +14,6 @@ import com.cadeteria.backend.model.PedidoPrecioLog;
 import com.cadeteria.backend.model.PedidoParada;
 import com.cadeteria.backend.model.PedidoUbicacion;
 import com.cadeteria.backend.model.ResultadoOferta;
-import com.cadeteria.backend.model.Zona;
 import com.cadeteria.backend.config.AppProperties;
 import com.cadeteria.backend.repository.CadeteRepository;
 import com.cadeteria.backend.repository.EstadoCadeteRepository;
@@ -553,12 +552,6 @@ public class PedidoService {
         return !ahora.isBefore(inicio) || ahora.isBefore(fin);
     }
 
-    private Set<String> zonasCompatibles(Zona zona) {
-        Set<String> ids = zona.getZonasAledanas().stream().map(Zona::getId).collect(Collectors.toSet());
-        ids.add(zona.getId());
-        return ids;
-    }
-
     private boolean dentroDeTopes(Cadete cadete, Pedido nuevoPedido) {
         List<Pedido> activos = repo.findByCadeteAsignadoIdAndEstadoIdIn(cadete.getId(), ESTADOS_OCUPAN_CADETE);
         if (cadete.getMaxViajesSimultaneos() != null && activos.size() >= cadete.getMaxViajesSimultaneos()) {
@@ -672,11 +665,12 @@ public class PedidoService {
     }
 
     /**
-     * Agrupar pedidos de la misma zona (o zonas aledañas) en una sola oferta a un cadete
-     * (ronda 4, punto 61) — para repartos que van al mismo lado, en vez de asignarlos uno
-     * por uno. Reusa `ofertar()` pedido por pedido (el cadete sigue viendo/aceptando cada
-     * uno por separado en la app, sin ningún cambio ahí); requiere que el cadete tenga
-     * "Máx. viajes simultáneos" configurado en 2 o más si el lote tiene más de un pedido.
+     * Agrupar pedidos con orígenes cercanos entre sí (dentro de "distancia_maxima_lote_km",
+     * default 3) en una sola oferta a un cadete (ronda 4, punto 61) — para repartos que van
+     * al mismo lado, en vez de asignarlos uno por uno. Reusa `ofertar()` pedido por pedido
+     * (el cadete sigue viendo/aceptando cada uno por separado en la app, sin ningún cambio
+     * ahí); requiere que el cadete tenga "Máx. viajes simultáneos" configurado en 2 o más si
+     * el lote tiene más de un pedido.
      */
     public List<Pedido> asignarLote(List<String> pedidoIds, String cadeteId, String adminUsername) {
         if (pedidoIds == null || pedidoIds.isEmpty()) {
@@ -691,15 +685,16 @@ public class PedidoService {
             throw new BadRequestException("El cadete todavia no pago la cuota semanal — no se le puede asignar.");
         }
         List<Pedido> pedidos = pedidoIds.stream().map(this::get).toList();
-        // Interim: Task 3 reemplaza este chequeo por cercania de origenes.
-        Zona zonaPrimero = pedidos.get(0).getZona();
-        Set<String> zonasCompatibles = zonaPrimero == null ? null : zonasCompatibles(zonaPrimero);
+        BigDecimal topeLoteKm = configuracionService.getBigDecimal("distancia_maxima_lote_km", BigDecimal.valueOf(3));
+        Pedido primero = pedidos.get(0);
         for (Pedido p : pedidos) {
             if (!"SIN_ASIGNAR".equals(p.getEstado().getId())) {
                 throw new BadRequestException("El pedido #" + p.getNumero() + " ya tiene una asignacion en curso.");
             }
-            if (zonasCompatibles != null && (p.getZona() == null || !zonasCompatibles.contains(p.getZona().getId()))) {
-                throw new BadRequestException("Todos los pedidos del lote tienen que ser de la misma zona (o zonas aledañas).");
+            double distancia = GeocodingService.distanciaKm(
+                    primero.getOrigenLat(), primero.getOrigenLng(), p.getOrigenLat(), p.getOrigenLng());
+            if (distancia > topeLoteKm.doubleValue()) {
+                throw new BadRequestException("Todos los pedidos del lote tienen que tener orígenes cercanos entre sí.");
             }
         }
         for (Pedido p : pedidos) {
