@@ -65,7 +65,6 @@ public class CadeteActualizacionService {
         CadeteActualizacion lote = new CadeteActualizacion();
         lote.setId(UUID.randomUUID().toString());
         lote.setCadete(cadete);
-        lote.setCreadoEn(Instant.now());
         lote = loteRepo.save(lote);
 
         for (CampoCandidato c : candidatos) {

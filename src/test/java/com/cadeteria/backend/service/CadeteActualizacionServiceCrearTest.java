@@ -58,9 +58,17 @@ class CadeteActualizacionServiceCrearTest {
         cadeteActual();
         when(campoRepo.existePendientePara("c1", "PENDIENTE")).thenReturn(false);
 
-        assertThrows(BadRequestException.class, () ->
-                service.crear("jperez", new ActualizacionCadeteRequest(
-                        null, null, null, null, null, null, "Rojo", null, null)));
+        service.crear("jperez", new ActualizacionCadeteRequest(
+                null, null, null, null, null, null, "Rojo", null, 2021));
+
+        ArgumentCaptor<CadeteActualizacionCampo> captor = ArgumentCaptor.forClass(CadeteActualizacionCampo.class);
+        verify(campoRepo, times(1)).save(captor.capture());
+        CadeteActualizacionCampo guardado = captor.getValue();
+
+        assertEquals("VEHICULO_ANIO", guardado.getCampo());
+        assertEquals("2020", guardado.getValorAnterior());
+        assertEquals("2021", guardado.getValorPropuesto());
+        assertEquals("PENDIENTE", guardado.getEstado());
     }
 
     @Test
