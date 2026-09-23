@@ -33,4 +33,7 @@ bin/
 .vscode/
 
 ### Mac OS ###
-.DS_Store.worktrees/
+.DS_Store
+
+### Worktrees aislados (superpowers) ###
+.worktrees/
