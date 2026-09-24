@@ -42,9 +42,12 @@ public class CadeteController {
     private final WebSocketPublisher publisher;
     private final ConfiguracionService configuracionService;
     private final PagoSemanalService pagoSemanalService;
+    private final com.cadeteria.backend.service.CadeteSesionService sesionService;
 
     public CadeteController(CadeteService service, WebSocketPublisher publisher, ConfiguracionService configuracionService,
-                             PagoSemanalService pagoSemanalService) {
+                             PagoSemanalService pagoSemanalService,
+                             com.cadeteria.backend.service.CadeteSesionService sesionService) {
+        this.sesionService = sesionService;
         this.service = service;
         this.publisher = publisher;
         this.configuracionService = configuracionService;
@@ -214,6 +217,17 @@ public class CadeteController {
         return pagoSemanalService.miSemanaActual(auth.getName());
     }
 
+    /** Minutos conectado hoy (hora de Argentina) — la estadística "Conectado" de Inicio (spec mejoras visuales §2, fase G). */
+    public record ConectadoHoyResponse(long minutos) {}
+
+    @GetMapping("/api/cadetes/me/conectado-hoy")
+    public ConectadoHoyResponse conectadoHoy(Authentication auth) {
+        java.time.Instant desde = java.time.LocalDate.now(ZONA).atStartOfDay(ZONA).toInstant();
+        java.time.Instant hasta = java.time.Instant.now();
+        double horas = sesionService.horasOnline(service.getByUsername(auth.getName()).getId(), desde, hasta);
+        return new ConectadoHoyResponse(Math.round(horas * 60));
+    }
+
     /** Subconjunto de /api/admin/configuracion que la app necesita (frecuencia de ubicación, Cloudinary). */
     @GetMapping("/api/cadetes/me/configuracion")
     public CadeteConfigResponse configuracion() {
@@ -232,7 +246,9 @@ public class CadeteController {
                 configuracionService.getBigDecimal("credito_bajo_alerta_umbral", java.math.BigDecimal.valueOf(500)),
                 configuracionService.getInt("tiempo_limite_aceptacion_seg", 120),
                 valores.getOrDefault("telefono_soporte", ""),
-                configuracionService.getBoolean("checklist_documentacion_obligatorio", false)
+                configuracionService.getBoolean("checklist_documentacion_obligatorio", false),
+                configuracionService.getBoolean("foto_retiro_obligatoria", false),
+                configuracionService.getBoolean("foto_entrega_obligatoria", true)
         );
     }
 

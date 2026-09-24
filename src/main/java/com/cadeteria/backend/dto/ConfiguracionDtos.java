@@ -29,6 +29,9 @@ public final class ConfiguracionDtos {
             /** Teléfono de contacto de la cadetería para la pantalla de Ayuda de la app (mejora 2026-09-16). */
             String telefonoSoporte,
             /** Si hace falta tener carnet/tarjeta verde/foto del vehículo cargados para poder activarse (mejora 2026-09-16). */
-            boolean checklistDocumentacionObligatorio
+            boolean checklistDocumentacionObligatorio,
+            /** Fotos configurables (spec mejoras visuales §6): la app pide la foto ANTES de intentar, en vez de esperar el error. */
+            boolean fotoRetiroObligatoria,
+            boolean fotoEntregaObligatoria
     ) {}
 }

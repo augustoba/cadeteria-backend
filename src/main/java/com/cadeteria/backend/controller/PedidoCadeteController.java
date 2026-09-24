@@ -116,7 +116,8 @@ public class PedidoCadeteController {
     @PostMapping("/{id}/recepcion")
     public PedidoResponse recepcion(@PathVariable String id, @Valid @RequestBody RecepcionRequest req,
                                      Authentication auth) {
-        return PedidoResponse.paraCadete(service.registrarRecepcion(id, auth.getName(), req.fotoUrl(), req.lat(), req.lng()));
+        return PedidoResponse.paraCadete(service.registrarRecepcion(id, auth.getName(), req.fotoUrl(), req.lat(), req.lng(),
+                Boolean.TRUE.equals(req.archivoPerdido())));
     }
 
     @PostMapping("/{id}/finalizar")

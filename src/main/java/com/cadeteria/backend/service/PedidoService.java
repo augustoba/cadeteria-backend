@@ -144,6 +144,17 @@ public class PedidoService {
     }
 
     /** Mejora 101 — antes el admin solo podía leer los comentarios del cadete, no dejar los propios. */
+    /** Deja constancia en el pedido de que el comprobante se perdió en el teléfono antes de subirse. */
+    private void dejarComentarioArchivoPerdido(Pedido pedido, Cadete cadete, String momento) {
+        PedidoComentario comentario = new PedidoComentario();
+        comentario.setId(UUID.randomUUID().toString());
+        comentario.setPedido(pedido);
+        comentario.setCadete(cadete);
+        comentario.setTexto("(automático) La foto/firma de " + momento
+                + " se perdió en el teléfono antes de poder subirse (sin señal) — se registró sin comprobante.");
+        pedidoComentarioRepo.save(comentario);
+    }
+
     public PedidoComentario agregarComentarioAdmin(String pedidoId, String adminUsername, String texto) {
         if (texto == null || texto.isBlank()) {
             throw new BadRequestException("El comentario no puede estar vacio.");
@@ -950,8 +961,13 @@ public class PedidoService {
         return pedido;
     }
 
-    /** Boton "Retirado": marca que el cadete paso por lo del cliente a buscar el pedido. La foto es opcional. */
-    public Pedido registrarRecepcion(String pedidoId, String cadeteUsername, String fotoUrl, Double lat, Double lng) {
+    /**
+     * Boton "Retirado": marca que el cadete paso por lo del cliente a buscar el pedido. La foto
+     * es opcional salvo que Configuración la exija (`foto_retiro_obligatoria`, spec mejoras
+     * visuales §6); `archivoPerdido` es la válvula de escape de la cola offline de la app.
+     */
+    public Pedido registrarRecepcion(String pedidoId, String cadeteUsername, String fotoUrl, Double lat, Double lng,
+                                     boolean archivoPerdido) {
         Pedido pedido = get(pedidoId);
         Cadete cadete = cadeteDelUsername(cadeteUsername);
         validarPertenencia(pedido, cadete);
@@ -960,6 +976,13 @@ public class PedidoService {
         }
         if (pedido.getRetiradoEn() != null) {
             throw new BadRequestException("El pedido ya fue marcado como retirado.");
+        }
+        boolean sinFotoRetiro = fotoUrl == null || fotoUrl.isBlank();
+        if (sinFotoRetiro && !archivoPerdido && configuracionService.getBoolean("foto_retiro_obligatoria", false)) {
+            throw new BadRequestException("Hace falta sacarle una foto al pedido al retirarlo.");
+        }
+        if (sinFotoRetiro && archivoPerdido) {
+            dejarComentarioArchivoPerdido(pedido, cadete, "retiro");
         }
         pedido.setRetiradoEn(Instant.now());
         if (fotoUrl != null && !fotoUrl.isBlank()) {
@@ -1028,11 +1051,20 @@ public class PedidoService {
         boolean sinReceptor = req.receptorNombre() == null || req.receptorNombre().isBlank();
         boolean sinFoto = req.fotoUrl() == null || req.fotoUrl().isBlank();
         boolean sinFirma = req.firmaUrl() == null || req.firmaUrl().isBlank();
-        if (exigirComprobante && (sinReceptor || sinFoto)) {
-            throw new BadRequestException("Hace falta el nombre y apellido de quien recibio y una foto de la entrega.");
+        // Foto de entrega: configurable (spec mejoras visuales §6, antes clavada en obligatoria).
+        // archivoPerdido = la app la sacó pero el archivo desapareció antes de subirse (cola offline).
+        boolean perdido = req.seperdioElArchivo();
+        if (exigirComprobante && sinReceptor) {
+            throw new BadRequestException("Hace falta el nombre y apellido de quien recibio.");
         }
-        if (exigirComprobante && sinFirma && configuracionService.getBoolean("firma_receptor_obligatoria", false)) {
+        if (exigirComprobante && sinFoto && !perdido && configuracionService.getBoolean("foto_entrega_obligatoria", true)) {
+            throw new BadRequestException("Hace falta una foto de la entrega.");
+        }
+        if (exigirComprobante && sinFirma && !perdido && configuracionService.getBoolean("firma_receptor_obligatoria", false)) {
             throw new BadRequestException("Hace falta la firma digital de quien recibio.");
+        }
+        if (exigirComprobante && perdido && (sinFoto || sinFirma)) {
+            dejarComentarioArchivoPerdido(pedido, cadete, "entrega");
         }
         pedido.setEntregaReceptorNombre(sinReceptor ? null : req.receptorNombre().trim());
         pedido.setEntregaFotoUrl(sinFoto ? null : req.fotoUrl().trim());

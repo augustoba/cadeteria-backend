@@ -187,7 +187,12 @@ public final class PedidoDtos {
      * lat/lng son la ubicación del celular del cadete en ese momento (opcional, si el GPS no
      * está disponible) — el admin la usa para verificar que el retiro fue en la dirección real.
      */
-    public record RecepcionRequest(String fotoUrl, Double lat, Double lng) {}
+    /**
+     * archivoPerdido: la app encoló el "Retirado" sin señal y, al reintentar, el archivo local
+     * de la foto ya no existía (se limpió la cache). Se acepta sin foto aunque sea obligatoria,
+     * antes que dejar el viaje trabado en la cola para siempre — y queda un comentario.
+     */
+    public record RecepcionRequest(String fotoUrl, Double lat, Double lng, Boolean archivoPerdido) {}
 
     /** Botón "Rechazar": motivo opcional, texto libre (spec Métricas: detectar patrones de rechazo). */
     public record RechazarRequest(String motivo) {}
@@ -200,7 +205,13 @@ public final class PedidoDtos {
      * según "firma_receptor_obligatoria" en Configuración (ronda 3, punto 51).
      * lat/lng: ubicación del cadete al finalizar (opcional), misma idea que en RecepcionRequest.
      */
-    public record FinalizarRequest(String receptorNombre, String fotoUrl, String firmaUrl, Double lat, Double lng) {}
+    /** archivoPerdido: igual que en {@link RecepcionRequest}, para la foto y la firma de la entrega. */
+    public record FinalizarRequest(String receptorNombre, String fotoUrl, String firmaUrl, Double lat, Double lng,
+                                   Boolean archivoPerdido) {
+        public boolean seperdioElArchivo() {
+            return Boolean.TRUE.equals(archivoPerdido);
+        }
+    }
 
     public record RutaResponse(Object geoJson) {}
 
