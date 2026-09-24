@@ -49,6 +49,15 @@ public final class MetricasDtos {
     /** Un rechazo con motivo, para la sección "Motivos de rechazo" de Métricas. */
     public record RechazoResponse(Long pedidoNumero, String cadeteNombre, String motivo, Instant ofrecidoEn) {}
 
+    /**
+     * Pedidos creados en el rango según de dónde salieron (mejora 2026-09-24): online (cliente
+     * desde "/pedir" o repitiendo desde el seguimiento) contra cargados en el panel, y estos
+     * últimos por usuario. sinDato = pedidos anteriores a que se empezara a registrar.
+     */
+    public record PorOrigenResponse(long web, long panel, long sinDato, java.util.List<PorUsuarioResponse> porUsuario) {}
+
+    public record PorUsuarioResponse(String username, long cantidad) {}
+
     /** Pedidos creados por hora del día (0-23, hora local) — para el gráfico de Métricas (ronda 5, punto 31). */
     public record PorHoraResponse(int hora, long cantidad) {}
 

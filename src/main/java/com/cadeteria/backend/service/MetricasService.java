@@ -131,6 +131,28 @@ public class MetricasService {
                 .toList();
     }
 
+    /** Online vs. cargados en el panel, y estos por usuario (mejora 2026-09-24). */
+    public com.cadeteria.backend.dto.MetricasDtos.PorOrigenResponse pedidosPorOrigen(Instant desde, Instant hasta) {
+        long web = 0, panel = 0, sinDato = 0;
+        java.util.Map<String, Long> porUsuario = new java.util.TreeMap<>();
+        for (Pedido p : pedidoRepo.findByCreadoEnBetween(desde, hasta)) {
+            if (PedidoService.ORIGEN_WEB.equals(p.getOrigenCarga())) {
+                web++;
+            } else if (PedidoService.ORIGEN_PANEL.equals(p.getOrigenCarga())) {
+                panel++;
+                String usuario = p.getCreadoPorUsername() == null ? "(sin usuario)" : p.getCreadoPorUsername();
+                porUsuario.merge(usuario, 1L, Long::sum);
+            } else {
+                sinDato++;
+            }
+        }
+        List<com.cadeteria.backend.dto.MetricasDtos.PorUsuarioResponse> usuarios = porUsuario.entrySet().stream()
+                .map(e -> new com.cadeteria.backend.dto.MetricasDtos.PorUsuarioResponse(e.getKey(), e.getValue()))
+                .sorted(java.util.Comparator.comparingLong(com.cadeteria.backend.dto.MetricasDtos.PorUsuarioResponse::cantidad).reversed())
+                .toList();
+        return new com.cadeteria.backend.dto.MetricasDtos.PorOrigenResponse(web, panel, sinDato, usuarios);
+    }
+
     /** Pedidos creados por hora del día (0-23, hora local) — para el gráfico de Métricas (ronda 5, punto 31). */
     public List<PorHoraResponse> pedidosPorHora(Instant desde, Instant hasta) {
         long[] porHora = new long[24];

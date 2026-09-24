@@ -266,7 +266,7 @@ public class SolicitudPedidoService {
                 s.getOrigenPisoDepto(), s.getOrigenObservaciones(),
                 s.getDestinoPisoDepto(), s.getDestinoObservaciones(),
                 requiereMoto, false, null, null);
-        return pedidoService.crear(req);
+        return pedidoService.crear(req, PedidoService.ORIGEN_WEB, null);
     }
 
     private void enviarSmsConfirmado(Pedido pedido) {

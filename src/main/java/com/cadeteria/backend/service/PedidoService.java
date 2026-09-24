@@ -335,7 +335,14 @@ public class PedidoService {
 
     // --- Alta ---
 
-    public Pedido crear(PedidoRequest req) {
+    public static final String ORIGEN_WEB = "WEB";
+    public static final String ORIGEN_PANEL = "PANEL";
+
+    /**
+     * @param origenCarga       {@link #ORIGEN_WEB} o {@link #ORIGEN_PANEL} (Métricas: online vs. cargados en el panel)
+     * @param creadoPorUsername usuario del panel que lo cargó; null si es WEB
+     */
+    public Pedido crear(PedidoRequest req, String origenCarga, String creadoPorUsername) {
         boolean esProgramado = req.programado() && req.fechaProgramada() != null
                 && req.fechaProgramada().isAfter(Instant.now());
 
@@ -360,6 +367,8 @@ public class PedidoService {
         p.setDestinoPisoDepto(textoOpcional(req.destinoPisoDepto()));
         p.setDestinoObservaciones(textoOpcional(req.destinoObservaciones()));
         p.setRequiereMoto(req.requiereMoto());
+        p.setOrigenCarga(origenCarga);
+        p.setCreadoPorUsername(creadoPorUsername);
         p.setProgramado(esProgramado);
         p.setFechaProgramada(esProgramado ? req.fechaProgramada() : null);
         p.setEstado(estado(esProgramado ? "PROGRAMADO" : "SIN_ASIGNAR"));
@@ -409,7 +418,7 @@ public class PedidoService {
                 original.getDestinoPisoDepto(), original.getDestinoObservaciones(),
                 original.isRequiereMoto(),
                 false, null, null);
-        return crear(req);
+        return crear(req, ORIGEN_WEB, null);
     }
 
     /** Candidato sugerido para asignacion (spec 5.1) — el admin lo confirma con si/no antes de ofertarlo. */

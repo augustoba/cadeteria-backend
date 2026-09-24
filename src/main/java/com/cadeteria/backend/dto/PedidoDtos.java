@@ -84,7 +84,9 @@ public final class PedidoDtos {
             /** Auditoría (ronda 4, punto 28): qué admin asignó/canceló, null si fue automático o no aplica. */
             String asignadoPorUsername, String canceladoPorUsername,
             /** Marca manual del admin para destacarlo en el dashboard (mejora 93). */
-            boolean prioritario
+            boolean prioritario,
+            /** WEB | PANEL | null (anterior a la mejora 2026-09-24) — y quién lo cargó si fue PANEL. */
+            String origenCarga, String creadoPorUsername
     ) {
         public static PedidoResponse from(Pedido p) {
             return from(p, true, false);
@@ -145,7 +147,8 @@ public final class PedidoDtos {
                             ? p.getParadas().stream().sorted(java.util.Comparator.comparingInt(com.cadeteria.backend.model.PedidoParada::getOrden))
                                     .map(ParadaResponse::from).toList()
                             : List.of(),
-                    p.getAsignadoPorUsername(), p.getCanceladoPorUsername(), p.isPrioritario());
+                    p.getAsignadoPorUsername(), p.getCanceladoPorUsername(), p.isPrioritario(),
+                    p.getOrigenCarga(), p.getCreadoPorUsername());
         }
     }
 

@@ -135,6 +135,17 @@ public class Pedido {
     private String canceladoPorUsername;
 
     /**
+     * De dónde salió el pedido (mejora 2026-09-24, para Métricas): WEB = lo cargó el cliente
+     * desde "/pedir" o lo repitió desde el seguimiento; PANEL = lo cargó alguien con cuenta
+     * en el panel. Null en los pedidos anteriores a la mejora (no se sabe).
+     */
+    @Column(length = 10)
+    private String origenCarga;
+
+    /** Usuario del panel que lo cargó (solo PANEL) — para ver cuántos cargó cada empleado. */
+    private String creadoPorUsername;
+
+    /**
      * Comisión ya descontada del crédito del cadete (ronda 7, modalidad PORCENTAJE) al
      * aceptar este viaje — null si el cadete es SEMANAL o si el viaje no llegó a
      * aceptarse. Se reembolsa (y se vuelve a poner en null) si el viaje se destraba sin
@@ -662,5 +673,21 @@ public class Pedido {
 
     public void setDestinoObservaciones(String destinoObservaciones) {
         this.destinoObservaciones = destinoObservaciones;
+    }
+
+    public String getOrigenCarga() {
+        return origenCarga;
+    }
+
+    public void setOrigenCarga(String origenCarga) {
+        this.origenCarga = origenCarga;
+    }
+
+    public String getCreadoPorUsername() {
+        return creadoPorUsername;
+    }
+
+    public void setCreadoPorUsername(String creadoPorUsername) {
+        this.creadoPorUsername = creadoPorUsername;
     }
 }

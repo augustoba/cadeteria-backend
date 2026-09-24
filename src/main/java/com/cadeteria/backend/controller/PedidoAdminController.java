@@ -128,8 +128,10 @@ public class PedidoAdminController {
     }
 
     @PostMapping
-    public ResponseEntity<PedidoResponse> create(@Valid @RequestBody PedidoRequest req) {
-        return ResponseEntity.status(201).body(PedidoResponse.from(service.crear(req)));
+    public ResponseEntity<PedidoResponse> create(@Valid @RequestBody PedidoRequest req,
+                                                 org.springframework.security.core.Authentication auth) {
+        return ResponseEntity.status(201).body(PedidoResponse.from(
+                service.crear(req, PedidoService.ORIGEN_PANEL, auth.getName())));
     }
 
     @GetMapping("/{id}/sugerencia")

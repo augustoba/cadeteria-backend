@@ -41,6 +41,32 @@ class MetricasServiceTest {
     }
 
     @Test
+    void pedidosPorOrigenSeparaOnlinePanelYSinDatoYCuentaPorUsuario() {
+        Instant desde = Instant.parse("2026-09-01T00:00:00Z");
+        Instant hasta = Instant.parse("2026-09-02T00:00:00Z");
+        when(pedidoRepo.findByCreadoEnBetween(desde, hasta)).thenReturn(List.of(
+                conOrigen("WEB", null), conOrigen("WEB", null),
+                conOrigen("PANEL", "admin"), conOrigen("PANEL", "admin"), conOrigen("PANEL", "lucia"),
+                conOrigen(null, null)));
+
+        var r = service.pedidosPorOrigen(desde, hasta);
+
+        assertEquals(2, r.web());
+        assertEquals(3, r.panel());
+        assertEquals(1, r.sinDato());
+        assertEquals("admin", r.porUsuario().get(0).username());
+        assertEquals(2, r.porUsuario().get(0).cantidad());
+        assertEquals("lucia", r.porUsuario().get(1).username());
+    }
+
+    private Pedido conOrigen(String origen, String usuario) {
+        Pedido p = new Pedido();
+        p.setOrigenCarga(origen);
+        p.setCreadoPorUsername(usuario);
+        return p;
+    }
+
+    @Test
     void metricasPorZonaIgnoraPedidosSinZonaSinTirarNpe() {
         Instant desde = Instant.parse("2026-09-01T00:00:00Z");
         Instant hasta = Instant.parse("2026-09-02T00:00:00Z");

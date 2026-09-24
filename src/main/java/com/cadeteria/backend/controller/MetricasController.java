@@ -56,6 +56,14 @@ public class MetricasController {
         return service.pedidosPorHora(rango[0], rango[1]);
     }
 
+    /** Online vs. cargados en el panel, y estos por usuario (mejora 2026-09-24). */
+    @GetMapping("/por-origen")
+    public com.cadeteria.backend.dto.MetricasDtos.PorOrigenResponse porOrigen(
+            @RequestParam(required = false) String desde, @RequestParam(required = false) String hasta) {
+        Instant[] rango = resolverRango(desde, hasta);
+        return service.pedidosPorOrigen(rango[0], rango[1]);
+    }
+
     /** Puntos de origen para el heatmap de demanda en el mapa en vivo (mejora 92). */
     @GetMapping("/heatmap")
     public List<double[]> heatmap(@RequestParam(required = false) String desde, @RequestParam(required = false) String hasta) {
