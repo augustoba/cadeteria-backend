@@ -43,14 +43,14 @@ public class PedidoCadeteController {
     @GetMapping("/activo")
     public ResponseEntity<PedidoResponse> activo(Authentication auth) {
         return service.activoDe(auth.getName())
-                .map(p -> ResponseEntity.ok(PedidoResponse.from(p)))
+                .map(p -> ResponseEntity.ok(PedidoResponse.paraCadete(p)))
                 .orElse(ResponseEntity.noContent().build());
     }
 
     /** Sección "Asignados y en curso" de la app — a diferencia de /activo, no asume uno solo. */
     @GetMapping("/activos")
     public List<PedidoResponse> activos(Authentication auth) {
-        return service.activosDe(auth.getName()).stream().map(PedidoResponse::from).toList();
+        return service.activosDe(auth.getName()).stream().map(PedidoResponse::paraCadete).toList();
     }
 
     private static final ZoneId ZONA = ZoneId.of("America/Argentina/Buenos_Aires");
@@ -72,7 +72,7 @@ public class PedidoCadeteController {
                     .plusDays(1).atStartOfDay(ZONA).toInstant();
         }
         PedidoService.HistorialCadete h = service.historialDe(auth.getName(), desdeInstant, hastaInstant);
-        List<PedidoResponse> pedidos = h.finalizados().stream().map(PedidoResponse::from).toList();
+        List<PedidoResponse> pedidos = h.finalizados().stream().map(PedidoResponse::paraCadete).toList();
         BigDecimal montoTotal = h.finalizados().stream()
                 .map(Pedido::getPrecio)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -82,41 +82,41 @@ public class PedidoCadeteController {
     /** Detalle de un pedido puntual propio (para abrir uno de la lista de "Asignados"/"Finalizados"). */
     @GetMapping("/{id}")
     public PedidoResponse detalle(@PathVariable String id, Authentication auth) {
-        return PedidoResponse.from(service.getDeCadete(id, auth.getName()));
+        return PedidoResponse.paraCadete(service.getDeCadete(id, auth.getName()));
     }
 
     @PostMapping("/{id}/aceptar")
     public PedidoResponse aceptar(@PathVariable String id, Authentication auth) {
-        return PedidoResponse.from(service.aceptar(id, auth.getName()));
+        return PedidoResponse.paraCadete(service.aceptar(id, auth.getName()));
     }
 
     @PostMapping("/{id}/rechazar")
     public PedidoResponse rechazar(@PathVariable String id, @RequestBody(required = false) RechazarRequest req, Authentication auth) {
-        return PedidoResponse.from(service.rechazar(id, auth.getName(), req == null ? null : req.motivo()));
+        return PedidoResponse.paraCadete(service.rechazar(id, auth.getName(), req == null ? null : req.motivo()));
     }
 
     @PostMapping("/{id}/recepcion")
     public PedidoResponse recepcion(@PathVariable String id, @Valid @RequestBody RecepcionRequest req,
                                      Authentication auth) {
-        return PedidoResponse.from(service.registrarRecepcion(id, auth.getName(), req.fotoUrl(), req.lat(), req.lng()));
+        return PedidoResponse.paraCadete(service.registrarRecepcion(id, auth.getName(), req.fotoUrl(), req.lat(), req.lng()));
     }
 
     @PostMapping("/{id}/finalizar")
     public PedidoResponse finalizar(@PathVariable String id, @RequestBody FinalizarRequest req, Authentication auth) {
-        return PedidoResponse.from(service.finalizar(id, auth.getName(), req));
+        return PedidoResponse.paraCadete(service.finalizar(id, auth.getName(), req));
     }
 
     /** Botón "No se pudo entregar" (ej. el cliente no atendió) — el pedido no se anula, el admin lo puede reintentar. */
     @PostMapping("/{id}/no-entregado")
     public PedidoResponse noEntregado(@PathVariable String id, @RequestBody(required = false) NoEntregadoRequest req,
                                        Authentication auth) {
-        return PedidoResponse.from(service.marcarNoEntregado(id, auth.getName(), req == null ? null : req.motivo()));
+        return PedidoResponse.paraCadete(service.marcarNoEntregado(id, auth.getName(), req == null ? null : req.motivo()));
     }
 
     /** Marca una parada intermedia como entregada (ronda 3, punto 38: varias entregas en la misma vuelta). */
     @PostMapping("/{id}/paradas/{paradaId}/entregada")
     public PedidoResponse marcarParadaEntregada(@PathVariable String id, @PathVariable String paradaId, Authentication auth) {
-        return PedidoResponse.from(service.marcarParadaEntregada(id, auth.getName(), paradaId));
+        return PedidoResponse.paraCadete(service.marcarParadaEntregada(id, auth.getName(), paradaId));
     }
 
     /** Nota de texto libre sobre el viaje (ej. "entregado en porteria a Fulano") — se ve en el detalle del panel. */

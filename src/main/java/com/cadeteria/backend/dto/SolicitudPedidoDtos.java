@@ -20,6 +20,9 @@ public final class SolicitudPedidoDtos {
             boolean retornaAlOrigen,
             @NotBlank String clienteNombre, @NotBlank String clienteTelefono,
             String detalle,
+            /** Piso/depto y observaciones de cada dirección (mejora 2026-09-24), opcionales. */
+            String origenPisoDepto, String origenObservaciones,
+            String destinoPisoDepto, String destinoObservaciones,
             /** Token de VerificacionTelefonoService.verificarCodigo — confirma que el teléfono es real (mejora 2026-09-17). */
             @NotBlank String verificacionToken
     ) {}
@@ -33,6 +36,8 @@ public final class SolicitudPedidoDtos {
             boolean retornaAlOrigen,
             String clienteNombre, String clienteTelefono,
             String detalle,
+            String origenPisoDepto, String origenObservaciones,
+            String destinoPisoDepto, String destinoObservaciones,
             String estado,
             boolean requiereMoto, BigDecimal precio,
             String pedidoCreadoId, String motivoRechazo,
@@ -43,7 +48,9 @@ public final class SolicitudPedidoDtos {
                     s.getId(), s.getOrigenDireccion(), s.getOrigenLat(), s.getOrigenLng(),
                     s.getDestinoDireccion(), s.getDestinoLat(), s.getDestinoLng(),
                     s.isLlevaDinero(), s.getMontoDeclarado(), s.isLlevaValores(), s.isRetornaAlOrigen(),
-                    s.getClienteNombre(), s.getClienteTelefono(), s.getDetalle(), s.getEstado(),
+                    s.getClienteNombre(), s.getClienteTelefono(), s.getDetalle(),
+                    s.getOrigenPisoDepto(), s.getOrigenObservaciones(),
+                    s.getDestinoPisoDepto(), s.getDestinoObservaciones(), s.getEstado(),
                     s.isRequiereMoto(), s.getPrecio(),
                     s.getPedidoCreadoId(), s.getMotivoRechazo(), s.getCreadoEn());
         }

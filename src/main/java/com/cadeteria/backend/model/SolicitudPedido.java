@@ -54,6 +54,20 @@ public class SolicitudPedido {
     @Column(length = 1000)
     private String detalle;
 
+    /**
+     * Piso/depto y observaciones de cada dirección (mejora 2026-09-24): opcionales, para
+     * edificios o indicaciones ("timbre roto", "portón verde"). Van aparte de la dirección
+     * para no ensuciar el geocoding. El cadete los ve recién al aceptar el viaje.
+     */
+    @Column(length = 50)
+    private String origenPisoDepto;
+    @Column(length = 300)
+    private String origenObservaciones;
+    @Column(length = 50)
+    private String destinoPisoDepto;
+    @Column(length = 300)
+    private String destinoObservaciones;
+
     /** PENDIENTE (recién llegó) -> COTIZADO (admin mandó precio, espera que el cliente confirme) o
      * CONFIRMADA (ya existe el Pedido real) -> RECHAZADA. */
     @Column(nullable = false)
@@ -249,5 +263,37 @@ public class SolicitudPedido {
 
     public void setCreadoEn(Instant creadoEn) {
         this.creadoEn = creadoEn;
+    }
+
+    public String getOrigenPisoDepto() {
+        return origenPisoDepto;
+    }
+
+    public void setOrigenPisoDepto(String origenPisoDepto) {
+        this.origenPisoDepto = origenPisoDepto;
+    }
+
+    public String getOrigenObservaciones() {
+        return origenObservaciones;
+    }
+
+    public void setOrigenObservaciones(String origenObservaciones) {
+        this.origenObservaciones = origenObservaciones;
+    }
+
+    public String getDestinoPisoDepto() {
+        return destinoPisoDepto;
+    }
+
+    public void setDestinoPisoDepto(String destinoPisoDepto) {
+        this.destinoPisoDepto = destinoPisoDepto;
+    }
+
+    public String getDestinoObservaciones() {
+        return destinoObservaciones;
+    }
+
+    public void setDestinoObservaciones(String destinoObservaciones) {
+        this.destinoObservaciones = destinoObservaciones;
     }
 }

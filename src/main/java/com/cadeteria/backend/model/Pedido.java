@@ -72,6 +72,20 @@ public class Pedido {
     @Column(length = 1000)
     private String detalle;
 
+    /**
+     * Piso/depto y observaciones de cada dirección (mejora 2026-09-24): opcionales, para
+     * edificios o indicaciones ("timbre roto", "portón verde"). Van aparte de la dirección
+     * para no ensuciar el geocoding. El cadete los ve recién al aceptar el viaje.
+     */
+    @Column(length = 50)
+    private String origenPisoDepto;
+    @Column(length = 300)
+    private String origenObservaciones;
+    @Column(length = 50)
+    private String destinoPisoDepto;
+    @Column(length = 300)
+    private String destinoObservaciones;
+
     /** Pedido cargado para el futuro (panel actual: "¿Pedido programado?"). */
     @Column(nullable = false)
     private boolean programado = false;
@@ -616,5 +630,37 @@ public class Pedido {
 
     public void setCalificadoEn(Instant calificadoEn) {
         this.calificadoEn = calificadoEn;
+    }
+
+    public String getOrigenPisoDepto() {
+        return origenPisoDepto;
+    }
+
+    public void setOrigenPisoDepto(String origenPisoDepto) {
+        this.origenPisoDepto = origenPisoDepto;
+    }
+
+    public String getOrigenObservaciones() {
+        return origenObservaciones;
+    }
+
+    public void setOrigenObservaciones(String origenObservaciones) {
+        this.origenObservaciones = origenObservaciones;
+    }
+
+    public String getDestinoPisoDepto() {
+        return destinoPisoDepto;
+    }
+
+    public void setDestinoPisoDepto(String destinoPisoDepto) {
+        this.destinoPisoDepto = destinoPisoDepto;
+    }
+
+    public String getDestinoObservaciones() {
+        return destinoObservaciones;
+    }
+
+    public void setDestinoObservaciones(String destinoObservaciones) {
+        this.destinoObservaciones = destinoObservaciones;
     }
 }

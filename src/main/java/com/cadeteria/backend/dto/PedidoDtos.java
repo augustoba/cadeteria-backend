@@ -28,6 +28,9 @@ public final class PedidoDtos {
             /** Declarado por el cliente (mejora 2026-09-23) — ver Pedido.llevaValores. */
             boolean llevaValores,
             String detalle,
+            /** Piso/depto y observaciones de cada dirección (mejora 2026-09-24), opcionales. */
+            String origenPisoDepto, String origenObservaciones,
+            String destinoPisoDepto, String destinoObservaciones,
             boolean requiereMoto,
             boolean programado,
             Instant fechaProgramada,
@@ -57,6 +60,9 @@ public final class PedidoDtos {
             String origenDireccion, Double origenLat, Double origenLng,
             String destinoDireccion, Double destinoLat, Double destinoLng,
             BigDecimal precio, BigDecimal montoDeclarado, boolean llevaValores, String detalle,
+            /** Piso/depto y observaciones (mejora 2026-09-24) — null para el cadete hasta que acepta, ver {@link #paraCadete}. */
+            String origenPisoDepto, String origenObservaciones,
+            String destinoPisoDepto, String destinoObservaciones,
             boolean requiereMoto, LookupResponse estado,
             CadeteResumen cadeteAsignado,
             boolean programado, Instant fechaProgramada,
@@ -81,7 +87,22 @@ public final class PedidoDtos {
             boolean prioritario
     ) {
         public static PedidoResponse from(Pedido p) {
-            return from(p, true);
+            return from(p, true, false);
+        }
+
+        /**
+         * Lo que ve el cadete (API de la app y eventos STOMP a su cola): mientras no aceptó el
+         * viaje, el detalle del pedido, el piso/depto y las observaciones de las direcciones van
+         * en null (mejora 2026-09-24) — decide con los mismos datos de siempre (origen, destino,
+         * precio, dinero, valores, moto) y el resto le aparece al aceptar. Se mira el estado y
+         * no solo aceptadoEn porque "Quitar" un pedido EN_CURSO no limpia aceptadoEn: el
+         * siguiente cadete lo recibiría PENDIENTE con la marca del anterior.
+         */
+        public static PedidoResponse paraCadete(Pedido p) {
+            String estado = p.getEstado() == null ? null : p.getEstado().getId();
+            boolean sinAceptar = p.getAceptadoEn() == null || estado == null
+                    || java.util.Set.of("PENDIENTE", "SIN_ASIGNAR", "PROGRAMADO").contains(estado);
+            return from(p, true, sinAceptar);
         }
 
         /**
@@ -92,15 +113,18 @@ public final class PedidoDtos {
          * {@link #from(Pedido)}, que sí las incluye.
          */
         public static PedidoResponse fromResumen(Pedido p) {
-            return from(p, false);
+            return from(p, false, false);
         }
 
-        private static PedidoResponse from(Pedido p, boolean incluirParadas) {
+        private static PedidoResponse from(Pedido p, boolean incluirParadas, boolean ocultarDetalle) {
             return new PedidoResponse(
                     p.getId(), p.getNumero(), p.getClienteTelefono(), p.getClienteNombre(),
                     p.getOrigenDireccion(), p.getOrigenLat(), p.getOrigenLng(),
                     p.getDestinoDireccion(), p.getDestinoLat(), p.getDestinoLng(),
-                    p.getPrecio(), p.getMontoDeclarado(), p.isLlevaValores(), p.getDetalle(),
+                    p.getPrecio(), p.getMontoDeclarado(), p.isLlevaValores(),
+                    ocultarDetalle ? null : p.getDetalle(),
+                    ocultarDetalle ? null : p.getOrigenPisoDepto(), ocultarDetalle ? null : p.getOrigenObservaciones(),
+                    ocultarDetalle ? null : p.getDestinoPisoDepto(), ocultarDetalle ? null : p.getDestinoObservaciones(),
                     p.isRequiereMoto(), LookupResponse.from(p.getEstado()),
                     CadeteResumen.from(p.getCadeteAsignado()),
                     p.isProgramado(), p.getFechaProgramada(),

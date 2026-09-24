@@ -355,6 +355,10 @@ public class PedidoService {
         p.setMontoDeclarado(req.montoDeclarado() == null ? BigDecimal.ZERO : req.montoDeclarado());
         p.setLlevaValores(req.llevaValores());
         p.setDetalle(req.detalle());
+        p.setOrigenPisoDepto(textoOpcional(req.origenPisoDepto()));
+        p.setOrigenObservaciones(textoOpcional(req.origenObservaciones()));
+        p.setDestinoPisoDepto(textoOpcional(req.destinoPisoDepto()));
+        p.setDestinoObservaciones(textoOpcional(req.destinoObservaciones()));
         p.setRequiereMoto(req.requiereMoto());
         p.setProgramado(esProgramado);
         p.setFechaProgramada(esProgramado ? req.fechaProgramada() : null);
@@ -401,6 +405,8 @@ public class PedidoService {
                 original.getOrigenDireccion(), original.getOrigenLat(), original.getOrigenLng(),
                 original.getDestinoDireccion(), original.getDestinoLat(), original.getDestinoLng(),
                 original.getPrecio(), null, original.isLlevaValores(), "Repetición del pedido #" + original.getNumero(),
+                original.getOrigenPisoDepto(), original.getOrigenObservaciones(),
+                original.getDestinoPisoDepto(), original.getDestinoObservaciones(),
                 original.isRequiereMoto(),
                 false, null, null);
         return crear(req);
@@ -756,9 +762,8 @@ public class PedidoService {
         // es una eleccion manual del cadete (ver CadeteService.actualizarEstado), no algo que
         // el sistema le pise en cada asignación. dentroDeTopes() es lo que limita cuántos
         // viajes puede llevar a la vez.
-        PedidoResponse dto = PedidoResponse.from(pedido);
-        publisher.publicarEventoViaje(cadete.getId(), "VIAJE_ASIGNADO", dto);
-        publisher.publicarPedido(dto);
+        publisher.publicarEventoViaje(cadete.getId(), "VIAJE_ASIGNADO", PedidoResponse.paraCadete(pedido));
+        publisher.publicarPedido(PedidoResponse.from(pedido));
         fcmService.enviar(cadete.getFcmToken(), "Nuevo viaje",
                 "Tenes un viaje nuevo asignado", Map.of("tipo", "VIAJE_ASIGNADO", "pedidoId", pedido.getId()));
     }
@@ -795,7 +800,7 @@ public class PedidoService {
         pedido.setEstado(estado("SIN_ASIGNAR"));
         repo.save(pedido);
 
-        PedidoResponse dtoQuitado = PedidoResponse.from(pedido);
+        PedidoResponse dtoQuitado = PedidoResponse.paraCadete(pedido);
         publisher.publicarEventoViaje(actual.getId(), "VIAJE_QUITADO", dtoQuitado);
         fcmService.enviar(actual.getFcmToken(), "Viaje reasignado", "Se te reasigno el viaje a otro cadete",
                 Map.of("tipo", "VIAJE_QUITADO", "pedidoId", pedido.getId()));
@@ -1112,7 +1117,7 @@ public class PedidoService {
 
     private void liberarYReasignar(Pedido pedido, Cadete cadeteQueNoAcepto) {
         liberarCadete(cadeteQueNoAcepto);
-        PedidoResponse dtoQuitado = PedidoResponse.from(pedido);
+        PedidoResponse dtoQuitado = PedidoResponse.paraCadete(pedido);
         publisher.publicarEventoViaje(cadeteQueNoAcepto.getId(), "VIAJE_QUITADO", dtoQuitado);
         fcmService.enviar(cadeteQueNoAcepto.getFcmToken(), "Viaje quitado",
                 "Se te quito el viaje", Map.of("tipo", "VIAJE_QUITADO", "pedidoId", pedido.getId()));
@@ -1367,5 +1372,10 @@ public class PedidoService {
     private com.cadeteria.backend.model.EstadoCadete estadoCadete(String id) {
         return estadoCadeteRepo.findById(id)
                 .orElseThrow(() -> new IllegalStateException("Falta seedear estado_cadete." + id));
+    }
+
+    /** Texto libre opcional: recortado, y null si vino vacío. */
+    private static String textoOpcional(String s) {
+        return s == null || s.isBlank() ? null : s.trim();
     }
 }

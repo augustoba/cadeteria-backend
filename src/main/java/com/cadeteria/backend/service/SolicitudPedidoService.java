@@ -105,7 +105,11 @@ public class SolicitudPedidoService {
         s.setRetornaAlOrigen(req.retornaAlOrigen());
         s.setClienteNombre(req.clienteNombre().trim());
         s.setClienteTelefono(req.clienteTelefono().trim());
-        s.setDetalle(req.detalle() == null || req.detalle().isBlank() ? null : req.detalle().trim());
+        s.setDetalle(textoOpcional(req.detalle()));
+        s.setOrigenPisoDepto(textoOpcional(req.origenPisoDepto()));
+        s.setOrigenObservaciones(textoOpcional(req.origenObservaciones()));
+        s.setDestinoPisoDepto(textoOpcional(req.destinoPisoDepto()));
+        s.setDestinoObservaciones(textoOpcional(req.destinoObservaciones()));
         s.setEstado("PENDIENTE");
         s.setTokenConfirmacion(UUID.randomUUID().toString());
         s = repo.save(s);
@@ -206,6 +210,8 @@ public class SolicitudPedidoService {
                 s.getOrigenDireccion(), s.getOrigenLat(), s.getOrigenLng(),
                 s.getDestinoDireccion(), s.getDestinoLat(), s.getDestinoLng(),
                 precio, montoDeclarado, s.isLlevaValores(), detalle.length() == 0 ? null : detalle.toString().trim(),
+                s.getOrigenPisoDepto(), s.getOrigenObservaciones(),
+                s.getDestinoPisoDepto(), s.getDestinoObservaciones(),
                 requiereMoto, false, null, null);
         return pedidoService.crear(req);
     }
@@ -214,5 +220,10 @@ public class SolicitudPedidoService {
         String link = frontBaseUrl + "/seguimiento/" + pedido.getTokenSeguimiento();
         smsGatewayService.enviar(pedido.getId(), pedido.getClienteTelefono(),
                 "Tu pedido fue confirmado. Seguilo acá: " + link);
+    }
+
+    /** Texto libre opcional: recortado, y null si vino vacío. */
+    private static String textoOpcional(String s) {
+        return s == null || s.isBlank() ? null : s.trim();
     }
 }
