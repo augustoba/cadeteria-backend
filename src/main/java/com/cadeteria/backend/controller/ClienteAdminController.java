@@ -6,7 +6,9 @@ import com.cadeteria.backend.dto.ClienteDtos.ClienteRequest;
 import com.cadeteria.backend.dto.ClienteDtos.ClienteResponse;
 import com.cadeteria.backend.dto.ClienteDtos.ClientesPaginaResponse;
 import com.cadeteria.backend.dto.ClienteDtos.LiquidarCuentaCorrienteResponse;
+import com.cadeteria.backend.dto.ClienteDtos.ReporteClienteResponse;
 import com.cadeteria.backend.service.ClienteService;
+import com.cadeteria.backend.service.ReporteClienteService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,9 +18,11 @@ import org.springframework.web.bind.annotation.*;
 public class ClienteAdminController {
 
     private final ClienteService service;
+    private final ReporteClienteService reporteClienteService;
 
-    public ClienteAdminController(ClienteService service) {
+    public ClienteAdminController(ClienteService service, ReporteClienteService reporteClienteService) {
         this.service = service;
+        this.reporteClienteService = reporteClienteService;
     }
 
     @GetMapping
@@ -34,6 +38,12 @@ public class ClienteAdminController {
     @GetMapping("/aviso")
     public ClienteAvisoResponse aviso(@RequestParam String telefono) {
         return service.aviso(telefono);
+    }
+
+    /** Reportes de cadetes sobre este teléfono, del más nuevo al más viejo (spec-antiabuso Fase 4). */
+    @GetMapping("/{telefono}/reportes")
+    public java.util.List<ReporteClienteResponse> reportes(@PathVariable String telefono) {
+        return reporteClienteService.deTelefono(telefono).stream().map(ReporteClienteResponse::from).toList();
     }
 
     @GetMapping("/{telefono}")

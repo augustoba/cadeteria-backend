@@ -7,15 +7,21 @@ import com.cadeteria.backend.dto.ClienteDtos.ClienteResponse;
 import com.cadeteria.backend.dto.ClienteDtos.PedidoResumenResponse;
 import com.cadeteria.backend.model.Cliente;
 import com.cadeteria.backend.model.Pedido;
+import com.cadeteria.backend.model.ReporteCliente;
 import com.cadeteria.backend.repository.ClienteRepository;
 import com.cadeteria.backend.repository.PedidoRepository;
+import com.cadeteria.backend.repository.ReporteClienteRepository;
+import com.cadeteria.backend.util.TelefonoUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 /**
@@ -29,10 +35,12 @@ public class ClienteService {
 
     private final ClienteRepository repo;
     private final PedidoRepository pedidoRepo;
+    private final ReporteClienteRepository reporteRepo;
 
-    public ClienteService(ClienteRepository repo, PedidoRepository pedidoRepo) {
+    public ClienteService(ClienteRepository repo, PedidoRepository pedidoRepo, ReporteClienteRepository reporteRepo) {
         this.repo = repo;
         this.pedidoRepo = pedidoRepo;
+        this.reporteRepo = reporteRepo;
     }
 
     public record ClientesPagina(List<ClienteResponse> items, long total, int pagina, int totalPaginas) {}
@@ -143,11 +151,62 @@ public class ClienteService {
     /** Aviso rápido al cargar un pedido nuevo — si el teléfono es problemático o tiene tarifa especial. */
     @Transactional(readOnly = true)
     public ClienteAvisoResponse aviso(String telefono) {
-        Cliente c = repo.findById(telefono).orElse(null);
-        if (c == null || !c.isActivo()) {
-            return new ClienteAvisoResponse(false, null, null);
+        String normalizado = TelefonoUtils.normalizar(telefono);
+        return avisos(List.of(normalizado == null ? "" : normalizado)).getOrDefault(normalizado, ClienteAvisoResponse.VACIO);
+    }
+
+    /**
+     * Avisos de varios teléfonos en 2 queries (fichas + reportes), para la bandeja de
+     * solicitudes web (spec-antiabuso Fase 1) — sin una request/query por solicitud. La
+     * clave del mapa es el teléfono normalizado; los que no tienen nada no aparecen.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, ClienteAvisoResponse> avisos(Collection<String> telefonosCrudos) {
+        List<String> telefonos = telefonosCrudos.stream()
+                .map(TelefonoUtils::normalizar)
+                .filter(t -> t != null && !t.isBlank())
+                .distinct()
+                .toList();
+        if (telefonos.isEmpty()) return Map.of();
+
+        Map<String, Cliente> fichas = repo.findAllById(telefonos).stream()
+                .filter(Cliente::isActivo)
+                .collect(Collectors.toMap(Cliente::getTelefono, c -> c));
+        Map<String, List<ReporteCliente>> reportes = reporteRepo.findByTelefonoInOrderByCreadoEnDesc(telefonos).stream()
+                .collect(Collectors.groupingBy(ReporteCliente::getTelefono));
+
+        Map<String, ClienteAvisoResponse> resultado = new HashMap<>();
+        for (String telefono : telefonos) {
+            Cliente c = fichas.get(telefono);
+            List<ReporteCliente> rs = reportes.getOrDefault(telefono, List.of());
+            ClienteAvisoResponse aviso = new ClienteAvisoResponse(
+                    c != null && c.isProblematico(),
+                    c == null ? null : c.getNotasProblematico(),
+                    c == null ? null : c.getTarifaEspecial(),
+                    rs.size(),
+                    rs.stream().collect(Collectors.groupingBy(ReporteCliente::getTipo, TreeMap::new, Collectors.counting())),
+                    rs.isEmpty() ? null : rs.get(0).getCreadoEn());
+            if (aviso.hayAviso()) resultado.put(telefono, aviso);
         }
-        return new ClienteAvisoResponse(c.isProblematico(), c.getNotasProblematico(), c.getTarifaEspecial());
+        return resultado;
+    }
+
+    /**
+     * "Marcar como fraudulento" (spec-antiabuso Fase 4): prende el flag manual de siempre
+     * ({@code problematico}), creando la ficha si el teléfono no tenía. La nota se suma a la
+     * que ya hubiera, no la pisa. Avisa, no bloquea — igual que hoy.
+     */
+    public void marcarProblematico(String telefonoCrudo, String nota) {
+        String telefono = TelefonoUtils.normalizar(telefonoCrudo);
+        Cliente c = repo.findById(telefono).orElseGet(() -> {
+            Cliente nuevo = new Cliente();
+            nuevo.setTelefono(telefono);
+            return nuevo;
+        });
+        c.setProblematico(true);
+        String anterior = c.getNotasProblematico();
+        c.setNotasProblematico(anterior == null || anterior.isBlank() ? nota : anterior + " | " + nota);
+        repo.save(c);
     }
 
     private ClienteResponse construirResumen(String telefono, List<Pedido> pedidos, Cliente guardado) {

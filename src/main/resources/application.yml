@@ -56,6 +56,12 @@ app:
     # de STOMP. En produccion: definir WHATSAPP_GATEWAY_TOKEN. El default es solo para
     # desarrollo local.
     gateway-token: ${WHATSAPP_GATEWAY_TOKEN:dev-token-whatsapp-cambiar-en-produccion}
+    # Solo desarrollo: los codigos de verificacion no se mandan, quedan en "Mensajes enviados"
+    # del panel de WhatsApp con chip SIMULADO. APAGAR EN PRODUCCION.
+    modo-simulado: ${WHATSAPP_MODO_SIMULADO:false}
+  verificacion:
+    # Codigo de "/pedir": AUTO (WhatsApp -> SMS -> sin verificar) | WHATSAPP | SMS
+    transporte: ${VERIFICACION_TRANSPORTE:AUTO}
   maps:
     nominatim-url: ${NOMINATIM_URL:https://nominatim.openstreetmap.org}
     open-route-service-url: ${ORS_URL:https://api.heigit.org/openrouteservice}

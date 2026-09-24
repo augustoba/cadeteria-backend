@@ -19,6 +19,7 @@ public class AppProperties {
     private Fcm fcm = new Fcm();
     private Mail mail = new Mail();
     private Cloudinary cloudinary = new Cloudinary();
+    private Verificacion verificacion = new Verificacion();
     private String frontBaseUrl = "http://localhost:4200";
 
     public String getFrontBaseUrl() {
@@ -107,6 +108,14 @@ public class AppProperties {
 
     public void setMail(Mail mail) {
         this.mail = mail;
+    }
+
+    public Verificacion getVerificacion() {
+        return verificacion;
+    }
+
+    public void setVerificacion(Verificacion verificacion) {
+        this.verificacion = verificacion;
     }
 
     public Cloudinary getCloudinary() {
@@ -245,6 +254,21 @@ public class AppProperties {
      */
     public static class Whatsapp {
         private String gatewayToken = "";
+        /**
+         * Solo desarrollo (spec-antiabuso §6): los códigos de verificación no se mandan, se
+         * guardan como mensaje ENVIADO con chip "SIMULADO" y se leen en la pestaña "Mensajes
+         * enviados" del panel de WhatsApp. Nunca prenderlo en producción: el sistema simularía
+         * mandar códigos que nadie recibe.
+         */
+        private boolean modoSimulado = false;
+
+        public boolean isModoSimulado() {
+            return modoSimulado;
+        }
+
+        public void setModoSimulado(boolean modoSimulado) {
+            this.modoSimulado = modoSimulado;
+        }
 
         public String getGatewayToken() {
             return gatewayToken;
@@ -395,6 +419,23 @@ public class AppProperties {
 
         public void setApiSecret(String apiSecret) {
             this.apiSecret = apiSecret;
+        }
+    }
+
+    /**
+     * Por dónde sale el código de verificación de "/pedir" (spec-antiabuso §4 Fase 2):
+     * WHATSAPP | SMS | AUTO. AUTO = WhatsApp si el gateway está conectado, si no SMS, y si
+     * tampoco hay SMS la solicitud entra marcada "sin verificar" para que la valide el admin.
+     */
+    public static class Verificacion {
+        private String transporte = "AUTO";
+
+        public String getTransporte() {
+            return transporte;
+        }
+
+        public void setTransporte(String transporte) {
+            this.transporte = transporte;
         }
     }
 }

@@ -36,6 +36,8 @@ public class SolicitudPedidoService {
     private final WebSocketPublisher publisher;
     private final VerificacionTelefonoService verificacionTelefonoService;
     private final ConfiguracionService configuracionService;
+    private final ClienteService clienteService;
+    private final WhatsappGatewayService whatsappGatewayService;
     private final String frontBaseUrl;
 
     private static final ZoneId ZONA_ART = ZoneId.of("America/Argentina/Buenos_Aires");
@@ -44,6 +46,7 @@ public class SolicitudPedidoService {
                                    SmsGatewayService smsGatewayService, WebSocketPublisher publisher,
                                    VerificacionTelefonoService verificacionTelefonoService,
                                    ConfiguracionService configuracionService,
+                                   ClienteService clienteService, WhatsappGatewayService whatsappGatewayService,
                                    AppProperties props) {
         this.repo = repo;
         this.pedidoService = pedidoService;
@@ -51,6 +54,8 @@ public class SolicitudPedidoService {
         this.publisher = publisher;
         this.verificacionTelefonoService = verificacionTelefonoService;
         this.configuracionService = configuracionService;
+        this.clienteService = clienteService;
+        this.whatsappGatewayService = whatsappGatewayService;
         this.frontBaseUrl = props.getFrontBaseUrl();
     }
 
@@ -90,8 +95,9 @@ public class SolicitudPedidoService {
         if (!estado.disponible()) {
             throw new BadRequestException(estado.mensaje());
         }
-        verificacionTelefonoService.consumirToken(req.verificacionToken(), req.clienteTelefono());
+        boolean sinVerificar = verificacionTelefonoService.consumirToken(req.verificacionToken(), req.clienteTelefono());
         SolicitudPedido s = new SolicitudPedido();
+        s.setSinVerificar(sinVerificar);
         s.setId(UUID.randomUUID().toString());
         s.setOrigenDireccion(req.origenDireccion().trim());
         s.setOrigenLat(req.origenLat());
@@ -182,6 +188,52 @@ public class SolicitudPedidoService {
 
         enviarSmsConfirmado(pedido);
         return pedido;
+    }
+
+    /**
+     * "Marcar como fraudulento" (spec-antiabuso Fase 4): prende "cliente problemático" en la
+     * ficha del teléfono — así alimenta la lista negra — y, si la solicitud todavía no se
+     * resolvió, la rechaza. No bloquea futuros pedidos: los avisa.
+     */
+    public SolicitudPedido marcarFraudulenta(String id, String nota, String adminUsername) {
+        SolicitudPedido s = get(id);
+        String detalle = "Solicitud web marcada como fraudulenta por " + adminUsername
+                + " (" + java.time.LocalDate.now(ZONA_ART) + ")"
+                + (nota == null || nota.isBlank() ? "" : ": " + nota.trim());
+        clienteService.marcarProblematico(s.getClienteTelefono(), detalle);
+        if ("PENDIENTE".equals(s.getEstado()) || "COTIZADO".equals(s.getEstado())) {
+            s.setEstado("RECHAZADA");
+            s.setMotivoRechazo("Fraudulenta");
+            s = repo.save(s);
+        }
+        return s;
+    }
+
+    /**
+     * Botón "Pedir confirmación por WhatsApp" (spec-antiabuso Fase 4): le manda al cliente
+     * los datos del pedido para que confirme. La respuesta se ve en la pestaña "Respuestas"
+     * del panel de WhatsApp. Usa la cola normal: si el gateway está apagado sale al volver.
+     */
+    public void pedirConfirmacionWhatsapp(String id) {
+        SolicitudPedido s = get(id);
+        String texto = "Hola " + s.getClienteNombre() + ", recibimos un pedido de envío a nombre de este número: desde "
+                + s.getOrigenDireccion() + " hasta " + s.getDestinoDireccion()
+                + ". ¿Confirmás el envío? Respondé SÍ o NO.";
+        whatsappGatewayService.enviar(s.getClienteTelefono(), texto, null);
+    }
+
+    /** El admin confirmó a mano que el teléfono es real (ej. llamó) — saca la marca y lo suma a la lista blanca. */
+    public SolicitudPedido validarTelefono(String id) {
+        SolicitudPedido s = get(id);
+        verificacionTelefonoService.marcarValidado(s.getClienteTelefono(), "ADMIN");
+        s.setSinVerificar(false);
+        return repo.save(s);
+    }
+
+    /** Avisos de los teléfonos de una lista de solicitudes, resueltos de una vez (sin N+1). */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, com.cadeteria.backend.dto.ClienteDtos.ClienteAvisoResponse> avisosDe(List<SolicitudPedido> solicitudes) {
+        return clienteService.avisos(solicitudes.stream().map(SolicitudPedido::getClienteTelefono).toList());
     }
 
     public SolicitudPedido rechazar(String id, String motivo) {

@@ -50,6 +50,15 @@ public class SmsGatewayService {
         this.publisher = publisher;
     }
 
+    /**
+     * Si hay un gateway de SMS configurado — la verificación de "/pedir" lo usa para decidir
+     * si puede mandar el código por acá o tiene que degradar (spec-antiabuso §6), porque
+     * {@link #enviar} con el gateway apagado "sale bien" sin mandar nada.
+     */
+    public boolean isHabilitado() {
+        return props.getSms().isEnabled() && !props.getSms().getGatewayUrl().isBlank();
+    }
+
     /** Uso sin pedido asociado (no hay donde marcar el fallo, solo se loguea). */
     @Async
     public void enviar(String telefono, String mensaje) {

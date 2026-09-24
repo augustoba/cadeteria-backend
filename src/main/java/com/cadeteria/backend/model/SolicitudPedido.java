@@ -80,6 +80,13 @@ public class SolicitudPedido {
     @Column(nullable = false)
     private boolean requiereMoto = false;
 
+    /**
+     * No se pudo mandar el código de verificación por ningún medio (spec-antiabuso §6): la
+     * solicitud entra igual, marcada, y el admin valida el teléfono a mano.
+     */
+    @Column(nullable = false)
+    private boolean sinVerificar = false;
+
     @Column(precision = 12, scale = 2)
     private BigDecimal precio;
 
@@ -295,5 +302,13 @@ public class SolicitudPedido {
 
     public void setDestinoObservaciones(String destinoObservaciones) {
         this.destinoObservaciones = destinoObservaciones;
+    }
+
+    public boolean isSinVerificar() {
+        return sinVerificar;
+    }
+
+    public void setSinVerificar(boolean sinVerificar) {
+        this.sinVerificar = sinVerificar;
     }
 }

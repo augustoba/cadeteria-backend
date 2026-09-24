@@ -41,6 +41,34 @@ public final class ClienteDtos {
     /** Listado paginado (mejora 2026-09-16) — ver {@link com.cadeteria.backend.service.ClienteService#listarPaginado}. */
     public record ClientesPaginaResponse(List<ClienteResponse> items, long total, int pagina, int totalPaginas) {}
 
-    /** Aviso rápido al cargar un pedido nuevo — si el teléfono es problemático o tiene tarifa especial. */
-    public record ClienteAvisoResponse(boolean problematico, String notasProblematico, BigDecimal tarifaEspecial) {}
+    /**
+     * Aviso rápido al cargar un pedido nuevo o revisar una solicitud web — si el teléfono es
+     * problemático, tiene tarifa especial o acumula reportes de cadetes (spec-antiabuso Fase 4:
+     * "Este teléfono tiene 3 reportes: 2 de demora, 1 de valores no declarados").
+     */
+    public record ClienteAvisoResponse(
+            boolean problematico, String notasProblematico, BigDecimal tarifaEspecial,
+            int cantidadReportes,
+            /** Cantidad por tipo (DEMORO, NO_DECLARO_VALORES, PEDIDO_FALSO, OTRO), solo los que tienen alguno. */
+            java.util.Map<String, Long> reportesPorTipo,
+            Instant ultimoReporteEn
+    ) {
+        public static final ClienteAvisoResponse VACIO =
+                new ClienteAvisoResponse(false, null, null, 0, java.util.Map.of(), null);
+
+        /** true si hay algo para mostrarle al admin (el cartel ámbar). */
+        public boolean hayAviso() {
+            return problematico || tarifaEspecial != null || cantidadReportes > 0;
+        }
+    }
+
+    /** Un reporte de cadete, para el historial en la ficha del cliente (spec-antiabuso Fase 4). */
+    public record ReporteClienteResponse(
+            String id, String tipo, Long pedidoNumero, String pedidoId, String cadeteNombre, String nota, Instant creadoEn
+    ) {
+        public static ReporteClienteResponse from(com.cadeteria.backend.model.ReporteCliente r) {
+            return new ReporteClienteResponse(r.getId(), r.getTipo(), r.getPedidoNumero(), r.getPedidoId(),
+                    r.getCadeteNombre(), r.getNota(), r.getCreadoEn());
+        }
+    }
 }

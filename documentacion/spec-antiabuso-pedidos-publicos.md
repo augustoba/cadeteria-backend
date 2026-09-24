@@ -1,7 +1,9 @@
 # Spec — Anti-abuso y reputación en los pedidos públicos
 
-Fecha: 2026-09-20. Estado: **propuesta, pendiente de revisión** — nada de esto está
-implementado.
+Fecha: 2026-09-20. Estado: **implementado el 2026-09-24** (fases 1 a 4, backend + panel + app).
+Decisión tomada al implementar: la lista blanca de teléfonos validados (Fase 2) se puede apagar
+con la clave `verificacion_recordar_telefonos` (Configuración → Pedidos web), porque para esos
+números afloja la protección contra suplantación. Default prendida, como dice el spec.
 
 Alcance: 3 repos (`cadeteria` backend, `admin-front` panel, `cadete-app` app) +
 `whatsapp-gateway`.

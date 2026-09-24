@@ -56,6 +56,8 @@ public class SaludController {
             boolean webPushConfigurado,
             boolean geocodingOk,
             boolean whatsappGatewayConectado,
+            /** WHATSAPP_MODO_SIMULADO prendido — los códigos de "/pedir" no salen de verdad (solo desarrollo). */
+            boolean whatsappModoSimulado,
             long smsFallidosPendientes,
             long pedidosActivos,
             Instant ultimoPedidoCreadoEn,
@@ -86,6 +88,7 @@ public class SaludController {
                 webPushService.isHabilitado(),
                 geocodingProxyService.isNominatimOk(),
                 whatsappGatewayService.estado().conectado(),
+                whatsappGatewayService.isModoSimulado(),
                 dbOk ? pedidoService.contarSmsFallidos() : 0,
                 pedidosActivos,
                 ultimoPedido,

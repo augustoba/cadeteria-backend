@@ -13,6 +13,7 @@ import com.cadeteria.backend.model.Cadete;
 import com.cadeteria.backend.model.Pedido;
 import com.cadeteria.backend.service.CadeteService;
 import com.cadeteria.backend.service.PedidoService;
+import com.cadeteria.backend.service.ReporteClienteService;
 import com.cadeteria.backend.service.RutaService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -33,8 +34,14 @@ public class PedidoCadeteController {
     private final PedidoService service;
     private final CadeteService cadeteService;
     private final RutaService rutaService;
+    private final ReporteClienteService reporteClienteService;
 
-    public PedidoCadeteController(PedidoService service, CadeteService cadeteService, RutaService rutaService) {
+    /** "Reportar al cliente" desde la pantalla del viaje (spec-antiabuso Fase 3). tipo: DEMORO | NO_DECLARO_VALORES | PEDIDO_FALSO | OTRO. */
+    public record ReporteRequest(String tipo, String nota) {}
+
+    public PedidoCadeteController(PedidoService service, CadeteService cadeteService, RutaService rutaService,
+                                  ReporteClienteService reporteClienteService) {
+        this.reporteClienteService = reporteClienteService;
         this.service = service;
         this.cadeteService = cadeteService;
         this.rutaService = rutaService;
@@ -93,6 +100,12 @@ public class PedidoCadeteController {
     @PostMapping("/{id}/aceptar")
     public PedidoResponse aceptar(@PathVariable String id, Authentication auth) {
         return PedidoResponse.paraCadete(service.aceptar(id, auth.getName()));
+    }
+
+    /** Solo acumula contra el teléfono del cliente: no bloquea ni marca nada (el admin decide). */
+    @PostMapping("/{id}/reporte")
+    public void reportarCliente(@PathVariable String id, @RequestBody ReporteRequest req, Authentication auth) {
+        reporteClienteService.reportar(id, auth.getName(), req.tipo(), req.nota());
     }
 
     @PostMapping("/{id}/rechazar")

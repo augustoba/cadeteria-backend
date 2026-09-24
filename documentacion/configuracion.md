@@ -17,10 +17,10 @@ Para una instalación nueva, en este orden:
    pedido" no sugiere ningún precio.
 4. **Rutas**: OSRM ya funciona solo, sin cargar nada. GraphHopper/OpenRouteService son
    opcionales, solo mejoran la precisión de la distancia real.
-5. **SMS gateway** — ⚠️ si vas a usar la página pública `/pedir`, esto **no es opcional**:
-   el cliente tiene que confirmar su teléfono con un código que sale por SMS, y con
-   `SMS_ENABLED=false` el código nunca llega (la página queda inutilizable, sin error
-   visible). Ver "Verificación del teléfono" en `frontend.md`.
+5. **Código de verificación de `/pedir`** (desde 2026-09-24): sale por **WhatsApp** si el
+   gateway está conectado, si no por **SMS**, y si no hay ninguno de los dos la solicitud entra
+   igual marcada **"sin verificar"** para que el admin valide el teléfono a mano (bandeja de
+   Pedidos web). Ya no queda inutilizable sin SMS, pero conviene tener al menos uno de los dos.
 6. Opcional: WhatsApp gateway, Firebase (push), SMTP de mail — estos sí se degradan solos
    si se dejan sin configurar, no rompen nada.
 
@@ -45,6 +45,8 @@ Se definen una sola vez al desplegar el backend (variables de entorno, o copiand
 | `FCM_CREDENTIALS_PATH` | Ruta al JSON de la cuenta de servicio de Firebase, para push a la app del cadete | vacío = push deshabilitado |
 | `MAIL_HOST` / `MAIL_PORT` / `MAIL_USERNAME` / `MAIL_PASSWORD` / `MAIL_FROM` | SMTP para el mail de alta de cadete | vacío = deshabilitado, no rompe el alta |
 | `SMS_ENABLED` / `SMS_GATEWAY_URL` / `SMS_GATEWAY_USER` / `SMS_GATEWAY_PASSWORD` | Gateway de SMS (proyecto android-sms-gateway) | deshabilitado por defecto |
+| `VERIFICACION_TRANSPORTE` | Por dónde sale el código de `/pedir`: `AUTO` (WhatsApp → SMS → sin verificar), `WHATSAPP` o `SMS` | `AUTO` |
+| `WHATSAPP_MODO_SIMULADO` | Solo desarrollo: los códigos no se mandan, quedan en "Mensajes enviados" del panel de WhatsApp con chip `SIMULADO` — **apagar en producción** (se ve en Salud del sistema) | `false` |
 | `NOMINATIM_URL` / `ORS_URL` | URLs de geocodificación/ruteo — genéricas, casi nunca hace falta tocarlas | ver `application.yml` |
 
 ## Panel → Configuración: pedidos, asignación y avisos
@@ -106,7 +108,6 @@ cargar un pedido).
 3. Pegarla en Configuración → "Rutas — distancia real por calle" → "GraphHopper — API key".
 
 ### Cómo sacar la key de OpenRouteService
-
 1. Registrarse en [openrouteservice.org](https://openrouteservice.org/).
 2. **Verificar el mail** — sin este paso el dashboard no deja ver la key (pantalla "Verify
    Account"). Si no llega el mail, hay un botón para reenviarlo.

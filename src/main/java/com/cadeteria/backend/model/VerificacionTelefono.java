@@ -45,6 +45,14 @@ public class VerificacionTelefono {
 
     private Instant tokenUsadoEn;
 
+    /**
+     * Cómo se resolvió (spec-antiabuso Fase 2): WHATSAPP | SMS (código enviado por ese medio),
+     * YA_VALIDADO (el teléfono ya estaba en telefono_validado, no se mandó código) o
+     * SIN_VERIFICAR (no había forma de mandarlo — la solicitud entra marcada para el admin).
+     */
+    @Column(length = 20)
+    private String via;
+
     public String getId() {
         return id;
     }
@@ -115,5 +123,13 @@ public class VerificacionTelefono {
 
     public void setTokenUsadoEn(Instant tokenUsadoEn) {
         this.tokenUsadoEn = tokenUsadoEn;
+    }
+
+    public String getVia() {
+        return via;
+    }
+
+    public void setVia(String via) {
+        this.via = via;
     }
 }

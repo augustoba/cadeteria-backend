@@ -43,9 +43,18 @@ public final class SolicitudPedidoDtos {
             String estado,
             boolean requiereMoto, BigDecimal precio,
             String pedidoCreadoId, String motivoRechazo,
-            Instant creadoEn
+            Instant creadoEn,
+            /** No se pudo mandar el código por ningún medio — el admin valida el teléfono a mano (spec-antiabuso §6). */
+            boolean sinVerificar,
+            /** Aviso del teléfono (problemático / reportes de cadetes), null si no hay nada — spec-antiabuso Fase 1. */
+            com.cadeteria.backend.dto.ClienteDtos.ClienteAvisoResponse avisoCliente
     ) {
         public static SolicitudPedidoResponse from(SolicitudPedido s) {
+            return from(s, null);
+        }
+
+        public static SolicitudPedidoResponse from(SolicitudPedido s,
+                                                   com.cadeteria.backend.dto.ClienteDtos.ClienteAvisoResponse aviso) {
             return new SolicitudPedidoResponse(
                     s.getId(), s.getOrigenDireccion(), s.getOrigenLat(), s.getOrigenLng(),
                     s.getDestinoDireccion(), s.getDestinoLat(), s.getDestinoLng(),
@@ -54,7 +63,8 @@ public final class SolicitudPedidoDtos {
                     s.getOrigenPisoDepto(), s.getOrigenObservaciones(),
                     s.getDestinoPisoDepto(), s.getDestinoObservaciones(), s.getEstado(),
                     s.isRequiereMoto(), s.getPrecio(),
-                    s.getPedidoCreadoId(), s.getMotivoRechazo(), s.getCreadoEn());
+                    s.getPedidoCreadoId(), s.getMotivoRechazo(), s.getCreadoEn(),
+                    s.isSinVerificar(), aviso);
         }
     }
 
@@ -64,6 +74,9 @@ public final class SolicitudPedidoDtos {
     ) {}
 
     public record RechazarSolicitudRequest(String motivo) {}
+
+    /** "Marcar como fraudulento" (spec-antiabuso Fase 4) — la nota queda en la ficha del cliente. */
+    public record FraudulentoRequest(String nota) {}
 
     /** Lo que ve la página pública "/confirmar-pedido/:token" antes (y después) de confirmar. */
     public record ConfirmacionPublicaResponse(

@@ -2,6 +2,7 @@ package com.cadeteria.backend.service;
 
 import com.cadeteria.backend.common.BadRequestException;
 import com.cadeteria.backend.common.ResourceNotFoundException;
+import com.cadeteria.backend.config.AppProperties;
 import com.cadeteria.backend.dto.WhatsappDtos.ChipEstado;
 import com.cadeteria.backend.dto.WhatsappDtos.ChipResponse;
 import com.cadeteria.backend.dto.WhatsappDtos.ComandoEnvio;
@@ -51,17 +52,54 @@ public class WhatsappGatewayService {
     private final WhatsappChipRepository chipRepo;
     private final WhatsappRespuestaRepository respuestaRepo;
     private final WebSocketPublisher publisher;
+    private final boolean modoSimulado;
 
     /** Estado de conexión en memoria — no persiste entre reinicios del backend, no hace falta. */
     private final AtomicReference<Instant> ultimoCambioEstado = new AtomicReference<>(null);
     private volatile boolean conectado = false;
 
     public WhatsappGatewayService(WhatsappMensajeRepository repo, WhatsappChipRepository chipRepo,
-                                   WhatsappRespuestaRepository respuestaRepo, WebSocketPublisher publisher) {
+                                   WhatsappRespuestaRepository respuestaRepo, WebSocketPublisher publisher,
+                                   AppProperties props) {
         this.repo = repo;
         this.chipRepo = chipRepo;
         this.respuestaRepo = respuestaRepo;
         this.publisher = publisher;
+        this.modoSimulado = props.getWhatsapp().isModoSimulado();
+        if (modoSimulado) {
+            log.warn("*** WHATSAPP EN MODO SIMULADO (WHATSAPP_MODO_SIMULADO=true): los códigos de verificación "
+                    + "NO se mandan, quedan en 'Mensajes enviados' del panel. Apagarlo en producción. ***");
+        }
+    }
+
+    public boolean isModoSimulado() {
+        return modoSimulado;
+    }
+
+    /**
+     * "Enviar ahora o fallar rápido" (spec-antiabuso §6), para códigos de verificación: un
+     * OTP que sale cuando el gateway vuelva, horas después, no sirve. Si el gateway no está
+     * conectado devuelve false SIN encolar, para que el llamador caiga al SMS. En modo
+     * simulado no publica nada: deja el mensaje ENVIADO con chip "SIMULADO" para leerlo
+     * desde el panel.
+     */
+    public boolean enviarYa(String telefono, String texto) {
+        if (modoSimulado) {
+            WhatsappMensaje m = new WhatsappMensaje();
+            m.setId(UUID.randomUUID().toString());
+            m.setTelefono(telefono);
+            m.setTexto(texto);
+            m.setEstado("ENVIADO");
+            m.setChipUsado("SIMULADO");
+            m.setEnviadoEn(Instant.now());
+            repo.save(m);
+            publisher.publicarPanelWhatsapp("MENSAJE");
+            log.info("WhatsApp SIMULADO a {}: {}", telefono, texto);
+            return true;
+        }
+        if (!conectado) return false;
+        enviar(telefono, texto, null);
+        return true;
     }
 
     /** Uso normal: encola y publica. Sin pedido asociado, pasar pedidoId null (ej. envío de prueba). */

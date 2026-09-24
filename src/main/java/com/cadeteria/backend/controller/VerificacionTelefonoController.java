@@ -1,6 +1,7 @@
 package com.cadeteria.backend.controller;
 
 import com.cadeteria.backend.dto.VerificacionTelefonoDtos.EnviarCodigoRequest;
+import com.cadeteria.backend.dto.VerificacionTelefonoDtos.EnviarCodigoResponse;
 import com.cadeteria.backend.dto.VerificacionTelefonoDtos.VerificarCodigoRequest;
 import com.cadeteria.backend.dto.VerificacionTelefonoDtos.VerificarCodigoResponse;
 import com.cadeteria.backend.service.VerificacionTelefonoService;
@@ -22,8 +23,8 @@ public class VerificacionTelefonoController {
     }
 
     @PostMapping("/enviar")
-    public void enviar(@Valid @RequestBody EnviarCodigoRequest req) {
-        service.enviarCodigo(req.telefono());
+    public EnviarCodigoResponse enviar(@Valid @RequestBody EnviarCodigoRequest req) {
+        return service.enviarCodigo(req.telefono());
     }
 
     @PostMapping("/verificar")
