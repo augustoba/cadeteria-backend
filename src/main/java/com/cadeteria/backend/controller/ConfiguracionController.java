@@ -45,6 +45,7 @@ public class ConfiguracionController {
     public List<EstadoClave> estadoApiKeys() {
         return Stream.of(
                 apiKeyPool.estadoDe(GeocodingProxyService.PROVEEDOR_GEOAPIFY, GeocodingProxyService.CONFIG_GEOAPIFY_KEYS),
+                apiKeyPool.estadoDe(GeocodingProxyService.PROVEEDOR_GOOGLE, GeocodingProxyService.CONFIG_GOOGLE_KEYS),
                 apiKeyPool.estadoDe(RutaService.PROVEEDOR_GRAPHHOPPER, RutaService.CONFIG_GRAPHHOPPER_KEYS),
                 apiKeyPool.estadoDe(RutaService.PROVEEDOR_ORS, RutaService.CONFIG_ORS_KEYS)
         ).flatMap(List::stream).toList();

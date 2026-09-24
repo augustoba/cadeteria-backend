@@ -27,6 +27,8 @@ public final class PedidoDtos {
             BigDecimal montoDeclarado,
             /** Declarado por el cliente (mejora 2026-09-23) — ver Pedido.llevaValores. */
             boolean llevaValores,
+            /** Valor declarado de los objetos de valor (2026-09-24), null si no lleva. */
+            BigDecimal montoValores,
             String detalle,
             /** Piso, depto y observaciones de cada dirección (mejora 2026-09-24), opcionales. */
             String origenPiso, String origenDepto, String origenObservaciones,
@@ -59,7 +61,7 @@ public final class PedidoDtos {
             String id, Long numero, String clienteTelefono, String clienteNombre,
             String origenDireccion, Double origenLat, Double origenLng,
             String destinoDireccion, Double destinoLat, Double destinoLng,
-            BigDecimal precio, BigDecimal montoDeclarado, boolean llevaValores, String detalle,
+            BigDecimal precio, BigDecimal montoDeclarado, boolean llevaValores, BigDecimal montoValores, String detalle,
             /** Piso, depto y observaciones (mejora 2026-09-24) — null para el cadete hasta que acepta, ver {@link #paraCadete}. */
             String origenPiso, String origenDepto, String origenObservaciones,
             String destinoPiso, String destinoDepto, String destinoObservaciones,
@@ -128,7 +130,7 @@ public final class PedidoDtos {
                     p.getId(), p.getNumero(), p.getClienteTelefono(), p.getClienteNombre(),
                     p.getOrigenDireccion(), p.getOrigenLat(), p.getOrigenLng(),
                     p.getDestinoDireccion(), p.getDestinoLat(), p.getDestinoLng(),
-                    p.getPrecio(), p.getMontoDeclarado(), p.isLlevaValores(),
+                    p.getPrecio(), p.getMontoDeclarado(), p.isLlevaValores(), p.getMontoValores(),
                     ocultarDetalle ? null : p.getDetalle(),
                     ocultarDetalle ? null : p.getOrigenPiso(), ocultarDetalle ? null : p.getOrigenDepto(), ocultarDetalle ? null : p.getOrigenObservaciones(),
                     ocultarDetalle ? null : p.getDestinoPiso(), ocultarDetalle ? null : p.getDestinoDepto(), ocultarDetalle ? null : p.getDestinoObservaciones(),

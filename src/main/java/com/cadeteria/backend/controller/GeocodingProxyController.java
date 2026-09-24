@@ -25,6 +25,12 @@ public class GeocodingProxyController {
         return service.buscar(q);
     }
 
+    /** "No está mi dirección — buscar de nuevo": sin cache y con Google si hay key (ver el service). */
+    @GetMapping("/buscar-ampliado")
+    public List<GeoAddress> buscarAmpliado(@RequestParam String q) {
+        return service.buscarAmpliado(q);
+    }
+
     @GetMapping("/reverse")
     public GeoAddress reverse(@RequestParam double lat, @RequestParam double lng) {
         return service.reverse(lat, lng);

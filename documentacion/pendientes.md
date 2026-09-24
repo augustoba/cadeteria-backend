@@ -56,6 +56,14 @@ probar de punta a punta que el código llegue al celular del cliente, y recién 
 opción. En desarrollo se puede probar el circuito con `WHATSAPP_MODO_SIMULADO=true` (el código
 aparece en WhatsApp → Mensajes enviados; nunca en producción, Salud del sistema lo marca en rojo).
 
+### 3b. Google para "No está mi dirección — buscar de nuevo" (opcional)
+El segundo intento del buscador de direcciones usa Google si hay una key en Configuración →
+"Google — API keys" (Geocoding API de Google Cloud; tope propio de 300/día por key ≈ 9.000/mes,
+dentro del cupo sin cargo). Sin key, ese intento vuelve a probar los servicios gratuitos
+salteando la memoria de direcciones. **Antes de cargar la key, revisar las condiciones de
+Google Maps Platform**: no permiten mostrar sus resultados sobre un mapa que no sea de Google (el
+panel y `/pedir` usan OpenStreetMap) ni guardarlos más de 30 días (por eso no van a la cache).
+
 ### 4. Evaluar autoalojar el motor de ruteo
 Sin cambios respecto del 2026-09-21 — ver el razonamiento en el historial de este archivo
 (`git log -p documentacion/pendientes.md`). Ya hay un OSRM propio levantado para el matching

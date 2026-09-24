@@ -125,6 +125,8 @@ public class SolicitudPedidoService {
         s.setLlevaDinero(req.llevaDinero());
         s.setMontoDeclarado(req.montoDeclarado());
         s.setLlevaValores(req.llevaValores());
+        s.setMontoValores(req.llevaValores() && req.montoValores() != null && req.montoValores().signum() > 0
+                ? req.montoValores() : null);
         s.setRequiereMoto(req.requiereMoto());
         s.setRetornaAlOrigen(req.retornaAlOrigen());
         s.setClienteNombre(req.clienteNombre().trim());
@@ -274,14 +276,15 @@ public class SolicitudPedidoService {
         StringBuilder detalle = new StringBuilder();
         if (s.isRetornaAlOrigen()) detalle.append("🔁 Retorna al origen. ");
         if (s.isLlevaDinero()) detalle.append("💵 Lleva dinero. ");
-        if (s.isLlevaValores()) detalle.append("💎 Transporta valores. ");
+        if (s.isLlevaValores()) detalle.append(s.getMontoValores() != null
+                ? "💎 Transporta valores ($" + s.getMontoValores().toPlainString() + "). " : "💎 Transporta valores. ");
         if (s.getDetalle() != null) detalle.append(s.getDetalle());
 
         PedidoRequest req = new PedidoRequest(
                 s.getClienteTelefono(), s.getClienteNombre(),
                 s.getOrigenDireccion(), s.getOrigenLat(), s.getOrigenLng(),
                 s.getDestinoDireccion(), s.getDestinoLat(), s.getDestinoLng(),
-                precio, montoDeclarado, s.isLlevaValores(), detalle.length() == 0 ? null : detalle.toString().trim(),
+                precio, montoDeclarado, s.isLlevaValores(), s.getMontoValores(), detalle.length() == 0 ? null : detalle.toString().trim(),
                 s.getOrigenPiso(), s.getOrigenDepto(), s.getOrigenObservaciones(),
                 s.getDestinoPiso(), s.getDestinoDepto(), s.getDestinoObservaciones(),
                 requiereMoto, false, null, null);

@@ -43,6 +43,13 @@ public class SolicitudPedido {
     @Column(nullable = false)
     private boolean llevaValores;
 
+    /**
+     * Cuánto valen los objetos de valor declarados (2026-09-24), igual que montoDeclarado para el
+     * dinero. Solo informativo (no cuenta para el tope de 5.2). Null si no transporta valores.
+     */
+    @Column(precision = 12, scale = 2)
+    private BigDecimal montoValores;
+
     @Column(nullable = false)
     private boolean retornaAlOrigen;
 
@@ -330,5 +337,13 @@ public class SolicitudPedido {
 
     public void setSinVerificar(boolean sinVerificar) {
         this.sinVerificar = sinVerificar;
+    }
+
+    public BigDecimal getMontoValores() {
+        return montoValores;
+    }
+
+    public void setMontoValores(BigDecimal montoValores) {
+        this.montoValores = montoValores;
     }
 }

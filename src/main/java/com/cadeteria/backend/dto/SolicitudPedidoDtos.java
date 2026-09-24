@@ -17,6 +17,7 @@ public final class SolicitudPedidoDtos {
             @NotBlank String destinoDireccion, @NotNull Double destinoLat, @NotNull Double destinoLng,
             boolean llevaDinero, BigDecimal montoDeclarado,
             boolean llevaValores,
+            BigDecimal montoValores,
             /** Lo pide el cliente (mejora 2026-09-24) — el admin lo puede cambiar al revisar. */
             boolean requiereMoto,
             boolean retornaAlOrigen,
@@ -36,6 +37,7 @@ public final class SolicitudPedidoDtos {
             String destinoDireccion, Double destinoLat, Double destinoLng,
             boolean llevaDinero, BigDecimal montoDeclarado,
             boolean llevaValores,
+            BigDecimal montoValores,
             boolean retornaAlOrigen,
             String clienteNombre, String clienteTelefono,
             String detalle,
@@ -59,7 +61,7 @@ public final class SolicitudPedidoDtos {
             return new SolicitudPedidoResponse(
                     s.getId(), s.getOrigenDireccion(), s.getOrigenLat(), s.getOrigenLng(),
                     s.getDestinoDireccion(), s.getDestinoLat(), s.getDestinoLng(),
-                    s.isLlevaDinero(), s.getMontoDeclarado(), s.isLlevaValores(), s.isRetornaAlOrigen(),
+                    s.isLlevaDinero(), s.getMontoDeclarado(), s.isLlevaValores(), s.getMontoValores(), s.isRetornaAlOrigen(),
                     s.getClienteNombre(), s.getClienteTelefono(), s.getDetalle(),
                     s.getOrigenPiso(), s.getOrigenDepto(), s.getOrigenObservaciones(),
                     s.getDestinoPiso(), s.getDestinoDepto(), s.getDestinoObservaciones(), s.getEstado(),

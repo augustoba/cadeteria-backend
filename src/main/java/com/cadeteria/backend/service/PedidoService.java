@@ -372,6 +372,7 @@ public class PedidoService {
         p.setPrecio(req.precio());
         p.setMontoDeclarado(req.montoDeclarado() == null ? BigDecimal.ZERO : req.montoDeclarado());
         p.setLlevaValores(req.llevaValores());
+        p.setMontoValores(req.llevaValores() ? montoPositivoONull(req.montoValores()) : null);
         p.setDetalle(req.detalle());
         p.setOrigenPiso(textoOpcional(req.origenPiso()));
         p.setOrigenDepto(textoOpcional(req.origenDepto()));
@@ -426,7 +427,7 @@ public class PedidoService {
                 original.getClienteTelefono(), original.getClienteNombre(),
                 original.getOrigenDireccion(), original.getOrigenLat(), original.getOrigenLng(),
                 original.getDestinoDireccion(), original.getDestinoLat(), original.getDestinoLng(),
-                original.getPrecio(), null, original.isLlevaValores(), "Repetición del pedido #" + original.getNumero(),
+                original.getPrecio(), null, original.isLlevaValores(), original.getMontoValores(), "Repetición del pedido #" + original.getNumero(),
                 original.getOrigenPiso(), original.getOrigenDepto(), original.getOrigenObservaciones(),
                 original.getDestinoPiso(), original.getDestinoDepto(), original.getDestinoObservaciones(),
                 original.isRequiereMoto(),
@@ -1420,5 +1421,10 @@ public class PedidoService {
     /** Texto libre opcional: recortado, y null si vino vacío. */
     private static String textoOpcional(String s) {
         return s == null || s.isBlank() ? null : s.trim();
+    }
+
+    /** Monto opcional: null si no vino o no es positivo. */
+    private static BigDecimal montoPositivoONull(BigDecimal monto) {
+        return monto == null || monto.signum() <= 0 ? null : monto;
     }
 }

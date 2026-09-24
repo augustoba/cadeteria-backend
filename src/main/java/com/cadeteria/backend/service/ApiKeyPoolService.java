@@ -40,7 +40,10 @@ public class ApiKeyPoolService {
             "geoapify", 3000,
             "locationiq", 5000,
             "graphhopper", 500,
-            "openrouteservice", 2500
+            "openrouteservice", 2500,
+            // Google no es gratis: es un tope PROPIO para no pasarse del cupo sin cargo (10.000
+            // geocodificaciones/mes por SKU desde 2025) — 300/día por key ≈ 9.000/mes.
+            "google", 300
     );
 
     public enum Estado { OK, AGOTADA }

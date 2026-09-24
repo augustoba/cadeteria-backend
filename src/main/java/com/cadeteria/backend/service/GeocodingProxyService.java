@@ -53,10 +53,16 @@ public class GeocodingProxyService {
     private static final String NOMINATIM_USER_AGENT = "CadeteriaBackend/1.0 (+https://github.com/augustoba/cadeteria-backend)";
     private static final String GEOAPIFY_URL = "https://api.geoapify.com/v1/geocode/search";
     private static final String LOCATIONIQ_URL = "https://us1.locationiq.com/v1/search";
+    private static final String GOOGLE_URL = "https://maps.googleapis.com/maps/api/geocode/json";
+    /** sw|ne de la provincia de Tucumán en el formato de "bounds" de Google (lat,lng). */
+    private static final String TUCUMAN_BOUNDS_GOOGLE = "-28.1,-66.2|-26.0,-64.4";
     public static final String PROVEEDOR_GEOAPIFY = "geoapify";
     public static final String PROVEEDOR_LOCATIONIQ = "locationiq";
     public static final String PROVEEDOR_NOMINATIM = "nominatim";
     public static final String PROVEEDOR_CACHE = "cache";
+    public static final String PROVEEDOR_GOOGLE = "google";
+    /** Keys de Google Geocoding (Configuración). Vacío = la búsqueda ampliada usa solo los gratuitos. */
+    public static final String CONFIG_GOOGLE_KEYS = "google_geocoding_keys";
     public static final String CONFIG_GEOAPIFY_KEYS = "geoapify_keys";
     public static final String CONFIG_LOCATIONIQ_KEYS = "locationiq_keys";
     private static final int MAX_INTENTOS_POR_PROVEEDOR = 10;
@@ -120,6 +126,95 @@ public class GeocodingProxyService {
                     mejor.lat(), mejor.lng(), mejor.approximate(), mejor.proveedor());
         }
         return out;
+    }
+
+    /**
+     * "No está mi dirección — buscar de nuevo" (2026-09-24): segundo intento cuando la lista de
+     * {@link #buscar} no trae la dirección correcta. Saltea la cache (un resultado cacheado mal
+     * hacía que siempre apareciera solo ese) y prueba Google si hay key cargada; sin key, vuelve
+     * a consultar los gratuitos directo. Si tampoco aparece, el front ofrece ubicarla a mano.
+     *
+     * <p>Los resultados de Google NO se guardan en la cache: sus condiciones no permiten guardarlos
+     * más de 30 días, y la cache es permanente.
+     */
+    public List<GeoAddress> buscarAmpliado(String textoCrudo) {
+        String q = textoCrudo == null ? "" : textoCrudo.trim().replaceAll("\\s+", " ");
+        if (q.length() < 4) return List.of();
+        Matcher m = NUMERO_FINAL.matcher(q);
+        Integer numero = m.matches() ? Integer.parseInt(m.group(2)) : null;
+
+        List<GeoAddress> google = queryGoogle(q, numero);
+        if (!google.isEmpty()) return dedupe(google);
+
+        List<GeoAddress> resultados = new ArrayList<>();
+        resultados.addAll(queryNominatim(q, numero));
+        resultados.addAll(queryGeoapify(q, numero));
+        resultados.addAll(queryLocationIq(q, numero));
+        return dedupe(resultados);
+    }
+
+    private List<GeoAddress> queryGoogle(String texto, Integer numeroEsperado) {
+        for (int intento = 0; intento < MAX_INTENTOS_POR_PROVEEDOR; intento++) {
+            String key = apiKeyPool.siguienteClave(PROVEEDOR_GOOGLE, CONFIG_GOOGLE_KEYS);
+            if (key == null || key.isBlank()) return List.of();
+            String url = GOOGLE_URL + "?language=es&region=ar&bounds=" + encode(TUCUMAN_BOUNDS_GOOGLE)
+                    + "&components=" + encode("country:AR|administrative_area:Tucumán")
+                    + "&address=" + encode(texto + ", Tucumán") + "&key=" + key;
+            try {
+                apiKeyPool.registrarUso(PROVEEDOR_GOOGLE, CONFIG_GOOGLE_KEYS, key);
+                Map<String, Object> data = restClient.get().uri(java.net.URI.create(url))
+                        .retrieve()
+                        .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+                if (data == null) return List.of();
+                String status = String.valueOf(data.get("status"));
+                if ("OVER_QUERY_LIMIT".equals(status) || "OVER_DAILY_LIMIT".equals(status) || "REQUEST_DENIED".equals(status)) {
+                    log.warn("Google Geocoding respondió {} — se pasa a la siguiente key.", status);
+                    apiKeyPool.marcarAgotada(PROVEEDOR_GOOGLE, CONFIG_GOOGLE_KEYS, key);
+                    continue;
+                }
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> results = (List<Map<String, Object>>) data.get("results");
+                if (results == null) return List.of();
+                List<GeoAddress> out = new ArrayList<>();
+                for (Map<String, Object> r : results) {
+                    GeoAddress a = desdeGoogle(r, numeroEsperado);
+                    if (a != null) out.add(a);
+                }
+                return out;
+            } catch (Exception e) {
+                log.warn("Fallo la búsqueda en Google de \"{}\": {}", texto, e.getMessage());
+                return List.of();
+            }
+        }
+        return List.of();
+    }
+
+    @SuppressWarnings("unchecked")
+    private GeoAddress desdeGoogle(Map<String, Object> r, Integer numeroEsperado) {
+        List<Map<String, Object>> componentes = (List<Map<String, Object>>) r.get("address_components");
+        Map<String, Object> geometry = (Map<String, Object>) r.get("geometry");
+        if (componentes == null || geometry == null) return null;
+        String calle = "", altura = null, localidad = "", provincia = "";
+        for (Map<String, Object> c : componentes) {
+            List<String> tipos = (List<String>) c.get("types");
+            String nombre = String.valueOf(c.get("long_name"));
+            if (tipos == null) continue;
+            if (tipos.contains("route")) calle = nombre;
+            else if (tipos.contains("street_number")) altura = nombre;
+            else if (tipos.contains("locality")) localidad = nombre;
+            else if (tipos.contains("administrative_area_level_1")) provincia = nombre;
+        }
+        if (calle.isBlank() || !provincia.toLowerCase().contains("tucum")) return null;
+        Map<String, Object> loc = (Map<String, Object>) geometry.get("location");
+        if (loc == null) return null;
+        // ROOFTOP / RANGE_INTERPOLATED = ubicó la altura; GEOMETRIC_CENTER / APPROXIMATE = solo la calle o zona.
+        String tipo = String.valueOf(geometry.get("location_type"));
+        boolean aproximada = altura == null || !("ROOFTOP".equals(tipo) || "RANGE_INTERPOLATED".equals(tipo));
+        Integer numero = parseNumero(altura, numeroEsperado);
+        String base = numero != null ? calle + " " + numero : calle;
+        String label = localidad.isBlank() ? base : base + ", " + localidad;
+        return new GeoAddress(label, calle, numero, localidad,
+                ((Number) loc.get("lat")).doubleValue(), ((Number) loc.get("lng")).doubleValue(), aproximada, PROVEEDOR_GOOGLE);
     }
 
     public GeoAddress reverse(double lat, double lng) {
