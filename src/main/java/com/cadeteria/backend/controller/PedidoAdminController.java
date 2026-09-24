@@ -55,7 +55,8 @@ public class PedidoAdminController {
      * "Pedidos finalizados" paginado en la base, no en memoria (mejora 2026-09-16, ver
      * {@link PedidoService#paginaFinalizados}) — desde/hasta en ISO-8601
      * (`2026-09-16T00:00:00Z`); sin ninguno de los dos = sin límite de fecha (el front lo
-     * manda siempre explícito, default "Hoy").
+     * manda siempre explícito, default "Hoy"). Sin paradas, igual que {@link #list}: la tabla
+     * no las muestra y el detalle se pide aparte (auditoría de endpoints 2026-09-24).
      */
     @GetMapping("/finalizados-pagina")
     public com.cadeteria.backend.dto.PedidoDtos.PaginaPedidosResponse finalizadosPagina(
@@ -67,7 +68,7 @@ public class PedidoAdminController {
             @RequestParam(defaultValue = "15") int tamano) {
         var r = service.paginaFinalizados(desde, hasta, cadeteId, tipoEstado, pagina, tamano);
         return new com.cadeteria.backend.dto.PedidoDtos.PaginaPedidosResponse(
-                r.items().stream().map(PedidoResponse::from).toList(), r.total(), r.pagina(), r.totalPaginas());
+                r.items().stream().map(PedidoResponse::fromResumen).toList(), r.total(), r.pagina(), r.totalPaginas());
     }
 
     /** Para el ícono de alertas centralizado del panel (ronda 4, punto 18). */

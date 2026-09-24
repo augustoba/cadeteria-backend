@@ -99,10 +99,15 @@ public final class PedidoDtos {
          * siguiente cadete lo recibiría PENDIENTE con la marca del anterior.
          */
         public static PedidoResponse paraCadete(Pedido p) {
+            return paraCadete(p, true);
+        }
+
+        /** Igual que {@link #paraCadete(Pedido)}; sin paradas para listados (historial), que no las muestran. */
+        public static PedidoResponse paraCadete(Pedido p, boolean incluirParadas) {
             String estado = p.getEstado() == null ? null : p.getEstado().getId();
             boolean sinAceptar = p.getAceptadoEn() == null || estado == null
                     || java.util.Set.of("PENDIENTE", "SIN_ASIGNAR", "PROGRAMADO").contains(estado);
-            return from(p, true, sinAceptar);
+            return from(p, incluirParadas, sinAceptar);
         }
 
         /**

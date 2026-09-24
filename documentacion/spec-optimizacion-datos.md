@@ -1,6 +1,6 @@
 # Spec — Optimización de datos e imágenes (costo de servidor)
 
-Fecha: 2026-09-20. Estado: **propuesta, pendiente de revisión**.
+Fecha: 2026-09-20. Estado: **fases 1-3 implementadas (2026-09-20); fase 4 (auditoría) hecha el 2026-09-24** — ver §6.
 
 **Motivo:** el backend va a pasar a un servidor alojado y se va a pagar por el tráfico.
 Todo byte que se mande de más se paga. Las fotos son, por lejos, el ítem más caro.
@@ -216,3 +216,13 @@ Números esperados, para saber si funcionó:
 3. **¿Cloudinary o mover las fotos a otro lado?** Fuera de alcance: hoy el diseño es
    "Cloudinary directo desde el cliente, el backend nunca ve el archivo" y eso está bien.
    Este spec no lo cambia.
+
+## 7. Resultado de la auditoría (fase 4, 2026-09-24)
+
+| Endpoint | Hallazgo | Qué se hizo |
+| --- | --- | --- |
+| `GET /api/admin/pedidos/finalizados-pagina` | Mapeaba con `from()` → una query lazy de paradas por fila (N+1, 15 por página) | Pasa a `fromResumen()`; el detalle se pide aparte con `GET /{id}` |
+| `GET /api/pedidos/me/historial` | Devolvía la lista con paradas (N+1 sobre todo el rango) | Lista sin paradas (Finalizados no las muestra) + `soloResumen=true` para las estadísticas de Inicio |
+| `GET /api/admin/clientes` | Ya pagina en la base. Queda un N+1 chico: si el cliente no tiene nombre manual, busca el último pedido por teléfono (hasta 20 queries por página) | Anotado, no se toca: acotado por el tamaño de página |
+| `GET /api/admin/pedidos` (activos/programados) | Ya usaba `fromResumen()` | Nada |
+

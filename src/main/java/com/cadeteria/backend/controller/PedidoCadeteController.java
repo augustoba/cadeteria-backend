@@ -60,10 +60,14 @@ public class PedidoCadeteController {
      * no-aceptados). `desde`/`hasta` en yyyy-MM-dd, ambos inclusive — sin parámetros trae
      * todo el historial de siempre (auditoría UX 2026-09-13, punto 5: antes la app no
      * tenía forma de acotar por fecha para comparar contra la liquidación semanal).
+     * `soloResumen=true` devuelve los números con la lista vacía — para las estadísticas de
+     * Inicio, que no necesitan los pedidos (auditoría de endpoints 2026-09-24). La lista va
+     * sin paradas: la pantalla de Finalizados no las muestra.
      */
     @GetMapping("/historial")
     public HistorialResponse historial(
-            @RequestParam(required = false) String desde, @RequestParam(required = false) String hasta, Authentication auth) {
+            @RequestParam(required = false) String desde, @RequestParam(required = false) String hasta,
+            @RequestParam(defaultValue = "false") boolean soloResumen, Authentication auth) {
         Instant desdeInstant = null;
         Instant hastaInstant = null;
         if (desde != null && !desde.isBlank()) {
@@ -72,11 +76,12 @@ public class PedidoCadeteController {
                     .plusDays(1).atStartOfDay(ZONA).toInstant();
         }
         PedidoService.HistorialCadete h = service.historialDe(auth.getName(), desdeInstant, hastaInstant);
-        List<PedidoResponse> pedidos = h.finalizados().stream().map(PedidoResponse::paraCadete).toList();
+        List<PedidoResponse> pedidos = soloResumen ? List.of()
+                : h.finalizados().stream().map(p -> PedidoResponse.paraCadete(p, false)).toList();
         BigDecimal montoTotal = h.finalizados().stream()
                 .map(Pedido::getPrecio)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return new HistorialResponse(pedidos, pedidos.size(), montoTotal, h.cantidadRechazados(), h.cantidadNoAceptados());
+        return new HistorialResponse(pedidos, h.finalizados().size(), montoTotal, h.cantidadRechazados(), h.cantidadNoAceptados());
     }
 
     /** Detalle de un pedido puntual propio (para abrir uno de la lista de "Asignados"/"Finalizados"). */
