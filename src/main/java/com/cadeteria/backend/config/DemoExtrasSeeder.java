@@ -53,7 +53,7 @@ public class DemoExtrasSeeder implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DemoExtrasSeeder.class);
     private static final ZoneId ZONA_ART = ZoneId.of("America/Argentina/Buenos_Aires");
-    private static final String CADETE_USERNAME_PREFERIDO = "jperez";
+    private static final String CADETE_USERNAME_PREFERIDO = "30111222";
 
     private static final List<String> CHAT_IDS = List.of(
             "demo-chat-01", "demo-chat-02", "demo-chat-03", "demo-chat-04");

@@ -14,7 +14,11 @@ import com.cadeteria.backend.repository.CadeteSesionRepository;
 import com.cadeteria.backend.repository.EstadoCadeteRepository;
 import com.cadeteria.backend.repository.EstadoPedidoRepository;
 import com.cadeteria.backend.repository.OfertaPedidoRepository;
+import com.cadeteria.backend.repository.PedidoCadeteExcluidoRepository;
 import com.cadeteria.backend.repository.PedidoComentarioRepository;
+import com.cadeteria.backend.repository.PedidoParadaRepository;
+import com.cadeteria.backend.repository.PedidoPrecioLogRepository;
+import com.cadeteria.backend.repository.PedidoPushSubscriptionRepository;
 import com.cadeteria.backend.repository.PedidoRepository;
 import com.cadeteria.backend.repository.PedidoUbicacionRepository;
 import com.cadeteria.backend.repository.ResultadoOfertaRepository;
@@ -72,6 +76,10 @@ public class DemoPedidoSeeder implements CommandLineRunner {
     private final ResultadoOfertaRepository resultadoOfertaRepo;
     private final EstadoCadeteRepository estadoCadeteRepo;
     private final CadeteSesionRepository sesionRepo;
+    private final PedidoCadeteExcluidoRepository excluidoRepo;
+    private final PedidoParadaRepository paradaRepo;
+    private final PedidoPrecioLogRepository precioLogRepo;
+    private final PedidoPushSubscriptionRepository pushRepo;
     private final AppProperties props;
 
     public DemoPedidoSeeder(PedidoRepository pedidoRepo, OfertaPedidoRepository ofertaRepo,
@@ -79,7 +87,9 @@ public class DemoPedidoSeeder implements CommandLineRunner {
                              CadeteRepository cadeteRepo, ZonaRepository zonaRepo,
                              TipoVehiculoRepository tipoVehiculoRepo, EstadoPedidoRepository estadoPedidoRepo,
                              ResultadoOfertaRepository resultadoOfertaRepo, EstadoCadeteRepository estadoCadeteRepo,
-                             CadeteSesionRepository sesionRepo, AppProperties props) {
+                             CadeteSesionRepository sesionRepo, PedidoCadeteExcluidoRepository excluidoRepo,
+                             PedidoParadaRepository paradaRepo, PedidoPrecioLogRepository precioLogRepo,
+                             PedidoPushSubscriptionRepository pushRepo, AppProperties props) {
         this.pedidoRepo = pedidoRepo;
         this.ofertaRepo = ofertaRepo;
         this.comentarioRepo = comentarioRepo;
@@ -91,6 +101,10 @@ public class DemoPedidoSeeder implements CommandLineRunner {
         this.resultadoOfertaRepo = resultadoOfertaRepo;
         this.estadoCadeteRepo = estadoCadeteRepo;
         this.sesionRepo = sesionRepo;
+        this.excluidoRepo = excluidoRepo;
+        this.paradaRepo = paradaRepo;
+        this.precioLogRepo = precioLogRepo;
+        this.pushRepo = pushRepo;
         this.props = props;
     }
 
@@ -223,10 +237,17 @@ public class DemoPedidoSeeder implements CommandLineRunner {
      * comentarios, puntos de ubicación) — no solo las de OFERTA_IDS. Si mientras corrió el
      * backend se generó actividad real contra uno de estos pedidos (ej. "asignacion_automatica"
      * prendida los volvió a ofertar, o el cadete dejó un comentario), esas filas igual tienen
-     * FK contra el pedido demo y bloquean el DELETE de abajo.
+     * FK contra el pedido demo y bloquean el DELETE de abajo. Lo mismo con los cadetes excluidos
+     * (al quitarle el pedido a alguien), las paradas, el log de cambios de precio y las
+     * suscripciones push del seguimiento: sin borrarlas, el arranque falla con una violación de
+     * FK, o el pedido recreado hereda exclusiones de una corrida anterior.
      */
     private void limpiarDemoAnterior() {
         PEDIDO_IDS.forEach(id -> ofertaRepo.findByPedidoId(id).forEach(ofertaRepo::delete));
+        PEDIDO_IDS.forEach(id -> excluidoRepo.findByPedidoId(id).forEach(excluidoRepo::delete));
+        PEDIDO_IDS.forEach(id -> paradaRepo.findByPedidoIdOrderByOrdenAsc(id).forEach(paradaRepo::delete));
+        PEDIDO_IDS.forEach(id -> precioLogRepo.findByPedidoIdOrderByCambiadoEnDesc(id).forEach(precioLogRepo::delete));
+        PEDIDO_IDS.forEach(id -> pushRepo.findByPedidoId(id).forEach(pushRepo::delete));
         PEDIDO_IDS.forEach(id -> comentarioRepo.findByPedidoIdOrderByCreadoEnAsc(id).forEach(comentarioRepo::delete));
         PEDIDO_IDS.forEach(id -> ubicacionRepo.findByPedidoIdOrderByCapturadoEnAsc(id).forEach(ubicacionRepo::delete));
         PEDIDO_IDS.forEach(id -> pedidoRepo.findById(id).ifPresent(pedidoRepo::delete));

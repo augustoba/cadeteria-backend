@@ -79,11 +79,11 @@ public class DemoCadeteZonaSeeder implements CommandLineRunner {
         TipoVehiculo bici = tipoVehiculoRepo.findById("BICI")
                 .orElseThrow(() -> new IllegalStateException("Falta seedear tipo_vehiculo.BICI"));
 
-        crearCadete("jperez", "Juan", "Pérez", "30111222", "3813010001", "jperez@demo.cadeteria.local",
+        crearCadete("30111222", "Juan", "Pérez", "30111222", "3813010001", "jperez@demo.cadeteria.local",
                 moto, "Negra", "A123BCD", "Honda", "Wave", 2021, "LIBRE");
-        crearCadete("mgomez", "Marcos", "Gómez", "30222333", "3813020002", "mgomez@demo.cadeteria.local",
+        crearCadete("30222333", "Marcos", "Gómez", "30222333", "3813020002", "mgomez@demo.cadeteria.local",
                 bici, "Roja", null, null, null, null, "DESCONECTADO");
-        log.info("Demo: 2 cadetes sembrados (usuario/contraseña: jperez o mgomez / '{}').", DEMO_PASSWORD);
+        log.info("Demo: 2 cadetes sembrados (usuario = DNI 30111222 o 30222333, contraseña '{}').", DEMO_PASSWORD);
     }
 
     private void crearCadete(String username, String nombre, String apellido, String dni, String telefono,

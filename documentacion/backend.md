@@ -25,13 +25,9 @@ Al arrancar contra una base vacía, corren en orden (`config/*Seeder.java`, cada
 2. `DemoCadeteZonaSeeder` — si no hay ningún cadete/zona cargado, siembra una zona y 2 cadetes
    de ejemplo (contraseña `cadete123`) para no arrancar con el panel vacío.
 
-   ⚠️ **Inconsistencia conocida**: los siembra con usuario `jperez` / `mgomez`, pero el login
-   de cadete exige que el usuario sea el DNI (`^[0-9]{1,8}$`, `CadeteDtos.REGEX_USERNAME_DNI`)
-   desde 2026-09-12. El login en sí no valida formato (hace un `findByUsername` pelado, así
-   que `jperez` todavía entra), pero son usuarios que **el propio panel rechaza si los editás**.
-   Los DNIs ya están cargados (`30111222` / `30222333`) — el fix pendiente es usarlos como
-   username. Los otros seeders (`DemoPedidoSeeder`, `DemoExtrasSeeder`) ya prefieren el DNI
-   `11111111` y caen a "cualquier cadete" si no existe, así que no se rompen.
+   El usuario de cada cadete es su DNI (`30111222` / `30222333`), igual que exige el panel
+   (`^[0-9]{1,8}$`, `CadeteDtos.REGEX_USERNAME_DNI`). Una base sembrada antes del 2026-09-24
+   conserva los usuarios viejos `jperez` / `mgomez` (el seeder no toca cadetes existentes).
 3. `DemoPedidoSeeder` — 8 pedidos de ejemplo cubriendo todos los estados del ciclo de vida,
    asignados al cadete demo. Se recrean en cada reinicio (no se acumulan).
 4. `DemoExtrasSeeder` — chat interno, solicitudes de pedido (flujo "pedido por WhatsApp"),

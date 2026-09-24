@@ -52,9 +52,6 @@ src/app/
 | `registro-cadete` | `/registro-cadete/:token` | Formulario público de alta de cadete por link |
 | `login` | `/login` | Login de admin |
 
-> `features/auth/` y `features/layout/` existen pero están **vacías** y sin referencias en
-> `app.routes.ts` — carpetas muertas, no pantallas.
-
 ### Verificación del teléfono en la página pública
 
 El cliente que carga un pedido en `/pedir` **no puede enviarlo sin confirmar antes que el
