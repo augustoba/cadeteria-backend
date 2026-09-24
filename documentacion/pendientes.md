@@ -1,132 +1,67 @@
 # Pendientes
 
-Última actualización: 2026-09-21.
+Última actualización: 2026-09-24.
 
 > El backlog largo (las 11 rondas de propuestas) vive en `MEJORAS-PROPUESTAS.md`, en la raíz
 > del proyecto. **Ese archivo está fuera de cualquier repo git**, así que no viaja con el
 > código. Este archivo es el pendiente corto y accionable, versionado acá a propósito.
 
 Todo el trabajo nuevo va en la rama **`develop`** de los 3 repos (`cadeteria`, `admin-front`,
-`cadete-app`).
+`cadete-app`). Lo del 2026-09-24 está en la rama **`pendientes-2026-09-24`** de los 3, sin
+mergear ni pushear todavía.
 
 ---
 
-## 1. Algoritmo de asignación — enfoque decidido, sin codificar
+## Cerrado el 2026-09-24
 
-**El problema.** Cuando un cadete **rechaza** un pedido, la cadena de reasignación se lo
-devuelve **en el acto** si él sigue siendo elegible (su contador de rechazos es 1 y el tope es
-3). Con un solo cadete libre, el mismo pedido le vuelve 3 veces seguidas, aunque haya otros
-pedidos esperando en el dashboard. Y como el cadete no ve los pedidos sin asignar, los otros
-no compiten: se quedan esperando.
+| # anterior | Qué era | Cómo quedó |
+| --- | --- | --- |
+| 1 | Rebote del pedido al cadete que lo rechaza | Hecho el 2026-09-21 (`d5d8353`). El cartel con las reglas quedó en la pantalla de oferta nueva |
+| 2 | El mapa del viaje no mostraba el origen | Ya estaba: pins de origen (naranja), destino (rojo) y cadete (azul) en `ViajeScreen.MapaViaje` |
+| 3 | Bug de "Test Cadete" sin explicar | **Cerrado sin reproducir**: el matching se reescribió entero por distancia (`asignacion-por-distancia`, 2026-09-23) y el código donde pasó ya no existe. Si vuelve a aparecer, se abre de nuevo con datos del matching nuevo |
+| 4 | Ver el pulso en el teléfono | Visto en el emulador (Pixel 5): el anillo aparece en LIBRE |
+| 5 | Sonido del contador + `spec-app-mejoras-visuales.md` | Sonido hecho el 2026-09-21; el resto del spec (fases A–G) hecho el 2026-09-24 |
+| 5 | `spec-antiabuso-pedidos-publicos.md` | Fases 1–4 hechas el 2026-09-24 (backend + panel + app) |
+| 6 | Filas huérfanas del seeder demo | `DemoPedidoSeeder` borra todas las tablas hijas del pedido demo (excluidos, paradas, log de precio, push); antes podían romper el arranque por FK |
+| 7 | Deudas de documentación | Seeder con DNI como usuario, README de la app (`./gradlew` anda), `frontend.md` sin las carpetas muertas |
+| — | Fase 4 de `spec-optimizacion-datos.md` | Auditoría hecha, ver §7 del spec |
 
-**Decidido:**
+Además, pedido el 2026-09-24:
+- **Piso/depto y observaciones por dirección** (origen y destino) en `/pedir` y en el alta del
+  panel; el cadete los ve (junto con el detalle del pedido) recién al aceptar.
+- `/pedir`: el cliente puede pedir moto; el alta del panel suma "Transporta valores".
+- **Métricas → "Cómo entraron los pedidos"**: online vs. cargados en el panel, y por usuario.
+- **Bug encontrado y arreglado**: si la foto de un viaje encolado sin señal se borraba del
+  teléfono, el backend rechazaba el "Finalizar" sin foto y el viaje quedaba trabado en la cola
+  para siempre. Ahora la app avisa `archivoPerdido` y queda un comentario automático.
 
-1. **No devolverle el mismo pedido en el acto al que acaba de rechazarlo** — un filtro en la
-   cadena de reasignación (`liberarYReasignar` ya recibe el cadete que no aceptó, así que es
-   local).
-2. **Un cartel en la pantalla de la oferta** explicándole al cadete las reglas: que rechazar
-   tiene un límite, y que si deja pasar el tiempo el pedido se le puede volver a ofrecer.
-   *(Encaja con el rediseño de la oferta de `spec-app-mejoras-visuales.md` — el mockup ya tiene
-   la mitad de ese texto.)*
+## Abierto
 
-**Ya existe y NO hay que construir:** pasados `minutos_pedido_urgente_reintentar` (30 por
-defecto) el pedido se considera urgente y **el filtro de rechazos se saltea entero**
-(`PedidoService:478-484`), así que se le puede volver a ofrecer a todos los que no lo
-aceptaron. Es la regla de los 30 minutos, ya implementada y configurable desde el panel.
+### 1. Probar en un teléfono real
+Todo lo del 2026-09-24 se probó con tests, con un script de punta a punta contra el backend
+(22 chequeos) y en el emulador. Falta el teléfono real: sonido del contador, recordatorio de
+30 minutos (tarda 30 minutos en aparecer) y las tipografías en un celular chico.
 
-**Arregla de yapa un segundo bug:** las ofertas **expiradas no cuentan** como rechazo
-(`PedidoService:472` filtra solo `RECHAZADO`), así que con pocos cadetes la cadena rebota para
-siempre entre los mismos y el pedido nunca llega a `SIN_ASIGNAR`. Esa fue la causa del "sigue
-apareciendo como pendiente hasta pasado un buen tiempo".
+### 2. Mergear `pendientes-2026-09-24` → `develop` → `main`
+En los 3 repos. El backend se edita también desde otra PC: pullear antes de mergear.
 
-## 2. El mapa del viaje no muestra el origen
+### 3. Primer chip de WhatsApp
+Con el gateway conectado, el código de `/pedir` sale por WhatsApp. Hasta entonces sale por SMS
+(si `SMS_ENABLED`) o la solicitud entra "sin verificar". En desarrollo:
+`WHATSAPP_MODO_SIMULADO=true` (nunca en producción; Salud del sistema lo marca en rojo).
 
-Cuando se le asigna un pedido al cadete, el mapa muestra el destino y dónde está el cadete,
-pero **no de dónde retira**.
+### 4. Evaluar autoalojar el motor de ruteo
+Sin cambios respecto del 2026-09-21 — ver el razonamiento en el historial de este archivo
+(`git log -p documentacion/pendientes.md`). Ya hay un OSRM propio levantado para el matching
+de trazas (`spec-routing-propio.md`); la Fase C (tiempos por tramo) sigue sin umbral definido.
 
-## 3. Bug sin explicar
+### 5. Importador de direcciones del sistema viejo
+Esperando que se termine de limpiar a mano el Excel (`importador-direcciones/exportes/`).
 
-Por qué la cadena no le volvió a ofrecer a "Test Cadete" una tercera vez. Se revisaron los
-filtros de `buscarCandidato` uno por uno y los pasa todos: activo, LIBRE, MOTO como el pedido,
-sin turno fijo, sin topes configurados, sin incidencia grave, SEMANAL habilitado. Juan sí queda
-fuera y eso se entiende (2 viajes en curso contra `asignacion_automatica_max_viajes_cadete`,
-default 1). **Antes de tocar el punto 1 conviene entender esto**, porque el punto 1 asume que
-la cadena corta por el filtro de rechazos y acá cortó por otra cosa.
-
-## 4. Verificación visual pendiente
-
-La animación del pulso **nunca se vio moverse**. Se confirmó que el anillo aparece en LIBRE y
-no en OCUPADO (comparando capturas), pero no que se expanda. El intento de medirlo por píxeles
-fue inconcluso (la estimación del centro del icono estaba mal). Hay que mirarlo en el teléfono.
-
-## 5. Trabajo empezado sin terminar
-
-- **`plan-app-pulso-y-sonido.md`, Task 2**: que el contador para aceptar **suene** además de
-  vibrar (el cadete va en moto y no siente la vibración). La Task 1 (el pulso) está hecha.
-- **`spec-app-mejoras-visuales.md`**: sin implementar salvo el pulso. Falta el rediseño de
-  Inicio, la oferta como pantalla completa, las estadísticas de Inicio (solo "Conectado"
-  necesita backend; las otras dos salen de `/pedidos/me/historial?desde=hoy`), el recordatorio
-  cada 30 min, y las tipografías del mockup (**necesitan los `.ttf`**, que hay que conseguir).
-- **`spec-antiabuso-pedidos-publicos.md`**: nada implementado.
-
-## 6. Datos sucios conocidos
-
-El seeder demo recrea los pedidos con **ids fijos** (`demo-pedido-01`…`08`) en cada reinicio,
-así que quedan **filas huérfanas en `oferta_pedido`** apuntando a esos ids. Al leer el historial
-de ofertas mezcla corridas y engaña — se presta a diagnosticar mal un bug, como pasó el
-2026-09-20.
-
-## 7. Deudas de mantenimiento anotadas
-
-- `documentacion/backend.md`: el seeder demo crea `jperez`/`mgomez` como usuario, y el login de
-  cadete exige que el usuario sea el **DNI** (`^[0-9]{1,8}$`). El login no valida formato así
-  que entran igual, pero **el panel los rechaza si los editás**. Los DNIs ya están cargados en
-  el seeder — usarlos como username.
-- `cadete-app/README.md` dice que hay que regenerar el wrapper de Gradle porque el `.jar` no
-  está versionado. **`./gradlew` funciona** (los scripts están versionados y el `.jar` está en
-  disco). Solo hace falta setear `ANDROID_HOME`.
-- `documentacion/frontend.md` menciona `features/auth/` y `features/layout/` como si fueran
-  pantallas: están **vacías y sin referencias** en `app.routes.ts`.
-
-## 8. Evaluar autoalojar el motor de ruteo (en vez de depender de OSRM/GraphHopper/ORS gratuitos)
-
-**El contexto.** El precio de un pedido se calcula por **distancia real de calle** (no línea
-recta) vía `RutaService`, que hoy encadena 3 fuentes gratuitas de terceros, en orden: **OSRM**
-(demo pública `router.project-osrm.org`, sin key, sin límite de cupo, pero — dice el propio
-comentario del código — "sin garantía de disponibilidad: servidor comunitario"), **GraphHopper**
-(500 req/día con key propia) y **OpenRouteService** (2.500 req/día con key propia). Si las tres
-fallan, cae a Haversine (línea recta), que subestima bastante en una ciudad con avenidas
-cortadas, ríos y rodeos — y eso pega directo en el precio sugerido al cliente.
-
-**Por qué se plantea autoalojar (surgió de una sugerencia externa, 2026-09-21).** Las tres son
-motores de ruteo **open source de verdad**, no solo "con capa gratis": OSRM (licencia BSD),
-GraphHopper (núcleo Apache 2.0; la API paga es un servicio aparte sobre el mismo motor) y
-OpenRouteService (motor propio, también open source, corriendo sobre datos de OpenStreetMap). Se
-pueden correr en un servidor propio con un extracto de OSM de Tucumán/Argentina, sin depender de
-ningún límite de cupo diario ni de que un tercero mantenga el servicio arriba.
-
-**Por qué NO es prioridad hoy, aunque la idea es válida:**
-- **No resuelve un problema de costo, porque hoy no hay ninguno.** Al volumen actual
-  (~70 viajes/día) el cupo gratis de GraphHopper + OpenRouteService sobra de sobra — nunca se
-  llega a pagar nada por ruteo, autoalojar no ahorra un peso que hoy se esté gastando.
-- **El único punto débil real es confiabilidad, no plata**, y ya está cubierto: si OSRM (la
-  demo pública, sin garantía) se cae, el sistema **ya** prueba GraphHopper y después
-  OpenRouteService solo, y si las tres fallan cae a línea recta sin romper nada
-  (`RutaService.resumenSiDisponible` está diseñado para degradar, nunca tirar error). El "riesgo"
-  que resolvería autoalojar ya tiene un colchón de 2 fuentes más atrás.
-- **Autoalojar cambia un costo de $0/mantenimiento por un costo de infraestructura +
-  mantenimiento recurrente**, no es "gratis y listo": hay que bajar y procesar el extracto de OSM
-  de Argentina/Tucumán, correr el motor (contenedor Docker corriendo 24/7, con su propia RAM/disco),
-  y sobre todo **mantenerlo actualizado a mano** cada vez que se abre una calle o cambia un
-  sentido — algo que hoy OSRM/GraphHopper/ORS le regalan al proyecto gratis, sin que nadie de acá
-  tenga que tocar nada.
-- **Es la misma decisión, con el mismo veredicto, que ya está anotada para el geocoding** en
-  `spec-geocoding-cache.md` §3.4 ("Pelias/Nominatim propio... gratis y sin límites, pero hay que
-  instalarlo y mantenerlo... solo si se quiere costo cero total aceptando el mantenimiento"). Acá
-  aplica el mismo razonamiento, para ruteo en vez de geocoding.
-
-**Cuándo reconsiderarlo:** si el volumen de pedidos crece un orden de magnitud (varios
-cientos/miles de viajes/día) y empieza a pisarse el free tier de GraphHopper/ORS, o si en la
-práctica OSRM público empieza a fallar seguido y se nota en cotizaciones cayendo a línea recta
-con más frecuencia de la esperada. Ninguna de las dos cosas pasa hoy — por eso queda anotado como
-pendiente a evaluar, no como tarea a hacer ya.
+### 6. Menores anotados
+- `GET /api/admin/clientes`: N+1 chico acotado por página (ver `spec-optimizacion-datos.md` §7).
+- El bundle del panel supera el presupuesto de 500 kB (ya pasaba antes: 509,7 kB en `develop`).
+- `cadeteria-apk/app/build/outputs/apk/debug/app-debug.apk` está versionado: cada build lo
+  deja modificado en git.
+- Con JDK 21 el `assembleDebug` falla en `jlink` (AGP 8.5): compilar con un JDK 17
+  (`-Dorg.gradle.java.home=...jbr-17...`).

@@ -1,7 +1,10 @@
 # Spec — Mejoras visuales y de operación de la app del cadete
 
-Fecha: 2026-09-20. Estado: **propuesta, pendiente de revisión** — nada de esto está
-implementado.
+Fecha: 2026-09-20. Estado: **implementado el 2026-09-24** (fases A–G; F = el botón "Reportar
+al cliente" en la pantalla del viaje, sin rediseñarla entera). Cambios al implementar: en la
+oferta, "Zona" se reemplazó por "Dinero" (la asignación ya no usa zona) y la distancia es en
+línea recta (la ruta que pide la app va del cadete al destino); el tab de Configuración se
+llama "Ajustes" porque "Configuración" no entraba en 4 pestañas.
 
 Alcance: `cadete-app` sobre todo; toca `cadeteria` (backend) en dos puntos concretos, y
 `admin-front` (panel) en uno.
