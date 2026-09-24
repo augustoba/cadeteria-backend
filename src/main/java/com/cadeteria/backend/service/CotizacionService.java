@@ -50,12 +50,9 @@ public class CotizacionService {
         if (destinoLat == null || destinoLng == null) {
             return Optional.empty();
         }
-        BigDecimal precioPorKm = configuracionService.getBigDecimal("precio_por_km", BigDecimal.ZERO);
-        if (precioPorKm.signum() <= 0) {
+        if (configuracionService.getBigDecimal("precio_por_km", BigDecimal.ZERO).signum() <= 0) {
             return Optional.empty();
         }
-        BigDecimal precioBase = configuracionService.getBigDecimal("precio_base_viaje", BigDecimal.ZERO);
-        BigDecimal distanciaMinimaKm = configuracionService.getBigDecimal("distancia_minima_km", BigDecimal.valueOf(2));
         Optional<RutaService.Resumen> ruta = rutaService.resumenSiDisponible(origenLat, origenLng, destinoLat, destinoLng, "MOTO");
         double km;
         String metodo;
@@ -67,11 +64,18 @@ public class CotizacionService {
             km = GeocodingService.distanciaKm(origenLat, origenLng, destinoLat, destinoLng) * factor.doubleValue();
             metodo = "DISTANCIA_ESTIMADA";
         }
+        return Optional.of(new Cotizacion(precioParaKm(km, montoDeclarado), metodo, null, null, km));
+    }
+
+    /** Tarifa actual aplicada a una distancia: mínimo hasta distancia_minima_km + precio_por_km por km extra + recargo. */
+    public BigDecimal precioParaKm(double km, BigDecimal montoDeclarado) {
+        BigDecimal precioPorKm = configuracionService.getBigDecimal("precio_por_km", BigDecimal.ZERO);
+        BigDecimal precioBase = configuracionService.getBigDecimal("precio_base_viaje", BigDecimal.ZERO);
+        BigDecimal distanciaMinimaKm = configuracionService.getBigDecimal("distancia_minima_km", BigDecimal.valueOf(2));
         double kmAdicionales = Math.max(0, km - distanciaMinimaKm.doubleValue());
-        BigDecimal precio = precioBase.add(precioPorKm.multiply(BigDecimal.valueOf(kmAdicionales)))
+        return precioBase.add(precioPorKm.multiply(BigDecimal.valueOf(kmAdicionales)))
                 .add(recargoPorDinero(montoDeclarado))
                 .setScale(0, RoundingMode.HALF_UP);
-        return Optional.of(new Cotizacion(precio, metodo, null, null, km));
     }
 
     /**
@@ -80,7 +84,7 @@ public class CotizacionService {
      * "recargo_dinero_transportado_monto" al precio, redondeando el tramo incompleto hacia
      * abajo. Umbral en 0 (o sin dinero declarado) desactiva el recargo.
      */
-    private BigDecimal recargoPorDinero(BigDecimal montoDeclarado) {
+    public BigDecimal recargoPorDinero(BigDecimal montoDeclarado) {
         if (montoDeclarado == null || montoDeclarado.signum() <= 0) {
             return BigDecimal.ZERO;
         }
