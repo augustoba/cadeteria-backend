@@ -59,7 +59,17 @@ public class SolicitudPedidoService {
         this.frontBaseUrl = props.getFrontBaseUrl();
     }
 
-    public record EstadoDisponibilidad(boolean disponible, String mensaje) {}
+    /**
+     * verificarTelefono: si "/pedir" tiene que pedir el código antes de enviar (clave
+     * `verificacion_telefono_activa`). Apagado por ahora (2026-09-24) para poder probar sin
+     * SMS/WhatsApp — pendiente probarlo prendido con el gateway real.
+     */
+    public record EstadoDisponibilidad(boolean disponible, String mensaje, boolean verificarTelefono) {}
+
+    /** Default false mientras no esté probado el envío real del código (ver pendientes.md). */
+    private boolean verificacionActiva() {
+        return configuracionService.getBoolean("verificacion_telefono_activa", false);
+    }
 
     /**
      * "Pausar pedidos" y "horario de atención" (mejora 2026-09-17) — el dueño pidió poder
@@ -71,7 +81,8 @@ public class SolicitudPedidoService {
     public EstadoDisponibilidad estadoDisponibilidad() {
         if (configuracionService.getBoolean("pedidos_pausados", false)) {
             return new EstadoDisponibilidad(false,
-                    configuracionService.getString("pedidos_pausados_mensaje", "Estamos pausados temporalmente, disculpá las molestias."));
+                    configuracionService.getString("pedidos_pausados_mensaje", "Estamos pausados temporalmente, disculpá las molestias."),
+                    verificacionActiva());
         }
         if (configuracionService.getBoolean("horario_atencion_activo", false)) {
             String desdeStr = configuracionService.getString("horario_atencion_desde", "08:00");
@@ -83,10 +94,11 @@ public class SolicitudPedidoService {
                     ? (!ahora.isBefore(desde) && ahora.isBefore(hasta))
                     : (!ahora.isBefore(desde) || ahora.isBefore(hasta));
             if (!dentro) {
-                return new EstadoDisponibilidad(false, "Fuera de nuestro horario de atención (" + desdeStr + " a " + hastaStr + ").");
+                return new EstadoDisponibilidad(false, "Fuera de nuestro horario de atención (" + desdeStr + " a " + hastaStr + ").",
+                        verificacionActiva());
             }
         }
-        return new EstadoDisponibilidad(true, null);
+        return new EstadoDisponibilidad(true, null, verificacionActiva());
     }
 
     /** Exige que el teléfono ya haya pasado por VerificacionTelefonoService (mejora 2026-09-17). */
@@ -95,7 +107,12 @@ public class SolicitudPedidoService {
         if (!estado.disponible()) {
             throw new BadRequestException(estado.mensaje());
         }
-        boolean sinVerificar = verificacionTelefonoService.consumirToken(req.verificacionToken(), req.clienteTelefono());
+        // Con la verificación apagada no se exige token (y no se marca "sin verificar": es una
+        // decisión del admin, no una falla de envío). Si viene uno igual, se consume.
+        boolean sinVerificar = false;
+        if (verificacionActiva() || (req.verificacionToken() != null && !req.verificacionToken().isBlank())) {
+            sinVerificar = verificacionTelefonoService.consumirToken(req.verificacionToken(), req.clienteTelefono());
+        }
         SolicitudPedido s = new SolicitudPedido();
         s.setSinVerificar(sinVerificar);
         s.setId(UUID.randomUUID().toString());
@@ -113,9 +130,11 @@ public class SolicitudPedidoService {
         s.setClienteNombre(req.clienteNombre().trim());
         s.setClienteTelefono(req.clienteTelefono().trim());
         s.setDetalle(textoOpcional(req.detalle()));
-        s.setOrigenPisoDepto(textoOpcional(req.origenPisoDepto()));
+        s.setOrigenPiso(textoOpcional(req.origenPiso()));
+        s.setOrigenDepto(textoOpcional(req.origenDepto()));
         s.setOrigenObservaciones(textoOpcional(req.origenObservaciones()));
-        s.setDestinoPisoDepto(textoOpcional(req.destinoPisoDepto()));
+        s.setDestinoPiso(textoOpcional(req.destinoPiso()));
+        s.setDestinoDepto(textoOpcional(req.destinoDepto()));
         s.setDestinoObservaciones(textoOpcional(req.destinoObservaciones()));
         s.setEstado("PENDIENTE");
         s.setTokenConfirmacion(UUID.randomUUID().toString());
@@ -263,8 +282,8 @@ public class SolicitudPedidoService {
                 s.getOrigenDireccion(), s.getOrigenLat(), s.getOrigenLng(),
                 s.getDestinoDireccion(), s.getDestinoLat(), s.getDestinoLng(),
                 precio, montoDeclarado, s.isLlevaValores(), detalle.length() == 0 ? null : detalle.toString().trim(),
-                s.getOrigenPisoDepto(), s.getOrigenObservaciones(),
-                s.getDestinoPisoDepto(), s.getDestinoObservaciones(),
+                s.getOrigenPiso(), s.getOrigenDepto(), s.getOrigenObservaciones(),
+                s.getDestinoPiso(), s.getDestinoDepto(), s.getDestinoObservaciones(),
                 requiereMoto, false, null, null);
         return pedidoService.crear(req, PedidoService.ORIGEN_WEB, null);
     }

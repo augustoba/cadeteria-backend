@@ -73,16 +73,20 @@ public class Pedido {
     private String detalle;
 
     /**
-     * Piso/depto y observaciones de cada dirección (mejora 2026-09-24): opcionales, para
-     * edificios o indicaciones ("timbre roto", "portón verde"). Van aparte de la dirección
+     * Piso, depto y observaciones de cada dirección (mejora 2026-09-24): opcionales, para
+     * edificios — piso y depto por separado, si no "1 15" no se sabe cuál es cuál o indicaciones ("timbre roto", "portón verde"). Van aparte de la dirección
      * para no ensuciar el geocoding. El cadete los ve recién al aceptar el viaje.
      */
-    @Column(length = 50)
-    private String origenPisoDepto;
+    @Column(length = 20)
+    private String origenPiso;
+    @Column(length = 20)
+    private String origenDepto;
     @Column(length = 300)
     private String origenObservaciones;
-    @Column(length = 50)
-    private String destinoPisoDepto;
+    @Column(length = 20)
+    private String destinoPiso;
+    @Column(length = 20)
+    private String destinoDepto;
     @Column(length = 300)
     private String destinoObservaciones;
 
@@ -643,12 +647,20 @@ public class Pedido {
         this.calificadoEn = calificadoEn;
     }
 
-    public String getOrigenPisoDepto() {
-        return origenPisoDepto;
+    public String getOrigenPiso() {
+        return origenPiso;
     }
 
-    public void setOrigenPisoDepto(String origenPisoDepto) {
-        this.origenPisoDepto = origenPisoDepto;
+    public void setOrigenPiso(String origenPiso) {
+        this.origenPiso = origenPiso;
+    }
+
+    public String getOrigenDepto() {
+        return origenDepto;
+    }
+
+    public void setOrigenDepto(String origenDepto) {
+        this.origenDepto = origenDepto;
     }
 
     public String getOrigenObservaciones() {
@@ -659,12 +671,20 @@ public class Pedido {
         this.origenObservaciones = origenObservaciones;
     }
 
-    public String getDestinoPisoDepto() {
-        return destinoPisoDepto;
+    public String getDestinoPiso() {
+        return destinoPiso;
     }
 
-    public void setDestinoPisoDepto(String destinoPisoDepto) {
-        this.destinoPisoDepto = destinoPisoDepto;
+    public void setDestinoPiso(String destinoPiso) {
+        this.destinoPiso = destinoPiso;
+    }
+
+    public String getDestinoDepto() {
+        return destinoDepto;
+    }
+
+    public void setDestinoDepto(String destinoDepto) {
+        this.destinoDepto = destinoDepto;
     }
 
     public String getDestinoObservaciones() {

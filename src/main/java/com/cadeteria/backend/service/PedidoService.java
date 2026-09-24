@@ -373,9 +373,11 @@ public class PedidoService {
         p.setMontoDeclarado(req.montoDeclarado() == null ? BigDecimal.ZERO : req.montoDeclarado());
         p.setLlevaValores(req.llevaValores());
         p.setDetalle(req.detalle());
-        p.setOrigenPisoDepto(textoOpcional(req.origenPisoDepto()));
+        p.setOrigenPiso(textoOpcional(req.origenPiso()));
+        p.setOrigenDepto(textoOpcional(req.origenDepto()));
         p.setOrigenObservaciones(textoOpcional(req.origenObservaciones()));
-        p.setDestinoPisoDepto(textoOpcional(req.destinoPisoDepto()));
+        p.setDestinoPiso(textoOpcional(req.destinoPiso()));
+        p.setDestinoDepto(textoOpcional(req.destinoDepto()));
         p.setDestinoObservaciones(textoOpcional(req.destinoObservaciones()));
         p.setRequiereMoto(req.requiereMoto());
         p.setOrigenCarga(origenCarga);
@@ -425,8 +427,8 @@ public class PedidoService {
                 original.getOrigenDireccion(), original.getOrigenLat(), original.getOrigenLng(),
                 original.getDestinoDireccion(), original.getDestinoLat(), original.getDestinoLng(),
                 original.getPrecio(), null, original.isLlevaValores(), "Repetición del pedido #" + original.getNumero(),
-                original.getOrigenPisoDepto(), original.getOrigenObservaciones(),
-                original.getDestinoPisoDepto(), original.getDestinoObservaciones(),
+                original.getOrigenPiso(), original.getOrigenDepto(), original.getOrigenObservaciones(),
+                original.getDestinoPiso(), original.getDestinoDepto(), original.getDestinoObservaciones(),
                 original.isRequiereMoto(),
                 false, null, null);
         return crear(req, ORIGEN_WEB, null);

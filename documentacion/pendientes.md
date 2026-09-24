@@ -27,7 +27,7 @@ mergear ni pushear todavía.
 | — | Fase 4 de `spec-optimizacion-datos.md` | Auditoría hecha, ver §7 del spec |
 
 Además, pedido el 2026-09-24:
-- **Piso/depto y observaciones por dirección** (origen y destino) en `/pedir` y en el alta del
+- **Piso, depto y observaciones por dirección** (origen y destino; piso y depto separados) en `/pedir` y en el alta del
   panel; el cadete los ve (junto con el detalle del pedido) recién al aceptar.
 - `/pedir`: el cliente puede pedir moto; el alta del panel suma "Transporta valores".
 - **Métricas → "Cómo entraron los pedidos"**: online vs. cargados en el panel, y por usuario.
@@ -45,10 +45,16 @@ Todo lo del 2026-09-24 se probó con tests, con un script de punta a punta contr
 ### 2. Mergear `pendientes-2026-09-24` → `develop` → `main`
 En los 3 repos. El backend se edita también desde otra PC: pullear antes de mergear.
 
-### 3. Primer chip de WhatsApp
-Con el gateway conectado, el código de `/pedir` sale por WhatsApp. Hasta entonces sale por SMS
-(si `SMS_ENABLED`) o la solicitud entra "sin verificar". En desarrollo:
-`WHATSAPP_MODO_SIMULADO=true` (nunca en producción; Salud del sistema lo marca en rojo).
+### 3. ⚠️ Probar y prender el código de verificación de `/pedir`
+**Apagado a propósito el 2026-09-24** para poder probar `/pedir` sin SMS ni WhatsApp: hoy el
+cliente pide sin código (Configuración → "Pedir un código al teléfono del cliente…", clave
+`verificacion_telefono_activa`, default `false`). Mientras esté apagado, cualquiera puede cargar
+un pedido a nombre de otro número — el admin igual revisa cada solicitud antes de confirmarla.
+
+Pendiente: conectar el primer chip de WhatsApp (o prender `SMS_ENABLED` con el gateway de SMS),
+probar de punta a punta que el código llegue al celular del cliente, y recién ahí prender la
+opción. En desarrollo se puede probar el circuito con `WHATSAPP_MODO_SIMULADO=true` (el código
+aparece en WhatsApp → Mensajes enviados; nunca en producción, Salud del sistema lo marca en rojo).
 
 ### 4. Evaluar autoalojar el motor de ruteo
 Sin cambios respecto del 2026-09-21 — ver el razonamiento en el historial de este archivo

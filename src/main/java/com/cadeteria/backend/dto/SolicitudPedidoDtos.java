@@ -22,11 +22,12 @@ public final class SolicitudPedidoDtos {
             boolean retornaAlOrigen,
             @NotBlank String clienteNombre, @NotBlank String clienteTelefono,
             String detalle,
-            /** Piso/depto y observaciones de cada dirección (mejora 2026-09-24), opcionales. */
-            String origenPisoDepto, String origenObservaciones,
-            String destinoPisoDepto, String destinoObservaciones,
+            /** Piso, depto y observaciones de cada dirección (mejora 2026-09-24), opcionales. */
+            String origenPiso, String origenDepto, String origenObservaciones,
+            String destinoPiso, String destinoDepto, String destinoObservaciones,
             /** Token de VerificacionTelefonoService.verificarCodigo — confirma que el teléfono es real (mejora 2026-09-17). */
-            @NotBlank String verificacionToken
+            /** Obligatorio solo con `verificacion_telefono_activa` prendida (lo valida el service). */
+            String verificacionToken
     ) {}
 
     public record SolicitudPedidoResponse(
@@ -38,8 +39,8 @@ public final class SolicitudPedidoDtos {
             boolean retornaAlOrigen,
             String clienteNombre, String clienteTelefono,
             String detalle,
-            String origenPisoDepto, String origenObservaciones,
-            String destinoPisoDepto, String destinoObservaciones,
+            String origenPiso, String origenDepto, String origenObservaciones,
+            String destinoPiso, String destinoDepto, String destinoObservaciones,
             String estado,
             boolean requiereMoto, BigDecimal precio,
             String pedidoCreadoId, String motivoRechazo,
@@ -60,8 +61,8 @@ public final class SolicitudPedidoDtos {
                     s.getDestinoDireccion(), s.getDestinoLat(), s.getDestinoLng(),
                     s.isLlevaDinero(), s.getMontoDeclarado(), s.isLlevaValores(), s.isRetornaAlOrigen(),
                     s.getClienteNombre(), s.getClienteTelefono(), s.getDetalle(),
-                    s.getOrigenPisoDepto(), s.getOrigenObservaciones(),
-                    s.getDestinoPisoDepto(), s.getDestinoObservaciones(), s.getEstado(),
+                    s.getOrigenPiso(), s.getOrigenDepto(), s.getOrigenObservaciones(),
+                    s.getDestinoPiso(), s.getDestinoDepto(), s.getDestinoObservaciones(), s.getEstado(),
                     s.isRequiereMoto(), s.getPrecio(),
                     s.getPedidoCreadoId(), s.getMotivoRechazo(), s.getCreadoEn(),
                     s.isSinVerificar(), aviso);

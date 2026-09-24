@@ -28,9 +28,9 @@ public final class PedidoDtos {
             /** Declarado por el cliente (mejora 2026-09-23) — ver Pedido.llevaValores. */
             boolean llevaValores,
             String detalle,
-            /** Piso/depto y observaciones de cada dirección (mejora 2026-09-24), opcionales. */
-            String origenPisoDepto, String origenObservaciones,
-            String destinoPisoDepto, String destinoObservaciones,
+            /** Piso, depto y observaciones de cada dirección (mejora 2026-09-24), opcionales. */
+            String origenPiso, String origenDepto, String origenObservaciones,
+            String destinoPiso, String destinoDepto, String destinoObservaciones,
             boolean requiereMoto,
             boolean programado,
             Instant fechaProgramada,
@@ -60,9 +60,9 @@ public final class PedidoDtos {
             String origenDireccion, Double origenLat, Double origenLng,
             String destinoDireccion, Double destinoLat, Double destinoLng,
             BigDecimal precio, BigDecimal montoDeclarado, boolean llevaValores, String detalle,
-            /** Piso/depto y observaciones (mejora 2026-09-24) — null para el cadete hasta que acepta, ver {@link #paraCadete}. */
-            String origenPisoDepto, String origenObservaciones,
-            String destinoPisoDepto, String destinoObservaciones,
+            /** Piso, depto y observaciones (mejora 2026-09-24) — null para el cadete hasta que acepta, ver {@link #paraCadete}. */
+            String origenPiso, String origenDepto, String origenObservaciones,
+            String destinoPiso, String destinoDepto, String destinoObservaciones,
             boolean requiereMoto, LookupResponse estado,
             CadeteResumen cadeteAsignado,
             boolean programado, Instant fechaProgramada,
@@ -130,8 +130,8 @@ public final class PedidoDtos {
                     p.getDestinoDireccion(), p.getDestinoLat(), p.getDestinoLng(),
                     p.getPrecio(), p.getMontoDeclarado(), p.isLlevaValores(),
                     ocultarDetalle ? null : p.getDetalle(),
-                    ocultarDetalle ? null : p.getOrigenPisoDepto(), ocultarDetalle ? null : p.getOrigenObservaciones(),
-                    ocultarDetalle ? null : p.getDestinoPisoDepto(), ocultarDetalle ? null : p.getDestinoObservaciones(),
+                    ocultarDetalle ? null : p.getOrigenPiso(), ocultarDetalle ? null : p.getOrigenDepto(), ocultarDetalle ? null : p.getOrigenObservaciones(),
+                    ocultarDetalle ? null : p.getDestinoPiso(), ocultarDetalle ? null : p.getDestinoDepto(), ocultarDetalle ? null : p.getDestinoObservaciones(),
                     p.isRequiereMoto(), LookupResponse.from(p.getEstado()),
                     CadeteResumen.from(p.getCadeteAsignado()),
                     p.isProgramado(), p.getFechaProgramada(),

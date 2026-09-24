@@ -29,9 +29,10 @@ class PedidoResponseParaCadeteTest {
         p.setOrigenDireccion("San Juan 354");
         p.setDestinoDireccion("Mendoza 800");
         p.setDetalle("Sobre con documentos");
-        p.setOrigenPisoDepto("3° B");
+        p.setOrigenPiso("3");
+        p.setOrigenDepto("B");
         p.setOrigenObservaciones("Timbre roto, llamar");
-        p.setDestinoPisoDepto("PB");
+        p.setDestinoPiso("PB");
         p.setDestinoObservaciones("Porton verde");
         return p;
     }
@@ -40,9 +41,10 @@ class PedidoResponseParaCadeteTest {
     void ofertaPendienteOcultaDetalleYExtrasDeDireccion() {
         PedidoResponse r = PedidoResponse.paraCadete(pedido("PENDIENTE", null));
         assertNull(r.detalle());
-        assertNull(r.origenPisoDepto());
+        assertNull(r.origenPiso());
+        assertNull(r.origenDepto());
         assertNull(r.origenObservaciones());
-        assertNull(r.destinoPisoDepto());
+        assertNull(r.destinoPiso());
         assertNull(r.destinoObservaciones());
         assertEquals("San Juan 354", r.origenDireccion());
     }
@@ -52,16 +54,18 @@ class PedidoResponseParaCadeteTest {
         // "Quitar" un pedido EN_CURSO no limpia aceptadoEn: el siguiente cadete no tiene que verlo.
         PedidoResponse r = PedidoResponse.paraCadete(pedido("PENDIENTE", Instant.now()));
         assertNull(r.detalle());
-        assertNull(r.origenPisoDepto());
+        assertNull(r.origenPiso());
+        assertNull(r.origenDepto());
     }
 
     @Test
     void enCursoMuestraTodo() {
         PedidoResponse r = PedidoResponse.paraCadete(pedido("EN_CURSO", Instant.now()));
         assertEquals("Sobre con documentos", r.detalle());
-        assertEquals("3° B", r.origenPisoDepto());
+        assertEquals("3", r.origenPiso());
+        assertEquals("B", r.origenDepto());
         assertEquals("Timbre roto, llamar", r.origenObservaciones());
-        assertEquals("PB", r.destinoPisoDepto());
+        assertEquals("PB", r.destinoPiso());
         assertEquals("Porton verde", r.destinoObservaciones());
     }
 
@@ -69,6 +73,7 @@ class PedidoResponseParaCadeteTest {
     void elPanelLoVeSiempre() {
         PedidoResponse r = PedidoResponse.from(pedido("PENDIENTE", null));
         assertEquals("Sobre con documentos", r.detalle());
-        assertEquals("3° B", r.origenPisoDepto());
+        assertEquals("3", r.origenPiso());
+        assertEquals("B", r.origenDepto());
     }
 }
