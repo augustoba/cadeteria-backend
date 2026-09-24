@@ -102,6 +102,7 @@ public class SolicitudPedidoService {
         s.setLlevaDinero(req.llevaDinero());
         s.setMontoDeclarado(req.montoDeclarado());
         s.setLlevaValores(req.llevaValores());
+        s.setRequiereMoto(req.requiereMoto());
         s.setRetornaAlOrigen(req.retornaAlOrigen());
         s.setClienteNombre(req.clienteNombre().trim());
         s.setClienteTelefono(req.clienteTelefono().trim());

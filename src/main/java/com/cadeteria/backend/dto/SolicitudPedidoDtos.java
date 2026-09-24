@@ -17,6 +17,8 @@ public final class SolicitudPedidoDtos {
             @NotBlank String destinoDireccion, @NotNull Double destinoLat, @NotNull Double destinoLng,
             boolean llevaDinero, BigDecimal montoDeclarado,
             boolean llevaValores,
+            /** Lo pide el cliente (mejora 2026-09-24) — el admin lo puede cambiar al revisar. */
+            boolean requiereMoto,
             boolean retornaAlOrigen,
             @NotBlank String clienteNombre, @NotBlank String clienteTelefono,
             String detalle,
