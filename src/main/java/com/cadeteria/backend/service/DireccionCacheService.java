@@ -69,6 +69,9 @@ public class DireccionCacheService {
     public void guardar(String calleTextoOriginal, int numero, String calleCanonica, String localidad,
                          double lat, double lng, boolean approximate, String proveedor) {
         if (calleCanonica == null || calleCanonica.isBlank()) return;
+        // Solo ubicaciones con la altura exacta: una aproximada se devolvía después como única
+        // opción (con la localidad que tocara primero) y el cliente no podía elegir otra.
+        if (approximate) return;
         String canonicaNorm = DireccionUtils.normalizar(calleCanonica);
 
         String varianteNorm = DireccionUtils.normalizar(calleTextoOriginal);

@@ -33,6 +33,7 @@ class CotizacionServiceTest {
         when(config.getBigDecimal(eq("precio_base_viaje"), eq(BigDecimal.ZERO))).thenReturn(new BigDecimal("2000"));
         when(config.getBigDecimal(eq("distancia_minima_km"), eq(BigDecimal.valueOf(2)))).thenReturn(BigDecimal.valueOf(2));
         when(config.getBigDecimal(eq("recargo_dinero_transportado_umbral"), eq(BigDecimal.ZERO))).thenReturn(BigDecimal.ZERO);
+        when(config.getBigDecimal(eq("factor_linea_recta"), eq(new BigDecimal("1.4")))).thenReturn(new BigDecimal("1.4"));
     }
 
     private BigDecimal precioPara(double metros) {
@@ -62,11 +63,12 @@ class CotizacionServiceTest {
     }
 
     @Test
-    void sinRutaUsaLineaRecta() {
+    void sinRutaUsaLineaRectaPorElFactor() {
         when(ruta.resumenSiDisponible(anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyString()))
                 .thenReturn(Optional.empty());
+        double recta = GeocodingService.distanciaKm(-26.83, -65.20, -26.80, -65.25);
         var c = service.cotizar(-26.83, -65.20, -26.80, -65.25, null).orElseThrow();
-        assertEquals("DISTANCIA", c.metodo());
-        assertTrue(c.distanciaKm() > 3 && c.distanciaKm() < 7, "linea recta ~5,8 km: " + c.distanciaKm());
+        assertEquals("DISTANCIA_ESTIMADA", c.metodo());
+        assertEquals(recta * 1.4, c.distanciaKm(), 0.001);
     }
 }

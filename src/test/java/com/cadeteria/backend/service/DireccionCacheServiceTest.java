@@ -92,7 +92,7 @@ class DireccionCacheServiceTest {
         when(aliasRepository.findByVarianteNorm("av peron")).thenReturn(Optional.empty());
         when(coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra("presidente peron", SMT, 1500)).thenReturn(Optional.empty());
 
-        service.guardar("Av. Perón", 1502, "Presidente Perón", SMT, -26.81, -65.20, true, "nominatim");
+        service.guardar("Av. Perón", 1502, "Presidente Perón", SMT, -26.81, -65.20, false, "nominatim");
 
         verify(aliasRepository).save(any(DireccionAlias.class));
         verify(coordsRepository).save(any(CuadraCoords.class));
@@ -103,7 +103,7 @@ class DireccionCacheServiceTest {
         when(aliasRepository.findByVarianteNorm("av peron")).thenReturn(Optional.of(alias("av peron", "presidente peron")));
         when(coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra("presidente peron", SMT, 1500)).thenReturn(Optional.empty());
 
-        service.guardar("Av. Perón", 1502, "Presidente Perón", SMT, -26.81, -65.20, true, "nominatim");
+        service.guardar("Av. Perón", 1502, "Presidente Perón", SMT, -26.81, -65.20, false, "nominatim");
 
         verify(aliasRepository, never()).save(any());
     }
@@ -114,7 +114,7 @@ class DireccionCacheServiceTest {
         CuadraCoords existente = coords("presidente peron", SMT, 1500, -26.81, -65.20, 1);
         when(coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra("presidente peron", SMT, 1500)).thenReturn(Optional.of(existente));
 
-        service.guardar("Perón", 1502, "Presidente Perón", SMT, -26.81, -65.20, true, "geoapify");
+        service.guardar("Perón", 1502, "Presidente Perón", SMT, -26.81, -65.20, false, "geoapify");
 
         assertEquals(2, existente.getConfirmaciones());
         verify(coordsRepository).save(existente);
@@ -128,14 +128,24 @@ class DireccionCacheServiceTest {
         when(aliasRepository.findByVarianteNorm("rivadavia")).thenReturn(Optional.of(alias("rivadavia", "rivadavia")));
         when(coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra("rivadavia", SMT, 500)).thenReturn(Optional.empty());
 
-        service.guardar("Rivadavia", 500, "Rivadavia", SMT, -26.81, -65.20, true, "geoapify");
+        service.guardar("Rivadavia", 500, "Rivadavia", SMT, -26.81, -65.20, false, "geoapify");
 
         verify(coordsRepository).save(any(CuadraCoords.class));
     }
 
     @Test
+    void noGuardaUnaUbicacionAproximada() {
+        // Sin la altura exacta el pin queda en cualquier punto de la calle: guardarlo hacía que se
+        // devolviera después como única opción, hasta con la localidad equivocada (2026-09-24).
+        service.guardar("Colombia", 4695, "Colombia", "Yerba Buena", -26.81, -65.28, true, "geoapify");
+
+        verify(aliasRepository, never()).save(any());
+        verify(coordsRepository, never()).save(any());
+    }
+
+    @Test
     void noGuardaNadaSiElProveedorNoDevolvioCalleCanonica() {
-        service.guardar("Av. Perón", 1502, "  ", SMT, -26.81, -65.20, true, "nominatim");
+        service.guardar("Av. Perón", 1502, "  ", SMT, -26.81, -65.20, false, "nominatim");
 
         verify(aliasRepository, never()).save(any());
         verify(coordsRepository, never()).save(any());

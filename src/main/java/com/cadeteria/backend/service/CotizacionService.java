@@ -11,7 +11,9 @@ import java.util.Optional;
  * <p>
  * **Solo por distancia** (2026-09-24 — la cadetería ya no trabaja por zonas, ni para asignar ni
  * para cobrar): se calcula la distancia real por calle (via {@link RutaService}, perfil moto) — o
- * en línea recta (Haversine) si el servicio falla, para no romper la sugerencia por eso. Sobre
+ * en línea recta (Haversine) × {@code factor_linea_recta} (default 1,4) si el servicio falla, para
+ * no romper la sugerencia por eso — la línea recta sola cobraba de menos: medido en 12 viajes de
+ * Tucumán (2026-09-24), la distancia por calle es en promedio 1,38 veces la recta. Sobre
  * esa distancia se cobra {@code precio_base_viaje} (el mínimo, default $2000) hasta los primeros
  * {@code distancia_minima_km} (default 2), y {@code precio_por_km} (default $320) por cada km
  * adicional — no desde el km 0, esos primeros km ya los cubre el mínimo. Todo configurable desde
@@ -37,7 +39,10 @@ public class CotizacionService {
         this.rutaService = rutaService;
     }
 
-    /** zonaId/zonaNombre quedan siempre en null (compatibilidad con el front); metodo = "DISTANCIA". */
+    /**
+     * zonaId/zonaNombre quedan siempre en null (compatibilidad con el front). metodo: "DISTANCIA" (por
+     * calle) o "DISTANCIA_ESTIMADA" (falló el ruteo: línea recta × factor_linea_recta).
+     */
     public record Cotizacion(BigDecimal precioSugerido, String metodo, String zonaId, String zonaNombre, Double distanciaKm) {}
 
     public Optional<Cotizacion> cotizar(double origenLat, double origenLng, Double destinoLat, Double destinoLng,
@@ -51,14 +56,22 @@ public class CotizacionService {
         }
         BigDecimal precioBase = configuracionService.getBigDecimal("precio_base_viaje", BigDecimal.ZERO);
         BigDecimal distanciaMinimaKm = configuracionService.getBigDecimal("distancia_minima_km", BigDecimal.valueOf(2));
-        double km = rutaService.resumenSiDisponible(origenLat, origenLng, destinoLat, destinoLng, "MOTO")
-                .map(r -> r.distanciaM() / 1000.0)
-                .orElseGet(() -> GeocodingService.distanciaKm(origenLat, origenLng, destinoLat, destinoLng));
+        Optional<RutaService.Resumen> ruta = rutaService.resumenSiDisponible(origenLat, origenLng, destinoLat, destinoLng, "MOTO");
+        double km;
+        String metodo;
+        if (ruta.isPresent()) {
+            km = ruta.get().distanciaM() / 1000.0;
+            metodo = "DISTANCIA";
+        } else {
+            BigDecimal factor = configuracionService.getBigDecimal("factor_linea_recta", new BigDecimal("1.4"));
+            km = GeocodingService.distanciaKm(origenLat, origenLng, destinoLat, destinoLng) * factor.doubleValue();
+            metodo = "DISTANCIA_ESTIMADA";
+        }
         double kmAdicionales = Math.max(0, km - distanciaMinimaKm.doubleValue());
         BigDecimal precio = precioBase.add(precioPorKm.multiply(BigDecimal.valueOf(kmAdicionales)))
                 .add(recargoPorDinero(montoDeclarado))
                 .setScale(0, RoundingMode.HALF_UP);
-        return Optional.of(new Cotizacion(precio, "DISTANCIA", null, null, km));
+        return Optional.of(new Cotizacion(precio, metodo, null, null, km));
     }
 
     /**

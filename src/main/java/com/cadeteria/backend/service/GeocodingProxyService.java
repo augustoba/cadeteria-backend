@@ -101,7 +101,10 @@ public class GeocodingProxyService {
 
         if (numero != null) {
             DireccionCacheService.ResultadoCache cacheado = direccionCache.buscar(streetPart, numero);
-            if (cacheado != null) {
+            // Una entrada aproximada (sin la altura exacta) no sirve como respuesta única: el pin
+            // queda en cualquier punto de la calle y hasta con la localidad equivocada (bug del
+            // 2026-09-24: "Colombia 4695" devolvía solo Yerba Buena). Se ignora y se busca en vivo.
+            if (cacheado != null && !cacheado.approximate()) {
                 String base = cacheado.calleCanonica() + " " + numero;
                 String label = cacheado.localidad() != null && !cacheado.localidad().isBlank()
                         ? base + ", " + cacheado.localidad() : base;
@@ -120,7 +123,7 @@ public class GeocodingProxyService {
             queryLocationIq(streetPart, null).forEach(r -> resultados.add(conNumero(r, numero)));
         }
         List<GeoAddress> out = dedupe(resultados);
-        if (numero != null && !out.isEmpty()) {
+        if (numero != null && !out.isEmpty() && !out.get(0).approximate()) {
             GeoAddress mejor = out.get(0);
             direccionCache.guardar(streetPart, numero, mejor.street(), mejor.locality(),
                     mejor.lat(), mejor.lng(), mejor.approximate(), mejor.proveedor());

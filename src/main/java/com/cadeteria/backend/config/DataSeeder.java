@@ -151,6 +151,7 @@ public class DataSeeder implements CommandLineRunner {
         configuracionRepo.save(config("precio_base_viaje", "2000"));
         configuracionRepo.save(config("distancia_minima_km", "2"));
         configuracionRepo.save(config("precio_por_km", "320"));
+        configuracionRepo.save(config("factor_linea_recta", "1.4"));
         configuracionRepo.save(config("recargo_dinero_transportado_umbral", "10000"));
         configuracionRepo.save(config("recargo_dinero_transportado_monto", "100"));
         // Bloqueo temporal de cuenta tras intentos fallidos de login (ronda 6, punto 49).
