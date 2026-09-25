@@ -3,6 +3,8 @@ package com.cadeteria.backend.repository;
 import com.cadeteria.backend.model.CuadraCoords;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -17,4 +19,7 @@ public interface CuadraCoordsRepository extends JpaRepository<CuadraCoords, Stri
 
     /** Para el GUARDADO, donde la localidad ya la devolvió el geocoder junto con el resultado. */
     Optional<CuadraCoords> findByCalleCanonicaAndLocalidadAndCuadra(String calleCanonica, String localidad, int cuadra);
+
+    /** Purga de las ubicaciones de Google vencidas (ver DireccionCacheService#borrarVencidas). */
+    long deleteByProveedorInAndCreadaEnBefore(Collection<String> proveedores, Instant limite);
 }

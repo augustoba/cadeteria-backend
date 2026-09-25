@@ -5,10 +5,17 @@ import com.cadeteria.backend.model.DireccionAlias;
 import com.cadeteria.backend.repository.CuadraCoordsRepository;
 import com.cadeteria.backend.repository.DireccionAliasRepository;
 import com.cadeteria.backend.util.DireccionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -18,21 +25,44 @@ import java.util.UUID;
  * "perón 1502" pegan en la misma fila. {@link GeocodingProxyService} es quien la consulta antes
  * de llamar a un proveedor y quien la alimenta después de un geocode real.
  * <p>
- * Todavía sin Google: hoy la cache se llena solo con lo que ya devuelven Nominatim/Geoapify
- * (decisión 2026-09-21, para no cargar tarjeta todavía). El día que se sume Google detrás de la
- * misma interfaz, esta clase no cambia — solo cambia quién le pasa el resultado a {@link #guardar}.
+ * Fuentes (columna {@code proveedor}): los gratuitos (Nominatim/Geoapify/LocationIQ) y el GPS
+ * real de los cadetes quedan para siempre; lo mismo el pin que el admin/cliente ubicó a mano
+ * ({@link #PROVEEDOR_MANUAL}). Lo que vino de la API de Google ({@code google}) VENCE: sus
+ * condiciones permiten guardar las coordenadas de Geocoding hasta 30 días corridos (2026-09-25),
+ * así que se ignora al leer y se borra pasados {@code google_cache_dias} (Configuración, default
+ * 30; 0 = no se guarda). El pin sacado de un link de Google Maps ({@link #PROVEEDOR_GOOGLE_LINK})
+ * es zona gris: por defecto no vence, pero {@code google_link_vence} lo suma a la misma regla.
+ * Si una fuente propia confirma una cuadra que vino de Google, la pisa y pasa a ser propia.
+ * <p>
+ * {@code google_cache_pausar_borrado} es SOLO para probar en dev (no se borra ni se filtra nada
+ * vencido) — antes de producción ver pendientes.md.
  */
 @Service
 public class DireccionCacheService {
 
+    private static final Logger log = LoggerFactory.getLogger(DireccionCacheService.class);
+
     public record ResultadoCache(String calleCanonica, String localidad, int cuadra, double lat, double lng, boolean approximate) {}
+
+    /** Pin ubicado a mano (doble clic / arrastrado) por quien carga el pedido. No vence. */
+    public static final String PROVEEDOR_MANUAL = "manual";
+    /** Pin sacado de un link de Google Maps pegado en el buscador. Vence solo con {@link #CONFIG_GOOGLE_LINK_VENCE}. */
+    public static final String PROVEEDOR_GOOGLE_LINK = "google_link";
+    private static final String PROVEEDOR_GOOGLE = "google";
+    public static final String CONFIG_DIAS_GOOGLE = "google_cache_dias";
+    public static final String CONFIG_PAUSAR_BORRADO = "google_cache_pausar_borrado";
+    public static final String CONFIG_GOOGLE_LINK_VENCE = "google_link_vence";
+    private static final int DIAS_GOOGLE_DEFAULT = 30;
 
     private final DireccionAliasRepository aliasRepository;
     private final CuadraCoordsRepository coordsRepository;
+    private final ConfiguracionService configuracionService;
 
-    public DireccionCacheService(DireccionAliasRepository aliasRepository, CuadraCoordsRepository coordsRepository) {
+    public DireccionCacheService(DireccionAliasRepository aliasRepository, CuadraCoordsRepository coordsRepository,
+                                 ConfiguracionService configuracionService) {
         this.aliasRepository = aliasRepository;
         this.coordsRepository = coordsRepository;
+        this.configuracionService = configuracionService;
     }
 
     /**
@@ -48,7 +78,10 @@ public class DireccionCacheService {
     public ResultadoCache buscar(String calleTexto, int numero) {
         String norm = DireccionUtils.normalizar(calleTexto);
         return aliasRepository.findByVarianteNorm(norm)
-                .map(alias -> coordsRepository.findByCalleCanonicaAndCuadra(alias.getCalleCanonica(), DireccionUtils.cuadra(numero)))
+                .map(alias -> coordsRepository.findByCalleCanonicaAndCuadra(alias.getCalleCanonica(), DireccionUtils.cuadra(numero))
+                        // Las aproximadas (guardadas antes del 2026-09-24) no sirven como respuesta y
+                        // hacían parecer ambigua una cuadra con una sola ubicación buena.
+                        .stream().filter(c -> !c.isApproximate() && !vencida(c)).toList())
                 .filter(candidatos -> candidatos.size() == 1)
                 .map(candidatos -> confirmarYMapear(candidatos.get(0)))
                 .orElse(null);
@@ -72,6 +105,8 @@ public class DireccionCacheService {
         // Solo ubicaciones con la altura exacta: una aproximada se devolvía después como única
         // opción (con la localidad que tocara primero) y el cliente no podía elegir otra.
         if (approximate) return;
+        // Días en 0 = no guardar nada de Google (y lo que ya hubiera se ignora al leer).
+        if (vence(proveedor) && diasGoogle() <= 0) return;
         String canonicaNorm = DireccionUtils.normalizar(calleCanonica);
 
         String varianteNorm = DireccionUtils.normalizar(calleTextoOriginal);
@@ -89,6 +124,15 @@ public class DireccionCacheService {
         coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra(canonicaNorm, localidadNorm, cuadra).ifPresentOrElse(
                 existente -> {
                     existente.setConfirmaciones(existente.getConfirmaciones() + 1);
+                    // Lo de Google se pisa: con una fuente propia deja de vencer, y con otra
+                    // consulta a Google es un dato recién obtenido (vuelve a contar desde hoy).
+                    if (vence(existente.getProveedor())) {
+                        existente.setLat(lat);
+                        existente.setLng(lng);
+                        existente.setApproximate(false);
+                        existente.setProveedor(proveedor == null ? "" : proveedor);
+                        existente.setCreadaEn(Instant.now());
+                    }
                     coordsRepository.save(existente);
                 },
                 () -> {
@@ -105,5 +149,46 @@ public class DireccionCacheService {
                     coordsRepository.save(c);
                 }
         );
+    }
+
+    /**
+     * Borra las ubicaciones de Google vencidas, todos los días a las 4:30. El filtro de
+     * {@link #buscar} ya las ignora aunque esto no haya corrido todavía.
+     */
+    @Scheduled(cron = "0 30 4 * * *", zone = "America/Argentina/Buenos_Aires")
+    @Transactional
+    public long borrarVencidas() {
+        if (borradoPausado()) {
+            log.warn("Borrado de ubicaciones de Google PAUSADO ({}) — solo para pruebas.", CONFIG_PAUSAR_BORRADO);
+            return 0;
+        }
+        Instant limite = Instant.now().minus(Duration.ofDays(Math.max(0, diasGoogle())));
+        long borradas = coordsRepository.deleteByProveedorInAndCreadaEnBefore(proveedoresQueVencen(), limite);
+        if (borradas > 0) log.info("Se borraron {} ubicaciones de Google vencidas.", borradas);
+        return borradas;
+    }
+
+    private boolean vencida(CuadraCoords c) {
+        if (!vence(c.getProveedor()) || borradoPausado()) return false;
+        return c.getCreadaEn().isBefore(Instant.now().minus(Duration.ofDays(Math.max(0, diasGoogle()))));
+    }
+
+    private boolean vence(String proveedor) {
+        return proveedor != null && proveedoresQueVencen().contains(proveedor);
+    }
+
+    private Set<String> proveedoresQueVencen() {
+        Set<String> out = new HashSet<>();
+        out.add(PROVEEDOR_GOOGLE);
+        if (configuracionService.getBoolean(CONFIG_GOOGLE_LINK_VENCE, false)) out.add(PROVEEDOR_GOOGLE_LINK);
+        return out;
+    }
+
+    private int diasGoogle() {
+        return configuracionService.getInt(CONFIG_DIAS_GOOGLE, DIAS_GOOGLE_DEFAULT);
+    }
+
+    private boolean borradoPausado() {
+        return configuracionService.getBoolean(CONFIG_PAUSAR_BORRADO, false);
     }
 }

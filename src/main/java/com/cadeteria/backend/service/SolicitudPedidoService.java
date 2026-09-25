@@ -38,6 +38,7 @@ public class SolicitudPedidoService {
     private final ConfiguracionService configuracionService;
     private final ClienteService clienteService;
     private final WhatsappGatewayService whatsappGatewayService;
+    private final GeocodingProxyService geocodingProxyService;
     private final String frontBaseUrl;
 
     private static final ZoneId ZONA_ART = ZoneId.of("America/Argentina/Buenos_Aires");
@@ -47,7 +48,7 @@ public class SolicitudPedidoService {
                                    VerificacionTelefonoService verificacionTelefonoService,
                                    ConfiguracionService configuracionService,
                                    ClienteService clienteService, WhatsappGatewayService whatsappGatewayService,
-                                   AppProperties props) {
+                                   GeocodingProxyService geocodingProxyService, AppProperties props) {
         this.repo = repo;
         this.pedidoService = pedidoService;
         this.smsGatewayService = smsGatewayService;
@@ -56,6 +57,7 @@ public class SolicitudPedidoService {
         this.configuracionService = configuracionService;
         this.clienteService = clienteService;
         this.whatsappGatewayService = whatsappGatewayService;
+        this.geocodingProxyService = geocodingProxyService;
         this.frontBaseUrl = props.getFrontBaseUrl();
     }
 
@@ -138,6 +140,8 @@ public class SolicitudPedidoService {
         s.setDestinoPiso(textoOpcional(req.destinoPiso()));
         s.setDestinoDepto(textoOpcional(req.destinoDepto()));
         s.setDestinoObservaciones(textoOpcional(req.destinoObservaciones()));
+        s.setOrigenFuente(textoOpcional(req.origenFuente()));
+        s.setDestinoFuente(textoOpcional(req.destinoFuente()));
         s.setEstado("PENDIENTE");
         s.setTokenConfirmacion(UUID.randomUUID().toString());
         s = repo.save(s);
@@ -287,8 +291,13 @@ public class SolicitudPedidoService {
                 precio, montoDeclarado, s.isLlevaValores(), s.getMontoValores(), detalle.length() == 0 ? null : detalle.toString().trim(),
                 s.getOrigenPiso(), s.getOrigenDepto(), s.getOrigenObservaciones(),
                 s.getDestinoPiso(), s.getDestinoDepto(), s.getDestinoObservaciones(),
-                requiereMoto, false, null, null);
-        return pedidoService.crear(req, PedidoService.ORIGEN_WEB, null);
+                requiereMoto, false, null, null, s.getOrigenFuente(), s.getDestinoFuente());
+        Pedido pedido = pedidoService.crear(req, PedidoService.ORIGEN_WEB, null);
+        // El pin del cliente se aprende recién acá, con la solicitud ya revisada por el admin:
+        // desde /pedir cualquiera podría mandar un pin mal puesto a propósito.
+        geocodingProxyService.aprenderPin(s.getOrigenDireccion(), s.getOrigenLat(), s.getOrigenLng(), s.getOrigenFuente());
+        geocodingProxyService.aprenderPin(s.getDestinoDireccion(), s.getDestinoLat(), s.getDestinoLng(), s.getDestinoFuente());
+        return pedido;
     }
 
     private void enviarSmsConfirmado(Pedido pedido) {

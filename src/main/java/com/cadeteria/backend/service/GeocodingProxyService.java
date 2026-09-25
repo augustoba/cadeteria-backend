@@ -1,9 +1,11 @@
 package com.cadeteria.backend.service;
 
 import com.cadeteria.backend.config.AppProperties;
+import com.cadeteria.backend.util.DireccionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
@@ -11,6 +13,8 @@ import org.springframework.web.client.RestClient;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -137,17 +141,27 @@ public class GeocodingProxyService {
      * hacía que siempre apareciera solo ese) y prueba Google si hay key cargada; sin key, vuelve
      * a consultar los gratuitos directo. Si tampoco aparece, el front ofrece ubicarla a mano.
      *
-     * <p>Los resultados de Google NO se guardan en la cache: sus condiciones no permiten guardarlos
-     * más de 30 días, y la cache es permanente.
+     * <p>El mejor resultado de Google (con altura exacta) se guarda en la cache marcado
+     * {@code google}: sus condiciones permiten guardarlo hasta 30 días, y la cache lo ignora y
+     * lo borra pasados {@code google_cache_dias} (ver {@link DireccionCacheService}).
      */
     public List<GeoAddress> buscarAmpliado(String textoCrudo) {
         String q = textoCrudo == null ? "" : textoCrudo.trim().replaceAll("\\s+", " ");
         if (q.length() < 4) return List.of();
         Matcher m = NUMERO_FINAL.matcher(q);
-        Integer numero = m.matches() ? Integer.parseInt(m.group(2)) : null;
+        boolean tieneNumero = m.matches();
+        Integer numero = tieneNumero ? Integer.parseInt(m.group(2)) : null;
 
         List<GeoAddress> google = queryGoogle(q, numero);
-        if (!google.isEmpty()) return dedupe(google);
+        if (!google.isEmpty()) {
+            List<GeoAddress> out = dedupe(google);
+            GeoAddress mejor = out.get(0);
+            if (numero != null && !mejor.approximate()) {
+                direccionCache.guardar(m.group(1).trim(), numero, mejor.street(), mejor.locality(),
+                        mejor.lat(), mejor.lng(), false, PROVEEDOR_GOOGLE);
+            }
+            return out;
+        }
 
         List<GeoAddress> resultados = new ArrayList<>();
         resultados.addAll(queryNominatim(q, numero));
@@ -218,6 +232,48 @@ public class GeocodingProxyService {
         String label = localidad.isBlank() ? base : base + ", " + localidad;
         return new GeoAddress(label, calle, numero, localidad,
                 ((Number) loc.get("lat")).doubleValue(), ((Number) loc.get("lng")).doubleValue(), aproximada, PROVEEDOR_GOOGLE);
+    }
+
+    /**
+     * Pin que el admin (o el cliente, ya revisado por el admin) ubicó a mano o sacó de un link de
+     * Google Maps, confirmado con el pedido: se aprende "calle tipeada + altura -> ese punto" para
+     * que la próxima vez salga directo de la cache. La calle canónica es la del reverse de ese
+     * punto (spec §5.4: nunca una adivinada), y solo si se parece a la que se tipeó — si no, el pin
+     * quedó en la esquina o en otra calle y no conviene aprenderlo. Async: el reverse tarda y el
+     * pedido no tiene por qué esperarlo.
+     */
+    @Async
+    public void aprenderPin(String direccion, Double lat, Double lng, String fuente) {
+        if (direccion == null || lat == null || lng == null) return;
+        if (!DireccionCacheService.PROVEEDOR_MANUAL.equals(fuente)
+                && !DireccionCacheService.PROVEEDOR_GOOGLE_LINK.equals(fuente)) return;
+        // "Colombia 4695, San Miguel de Tucumán" -> "Colombia" + 4695
+        Matcher m = NUMERO_FINAL.matcher(direccion.split(",")[0].trim());
+        if (!m.matches()) return;
+        String calleTipeada = m.group(1).trim();
+        int numero = Integer.parseInt(m.group(2));
+        GeoAddress r = reverse(lat, lng);
+        if (r == null || !mismaCalle(calleTipeada, r.street())) {
+            log.info("No se aprende el pin de \"{}\": el reverse dio \"{}\".", direccion, r == null ? null : r.street());
+            return;
+        }
+        direccionCache.guardar(calleTipeada, numero, r.street(), r.locality(), lat, lng, false, fuente);
+    }
+
+    private static final Set<String> PALABRAS_GENERICAS = Set.of(
+            "av", "avda", "avenida", "calle", "pasaje", "pje", "gral", "general", "dr", "doctor",
+            "de", "del", "la", "las", "los", "el", "san", "santa", "presidente", "pte");
+
+    /** "av mate de luna" vs "Avenida Mate de Luna": alcanza con compartir una palabra que no sea genérica. */
+    static boolean mismaCalle(String tipeada, String reverse) {
+        String a = DireccionUtils.normalizar(tipeada), b = DireccionUtils.normalizar(reverse);
+        if (a.isEmpty() || b.isEmpty()) return false;
+        if (a.equals(b) || a.contains(b) || b.contains(a)) return true;
+        Set<String> palabrasB = new HashSet<>(Arrays.asList(b.split(" ")));
+        for (String p : a.split(" ")) {
+            if (p.length() >= 3 && !PALABRAS_GENERICAS.contains(p) && palabrasB.contains(p)) return true;
+        }
+        return false;
     }
 
     public GeoAddress reverse(double lat, double lng) {

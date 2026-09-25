@@ -13,6 +13,7 @@ import com.cadeteria.backend.dto.PedidoDtos.PedidoResponse;
 import com.cadeteria.backend.dto.PedidoDtos.PuntoTrayectoResponse;
 import com.cadeteria.backend.dto.PedidoDtos.QuitarRequest;
 import com.cadeteria.backend.model.Pedido;
+import com.cadeteria.backend.service.GeocodingProxyService;
 import com.cadeteria.backend.service.PdfComprobanteService;
 import com.cadeteria.backend.service.PedidoService;
 import jakarta.validation.Valid;
@@ -31,7 +32,11 @@ public class PedidoAdminController {
     private final PedidoService service;
     private final PdfComprobanteService pdfService;
 
-    public PedidoAdminController(PedidoService service, PdfComprobanteService pdfService) {
+    private final GeocodingProxyService geocodingProxyService;
+
+    public PedidoAdminController(PedidoService service, PdfComprobanteService pdfService,
+                                 GeocodingProxyService geocodingProxyService) {
+        this.geocodingProxyService = geocodingProxyService;
         this.service = service;
         this.pdfService = pdfService;
     }
@@ -130,8 +135,10 @@ public class PedidoAdminController {
     @PostMapping
     public ResponseEntity<PedidoResponse> create(@Valid @RequestBody PedidoRequest req,
                                                  org.springframework.security.core.Authentication auth) {
-        return ResponseEntity.status(201).body(PedidoResponse.from(
-                service.crear(req, PedidoService.ORIGEN_PANEL, auth.getName())));
+        Pedido pedido = service.crear(req, PedidoService.ORIGEN_PANEL, auth.getName());
+        geocodingProxyService.aprenderPin(req.origenDireccion(), req.origenLat(), req.origenLng(), req.origenFuente());
+        geocodingProxyService.aprenderPin(req.destinoDireccion(), req.destinoLat(), req.destinoLng(), req.destinoFuente());
+        return ResponseEntity.status(201).body(PedidoResponse.from(pedido));
     }
 
     @GetMapping("/{id}/sugerencia")

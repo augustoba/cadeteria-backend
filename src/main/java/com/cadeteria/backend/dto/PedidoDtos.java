@@ -37,7 +37,13 @@ public final class PedidoDtos {
             boolean programado,
             Instant fechaProgramada,
             /** Paradas intermedias, en orden (ronda 3, punto 38) — null o vacío si el pedido es simple. */
-            List<ParadaRequest> paradasAdicionales
+            List<ParadaRequest> paradasAdicionales,
+            /**
+             * De dónde salió el pin de cada dirección (2026-09-25): "manual" (ubicado a mano) o
+             * "google_link" (link de Google Maps pegado) se aprenden en la cache de direcciones
+             * (GeocodingProxyService#aprenderPin); el nombre de un buscador o null, no.
+             */
+            String origenFuente, String destinoFuente
     ) {}
 
     /** Una parada intermedia al cargar el pedido (spec: repartos con varias entregas en una vuelta). */

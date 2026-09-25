@@ -78,6 +78,11 @@ public class SolicitudPedido {
     private String destinoDepto;
     @Column(length = 300)
     private String destinoObservaciones;
+    /** "manual" / "google_link" / proveedor del buscador — se aprende recién cuando el admin la confirma (ver SolicitudPedidoService). */
+    @Column(length = 30)
+    private String origenFuente;
+    @Column(length = 30)
+    private String destinoFuente;
 
     /** PENDIENTE (recién llegó) -> COTIZADO (admin mandó precio, espera que el cliente confirme) o
      * CONFIRMADA (ya existe el Pedido real) -> RECHAZADA. */
@@ -321,6 +326,22 @@ public class SolicitudPedido {
 
     public void setDestinoDepto(String destinoDepto) {
         this.destinoDepto = destinoDepto;
+    }
+
+    public String getOrigenFuente() {
+        return origenFuente;
+    }
+
+    public void setOrigenFuente(String origenFuente) {
+        this.origenFuente = origenFuente;
+    }
+
+    public String getDestinoFuente() {
+        return destinoFuente;
+    }
+
+    public void setDestinoFuente(String destinoFuente) {
+        this.destinoFuente = destinoFuente;
     }
 
     public String getDestinoObservaciones() {

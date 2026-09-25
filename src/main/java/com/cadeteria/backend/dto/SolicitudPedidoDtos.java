@@ -28,7 +28,13 @@ public final class SolicitudPedidoDtos {
             String destinoPiso, String destinoDepto, String destinoObservaciones,
             /** Token de VerificacionTelefonoService.verificarCodigo — confirma que el teléfono es real (mejora 2026-09-17). */
             /** Obligatorio solo con `verificacion_telefono_activa` prendida (lo valida el service). */
-            String verificacionToken
+            String verificacionToken,
+            /**
+             * De dónde salió el pin de cada dirección (2026-09-25): "manual" (ubicado a mano) o
+             * "google_link" (link de Google Maps pegado) se aprenden en la cache de direcciones
+             * (GeocodingProxyService#aprenderPin); el nombre de un buscador o null, no.
+             */
+            String origenFuente, String destinoFuente
     ) {}
 
     public record SolicitudPedidoResponse(

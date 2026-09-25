@@ -431,7 +431,7 @@ public class PedidoService {
                 original.getOrigenPiso(), original.getOrigenDepto(), original.getOrigenObservaciones(),
                 original.getDestinoPiso(), original.getDestinoDepto(), original.getDestinoObservaciones(),
                 original.isRequiereMoto(),
-                false, null, null);
+                false, null, null, null, null);
         return crear(req, ORIGEN_WEB, null);
     }
 

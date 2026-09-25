@@ -13,7 +13,8 @@ import java.time.Instant;
  * geocodificada, para no volver a pagar el mismo geocode dos veces (ver
  * documentacion/spec-geocoding-cache.md §5.1 y §5.3). {@code cuadra} es el bloque de
  * centena de la altura (1502 -> 1500), calculado por {@link com.cadeteria.backend.util.DireccionUtils#cuadra}.
- * Sin TTL: una calle no se mueve, la entrada sirve para siempre.
+ * Sin TTL: una calle no se mueve, la entrada sirve para siempre — salvo las que vinieron de
+ * Google, que vencen por sus condiciones (ver DireccionCacheService).
  * <p>
  * {@code localidad} SÍ es parte de la clave acá (a diferencia de {@link DireccionAlias}): el
  * nombre de calle que devuelve el geocoder no distingue ciudad ("Rivadavia" existe en San Miguel

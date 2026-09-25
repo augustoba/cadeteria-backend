@@ -7,12 +7,19 @@ import com.cadeteria.backend.repository.DireccionAliasRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -31,13 +38,18 @@ class DireccionCacheServiceTest {
 
     private DireccionAliasRepository aliasRepository;
     private CuadraCoordsRepository coordsRepository;
+    private ConfiguracionService configuracion;
     private DireccionCacheService service;
 
     @BeforeEach
     void setUp() {
         aliasRepository = mock(DireccionAliasRepository.class);
         coordsRepository = mock(CuadraCoordsRepository.class);
-        service = new DireccionCacheService(aliasRepository, coordsRepository);
+        configuracion = mock(ConfiguracionService.class);
+        // Defaults reales: 30 días, borrado activo, el link de Google Maps no vence.
+        when(configuracion.getInt(eq(DireccionCacheService.CONFIG_DIAS_GOOGLE), anyInt())).thenReturn(30);
+        when(configuracion.getBoolean(anyString(), anyBoolean())).thenReturn(false);
+        service = new DireccionCacheService(aliasRepository, coordsRepository, configuracion);
     }
 
     @Test
@@ -151,6 +163,120 @@ class DireccionCacheServiceTest {
         verify(coordsRepository, never()).save(any());
     }
 
+    @Test
+    void ignoraUnaUbicacionDeGoogleVencida() {
+        DireccionAlias alias = alias("colombia", "colombia");
+        CuadraCoords deGoogle = coords("colombia", SMT, 4600, -26.79, -65.25, 1);
+        deGoogle.setProveedor("google");
+        deGoogle.setCreadaEn(Instant.now().minus(Duration.ofDays(31)));
+        when(aliasRepository.findByVarianteNorm("colombia")).thenReturn(Optional.of(alias));
+        when(coordsRepository.findByCalleCanonicaAndCuadra("colombia", 4600)).thenReturn(List.of(deGoogle));
+
+        assertNull(service.buscar("Colombia", 4695));
+    }
+
+    @Test
+    void usaUnaUbicacionDeGoogleDentroDelPlazo() {
+        DireccionAlias alias = alias("colombia", "colombia");
+        CuadraCoords deGoogle = coords("colombia", SMT, 4600, -26.79, -65.25, 1);
+        deGoogle.setProveedor("google");
+        deGoogle.setCreadaEn(Instant.now().minus(Duration.ofDays(29)));
+        when(aliasRepository.findByVarianteNorm("colombia")).thenReturn(Optional.of(alias));
+        when(coordsRepository.findByCalleCanonicaAndCuadra("colombia", 4600)).thenReturn(List.of(deGoogle));
+
+        assertNotNull(service.buscar("Colombia", 4695));
+    }
+
+    @Test
+    void conElBorradoPausadoUsaUnaUbicacionDeGoogleVencida() {
+        when(configuracion.getBoolean(eq(DireccionCacheService.CONFIG_PAUSAR_BORRADO), anyBoolean())).thenReturn(true);
+        DireccionAlias alias = alias("colombia", "colombia");
+        CuadraCoords deGoogle = coords("colombia", SMT, 4600, -26.79, -65.25, 1);
+        deGoogle.setProveedor("google");
+        deGoogle.setCreadaEn(Instant.now().minus(Duration.ofDays(90)));
+        when(aliasRepository.findByVarianteNorm("colombia")).thenReturn(Optional.of(alias));
+        when(coordsRepository.findByCalleCanonicaAndCuadra("colombia", 4600)).thenReturn(List.of(deGoogle));
+
+        assertNotNull(service.buscar("Colombia", 4695));
+        assertEquals(0, service.borrarVencidas());
+        verify(coordsRepository, never()).deleteByProveedorInAndCreadaEnBefore(any(), any());
+    }
+
+    @Test
+    void unaAproximadaViejaNoVuelveAmbiguaLaCuadra() {
+        // Filas aproximadas guardadas antes del 2026-09-24 (ej. "Colombia 4600" en Yerba Buena)
+        // no se usan como respuesta, así que tampoco cuentan como "otra localidad".
+        DireccionAlias alias = alias("colombia", "colombia");
+        CuadraCoords vieja = coords("colombia", "Yerba Buena", 4600, -26.81, -65.28, 1);
+        vieja.setApproximate(true);
+        CuadraCoords buena = coords("colombia", SMT, 4600, -26.7954, -65.2568, 1);
+        buena.setProveedor(DireccionCacheService.PROVEEDOR_GOOGLE_LINK);
+        when(aliasRepository.findByVarianteNorm("colombia")).thenReturn(Optional.of(alias));
+        when(coordsRepository.findByCalleCanonicaAndCuadra("colombia", 4600)).thenReturn(List.of(vieja, buena));
+
+        assertEquals(SMT, service.buscar("Colombia", 4695).localidad());
+    }
+
+    @Test
+    void unPinManualNoVenceNunca() {
+        DireccionAlias alias = alias("colombia", "colombia");
+        CuadraCoords manual = coords("colombia", SMT, 4600, -26.79, -65.25, 1);
+        manual.setProveedor(DireccionCacheService.PROVEEDOR_MANUAL);
+        manual.setCreadaEn(Instant.now().minus(Duration.ofDays(400)));
+        when(aliasRepository.findByVarianteNorm("colombia")).thenReturn(Optional.of(alias));
+        when(coordsRepository.findByCalleCanonicaAndCuadra("colombia", 4600)).thenReturn(List.of(manual));
+
+        assertNotNull(service.buscar("Colombia", 4695));
+    }
+
+    @Test
+    void unaFuentePropiaPisaLaUbicacionDeGoogleYDejaDeVencer() {
+        when(aliasRepository.findByVarianteNorm("colombia")).thenReturn(Optional.of(alias("colombia", "colombia")));
+        CuadraCoords deGoogle = coords("colombia", SMT, 4600, -26.79, -65.25, 1);
+        deGoogle.setProveedor("google");
+        deGoogle.setCreadaEn(Instant.now().minus(Duration.ofDays(20)));
+        when(coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra("colombia", SMT, 4600)).thenReturn(Optional.of(deGoogle));
+
+        service.guardar("Colombia", 4695, "Colombia", SMT, -26.7954, -65.2568, false, DireccionCacheService.PROVEEDOR_MANUAL);
+
+        assertEquals(DireccionCacheService.PROVEEDOR_MANUAL, deGoogle.getProveedor());
+        assertEquals(-26.7954, deGoogle.getLat());
+        assertEquals(2, deGoogle.getConfirmaciones());
+    }
+
+    @Test
+    void googleNoPisaUnaUbicacionPropia() {
+        when(aliasRepository.findByVarianteNorm("colombia")).thenReturn(Optional.of(alias("colombia", "colombia")));
+        CuadraCoords propia = coords("colombia", SMT, 4600, -26.79, -65.25, 1);
+        when(coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra("colombia", SMT, 4600)).thenReturn(Optional.of(propia));
+
+        service.guardar("Colombia", 4695, "Colombia", SMT, -26.70, -65.10, false, "google");
+
+        assertEquals("nominatim", propia.getProveedor());
+        assertEquals(-26.79, propia.getLat());
+    }
+
+    @Test
+    void conCeroDiasNoGuardaNadaDeGoogle() {
+        when(configuracion.getInt(eq(DireccionCacheService.CONFIG_DIAS_GOOGLE), anyInt())).thenReturn(0);
+
+        service.guardar("Colombia", 4695, "Colombia", SMT, -26.79, -65.25, false, "google");
+
+        verify(aliasRepository, never()).save(any());
+        verify(coordsRepository, never()).save(any());
+    }
+
+    @Test
+    void elBorradoDiarioIncluyeElLinkDeGoogleMapsSoloSiEstaConfigurado() {
+        service.borrarVencidas();
+        verify(coordsRepository).deleteByProveedorInAndCreadaEnBefore(eq(java.util.Set.of("google")), any());
+
+        when(configuracion.getBoolean(eq(DireccionCacheService.CONFIG_GOOGLE_LINK_VENCE), anyBoolean())).thenReturn(true);
+        service.borrarVencidas();
+        verify(coordsRepository).deleteByProveedorInAndCreadaEnBefore(
+                eq(java.util.Set.of("google", DireccionCacheService.PROVEEDOR_GOOGLE_LINK)), any());
+    }
+
     private DireccionAlias alias(String varianteNorm, String calleCanonica) {
         DireccionAlias a = new DireccionAlias();
         a.setId("a1");
@@ -168,7 +294,7 @@ class DireccionCacheServiceTest {
         c.setCuadra(cuadra);
         c.setLat(lat);
         c.setLng(lng);
-        c.setApproximate(true);
+        c.setApproximate(false);
         c.setProveedor("nominatim");
         c.setConfirmaciones(confirmaciones);
         return c;
