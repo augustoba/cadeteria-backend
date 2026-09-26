@@ -306,6 +306,15 @@ public class PedidoService {
      */
     @Transactional
     public ReclamoResultado reclamoDelCliente(String token) {
+        return reclamoDelCliente(token, null);
+    }
+
+    /**
+     * Igual, con lo que escribió el cliente: obligatorio al reportar un problema con la entrega
+     * (2026-09-25), hasta 300 caracteres; en los otros dos casos no se usa.
+     */
+    @Transactional
+    public ReclamoResultado reclamoDelCliente(String token, String textoCliente) {
         Pedido pedido = getPorToken(token);
         Cadete cadete = pedido.getCadeteAsignado();
         String estado = pedido.getEstado().getId();
@@ -315,7 +324,12 @@ public class PedidoService {
         } else if ("EN_CURSO".equals(estado)) {
             detalle = "El cliente reporta demora en la entrega del pedido N° " + pedido.getNumero() + ": todavía no lo recibió.";
         } else if ("FINALIZADO".equals(estado)) {
-            detalle = "El cliente reportó un inconveniente con la entrega del pedido N° " + pedido.getNumero() + ".";
+            String texto = textoCliente == null ? "" : textoCliente.trim().replaceAll("\\s+", " ");
+            if (texto.length() < 5) {
+                throw new BadRequestException("Contanos qué pasó con la entrega.");
+            }
+            if (texto.length() > 300) texto = texto.substring(0, 300);
+            detalle = "El cliente reportó un problema con la entrega del pedido N° " + pedido.getNumero() + ": \"" + texto + "\".";
         } else {
             throw new BadRequestException("En este momento no se puede enviar un reclamo para este pedido.");
         }

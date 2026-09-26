@@ -67,10 +67,13 @@ public class PublicoController {
 
     public record ReclamoResponse(boolean avisado, String mensaje) {}
 
+    /** texto: lo que pasó — obligatorio solo al reportar un problema con la entrega. */
+    public record ReclamoRequest(String texto) {}
+
     /** Botón de reclamo del seguimiento (2026-09-25): el tipo lo decide el estado del pedido. */
     @PostMapping("/reclamo")
-    public ReclamoResponse reclamo(@PathVariable String token) {
-        var r = service.reclamoDelCliente(token);
+    public ReclamoResponse reclamo(@PathVariable String token, @RequestBody(required = false) ReclamoRequest req) {
+        var r = service.reclamoDelCliente(token, req == null ? null : req.texto());
         return new ReclamoResponse(r.avisado(), r.mensaje());
     }
 

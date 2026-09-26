@@ -110,9 +110,11 @@ class PedidoServiceSeguimientoTest {
 
         Pedido entregado = conCadete(pedido("FINALIZADO", Instant.now()));
         when(repo.findByTokenSeguimiento("tok2")).thenReturn(Optional.of(entregado));
-        service.reclamoDelCliente("tok2");
+        // sin contar qué pasó, no
+        assertThrows(BadRequestException.class, () -> service.reclamoDelCliente("tok2", "  "));
+        service.reclamoDelCliente("tok2", "Llegó el paquete abierto");
         org.mockito.Mockito.verify(fcm).enviar(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.contains("inconveniente con la entrega"), org.mockito.ArgumentMatchers.any());
+                org.mockito.ArgumentMatchers.contains("\"Llegó el paquete abierto\""), org.mockito.ArgumentMatchers.any());
     }
 
     @Test
