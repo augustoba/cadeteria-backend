@@ -121,6 +121,9 @@ Direcciones que el buscador no encuentra — para ir llenando la base propia sin
 - **Panel, dashboard**: pedidos sin asignar hace más de `minutos_pedido_urgente_reintentar` (30)
   parpadean en violeta; selector "Ordenar" (reclamos primero, demorados en retirar, sin asignar hace
   más tiempo); leyenda de colores.
+- **Sonidos del panel**: uno distinto por tipo de aviso (mensaje de cadete, pedido nuevo, pedido web,
+  reclamo por demora, problema con la entrega como alarma, alertas operativas). Antes era el mismo
+  beep y varias alertas no sonaban. Configuración → "Sonidos del panel" para escucharlos.
 - **Registro de cadete**: al enviar, cartel de que le llega un mail al darlo de alta o si hay que
   corregir. **Ficha del cadete**: apellido, DNI, fotos y datos en solapas.
 - **Demo**: al arrancar con `DEMO_ENABLED=true` se siembra un pedido por cada situación (incluidos
@@ -149,6 +152,8 @@ pruebas contra el backend en la base `cadeteria_prueba_claude`. **No se probó:*
 - **Push a la app** (necesita Firebase configurado) y **WhatsApp real**: el seguimiento del reclamo
   solo se probó con `WHATSAPP_MODO_SIMULADO=true`.
 - **Mails reales** (alta, corrección y rechazo de cadetes): no hay SMTP configurado en esta PC.
+- **Los sonidos del panel** en el navegador (solo se compiló). Ojo: el navegador no deja sonar nada
+  hasta que alguien hace un clic en la página después de abrirla.
 - **Link corto de Google Maps** de la app del celular (`maps.app.goo.gl`): no se probó con uno real.
 - **Registro de cadete con DNI repetido** en la base real (se probó en la de prueba).
 - Que el QR se lea desde otro celular (necesita `FRONT_BASE_URL` pública; con `localhost` no abre).
