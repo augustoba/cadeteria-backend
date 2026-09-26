@@ -53,9 +53,20 @@ public class MapeoCallesCadetesService {
     private final GeocodingProxyService geocodingProxyService;
     private final ConfiguracionService configuracionService;
 
+    /**
+     * El teléfono resuelve la calle cada ~120 m o 2 min (APK, ThrottleCalle). Si lo hizo hace menos de
+     * esto y el cadete no se alejó más de {@link #DISTANCIA_TELEFONO_M}, no se consulta a Nominatim.
+     * Antes la ventana era el intervalo del mapeo: con 10 s en la prueba del 2026-09-26 el respaldo
+     * corrió casi siempre en paralelo al teléfono (62 % de lo aprendido) e infló una cuadra estando quieto.
+     */
+    private static final Duration VENTANA_TELEFONO = Duration.ofMinutes(3);
+    private static final double DISTANCIA_TELEFONO_M = 120;
+
+    private record CalleResuelta(Instant en, double lat, double lng) {}
+
     private volatile Instant ultimaCorrida = Instant.EPOCH;
-    /** Última vez que el teléfono de cada cadete mandó su calle ya resuelta (2026-09-26). */
-    private final java.util.Map<String, Instant> calleDelTelefono = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Última calle que resolvió (y se guardó) el teléfono de cada cadete, con dónde estaba (2026-09-26). */
+    private final java.util.Map<String, CalleResuelta> calleDelTelefono = new java.util.concurrent.ConcurrentHashMap<>();
 
     public MapeoCallesCadetesService(CadeteRepository cadeteRepository, GeocodingProxyService geocodingProxyService,
                                       ConfiguracionService configuracionService) {
@@ -72,11 +83,12 @@ public class MapeoCallesCadetesService {
         if (Duration.between(ultimaCorrida, Instant.now()).getSeconds() < intervaloEfectivoSeg) return;
         ultimaCorrida = Instant.now();
 
-        Instant limiteTelefono = Instant.now().minusSeconds(intervaloEfectivoSeg);
+        Instant limiteTelefono = Instant.now().minus(VENTANA_TELEFONO);
         for (Cadete c : cadetesActivosConUbicacionReciente()) {
-            // Si su teléfono ya resolvió la calle en este intervalo, no se gasta otra consulta.
-            Instant resuelta = calleDelTelefono.get(c.getId());
-            if (resuelta != null && resuelta.isAfter(limiteTelefono)) continue;
+            // Si su teléfono ya resolvió la calle hace poco y cerca de acá, no se gasta otra consulta.
+            CalleResuelta resuelta = calleDelTelefono.get(c.getId());
+            if (resuelta != null && resuelta.en().isAfter(limiteTelefono)
+                    && distanciaM(resuelta.lat(), resuelta.lng(), c.getLat(), c.getLng()) <= DISTANCIA_TELEFONO_M) continue;
             try {
                 geocodingProxyService.reverse(c.getLat(), c.getLng());
             } catch (Exception e) {
@@ -86,9 +98,16 @@ public class MapeoCallesCadetesService {
         }
     }
 
-    /** El teléfono del cadete mandó la calle de su posición (Geocoder de Android). */
-    public void registrarCalleDelTelefono(String cadeteId) {
-        calleDelTelefono.put(cadeteId, Instant.now());
+    /** El teléfono del cadete resolvió la calle de esta posición y se guardó (Geocoder de Android). */
+    public void registrarCalleDelTelefono(String cadeteId, double lat, double lng) {
+        calleDelTelefono.put(cadeteId, new CalleResuelta(Instant.now(), lat, lng));
+    }
+
+    static double distanciaM(double lat1, double lng1, double lat2, double lng2) {
+        double dLat = Math.toRadians(lat2 - lat1), dLng = Math.toRadians(lng2 - lng1);
+        double a = Math.pow(Math.sin(dLat / 2), 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) * Math.pow(Math.sin(dLng / 2), 2);
+        return 2 * 6_371_000 * Math.asin(Math.sqrt(a));
     }
 
     private List<Cadete> cadetesActivosConUbicacionReciente() {

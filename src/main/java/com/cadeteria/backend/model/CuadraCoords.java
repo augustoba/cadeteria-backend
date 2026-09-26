@@ -53,6 +53,12 @@ public class CuadraCoords {
     @Column(nullable = false)
     private int confirmaciones = 1;
 
+    /**
+     * Cuántos puntos reales se promediaron en lat/lng (2026-09-26). No es lo mismo que
+     * {@link #confirmaciones}, que también suma en cada búsqueda. Null (filas anteriores) = 1.
+     */
+    private Integer muestras = 1;
+
     @Column(name = "creada_en", nullable = false)
     private Instant creadaEn = Instant.now();
 
@@ -126,6 +132,14 @@ public class CuadraCoords {
 
     public void setConfirmaciones(int confirmaciones) {
         this.confirmaciones = confirmaciones;
+    }
+
+    public int getMuestras() {
+        return muestras == null ? 1 : muestras;
+    }
+
+    public void setMuestras(int muestras) {
+        this.muestras = muestras;
     }
 
     public Instant getCreadaEn() {

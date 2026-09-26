@@ -47,6 +47,24 @@ public final class DireccionUtils {
         return out.toString();
     }
 
+    private static final java.util.Set<String> CONECTORES = java.util.Set.of("de", "del", "la", "las", "los", "el", "y", "e");
+
+    /**
+     * "9 de julio" -> "9 de Julio" (2026-09-26): la calle canónica se guarda normalizada
+     * (minúsculas, sin acentos) y el buscador la mostraba así ("lamadrid 650"). Los acentos no se
+     * recuperan: es solo para que se lea prolijo.
+     */
+    public static String nombreParaMostrar(String calleNorm) {
+        if (calleNorm == null || calleNorm.isBlank()) return calleNorm;
+        StringBuilder out = new StringBuilder();
+        for (String palabra : calleNorm.trim().split("\\s+")) {
+            if (out.length() > 0) out.append(' ');
+            boolean conector = out.length() > 0 && CONECTORES.contains(palabra);
+            out.append(conector ? palabra : Character.toUpperCase(palabra.charAt(0)) + palabra.substring(1));
+        }
+        return out.toString();
+    }
+
     /** Bloque de cuadra (centena) de una altura: 1502 -> 1500 (ver spec §5.1). */
     public static int cuadra(int numero) {
         return (numero / 100) * 100;

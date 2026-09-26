@@ -181,10 +181,11 @@ public class CadeteController {
         Cadete c = service.actualizarUbicacion(auth.getName(), req.lat(), req.lng(), calleParaMostrar(req));
         publisher.publicarUbicacion(c);
         // Calle resuelta por el Geocoder del teléfono (2026-09-26): alimenta la cache y evita que el
-        // mapeo de calles vuelva a consultar ese punto. Sin calle, el mapeo sigue como siempre.
-        if (req.calle() != null && req.altura() != null) {
-            mapeoCallesCadetesService.registrarCalleDelTelefono(c.getId());
-            geocodingProxyService.aprenderDelTelefono(req.calle(), req.altura(), req.localidad(), req.lat(), req.lng(), req.precision());
+        // mapeo de calles vuelva a consultar ese punto. Sin calle (o si no se guardó por GPS
+        // impreciso), el mapeo sigue como siempre.
+        if (req.calle() != null && req.altura() != null
+                && geocodingProxyService.aprenderDelTelefono(req.calle(), req.altura(), req.localidad(), req.lat(), req.lng(), req.precision())) {
+            mapeoCallesCadetesService.registrarCalleDelTelefono(c.getId(), req.lat(), req.lng());
         }
         return CadeteResponse.from(c);
     }

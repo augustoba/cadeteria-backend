@@ -332,6 +332,56 @@ class DireccionCacheServiceTest {
         assertEquals(3, existente.getConfirmaciones());
     }
 
+    @Test
+    void elNombreDelProveedorTambienPasaPorLosAlias() {
+        // Lista curada: "general lamadrid" (OSM) -> "lamadrid" (como busca la gente).
+        when(aliasRepository.findByVarianteNorm("lamadrid")).thenReturn(Optional.of(alias("lamadrid", "lamadrid")));
+        when(aliasRepository.findByVarianteNorm("general lamadrid")).thenReturn(Optional.of(alias("general lamadrid", "lamadrid")));
+        when(coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra("lamadrid", SMT, 600)).thenReturn(Optional.empty());
+
+        service.guardar("Lamadrid", 650, "General Lamadrid", SMT, -26.83, -65.20, false, "nominatim");
+
+        verify(coordsRepository).save(org.mockito.ArgumentMatchers.<CuadraCoords>argThat(c -> "lamadrid".equals(c.getCalleCanonica())));
+        verify(coordsRepository, never()).findByCalleCanonicaAndLocalidadAndCuadra(eq("general lamadrid"), anyString(), anyInt());
+    }
+
+    @Test
+    void dosPasadasDeLaMismaFuenteSePromedianEnVezDeQuedarseConLaEsquina() {
+        CuadraCoords existente = coords("peru", SMT, 3700, -26.8000, -65.2400, 1);
+        when(aliasRepository.findByVarianteNorm(anyString())).thenReturn(Optional.of(alias("peru", "peru")));
+        when(coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra("peru", SMT, 3700)).thenReturn(Optional.of(existente));
+
+        service.guardar("Perú", 3750, "Perú", SMT, -26.8010, -65.2410, false, "nominatim");
+
+        assertEquals(-26.8005, existente.getLat(), 1e-9);
+        assertEquals(-65.2405, existente.getLng(), 1e-9);
+        assertEquals(2, existente.getMuestras());
+        assertEquals(2, existente.getConfirmaciones());
+    }
+
+    @Test
+    void loDelTelefonoNoSeMezclaEnUnaFilaQueNoVence() {
+        CuadraCoords existente = coords("peru", SMT, 3700, -26.8000, -65.2400, 1);
+        when(aliasRepository.findByVarianteNorm(anyString())).thenReturn(Optional.of(alias("peru", "peru")));
+        when(coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra("peru", SMT, 3700)).thenReturn(Optional.of(existente));
+
+        service.guardar("Perú", 3750, "Perú", SMT, -26.8010, -65.2410, false, DireccionCacheService.PROVEEDOR_ANDROID_GEOCODER);
+
+        assertEquals(-26.8000, existente.getLat());
+        assertEquals("nominatim", existente.getProveedor());
+        assertEquals(1, existente.getMuestras());
+    }
+
+    @Test
+    void mismaCanonicaReconoceNombresDistintosDeLaMismaCalle() {
+        when(aliasRepository.findByVarianteNorm("avenida general roca")).thenReturn(Optional.of(alias("avenida general roca", "avenida nestor kirchner")));
+        when(aliasRepository.findByVarianteNorm("avenida nestor kirchner")).thenReturn(Optional.of(alias("avenida nestor kirchner", "avenida nestor kirchner")));
+        when(aliasRepository.findByVarianteNorm("camino del peru")).thenReturn(Optional.empty());
+
+        assertEquals(true, service.mismaCanonica("Av. General Roca", "Avenida Néstor Kirchner"));
+        assertEquals(false, service.mismaCanonica("Camino del Perú", "Avenida Néstor Kirchner"));
+    }
+
     private DireccionAlias alias(String varianteNorm, String calleCanonica) {
         DireccionAlias a = new DireccionAlias();
         a.setId("a1");

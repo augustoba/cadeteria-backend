@@ -7,6 +7,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class DireccionUtilsTest {
 
     @Test
+    void nombreParaMostrarCapitalizaMenosLosConectores() {
+        assertEquals("9 de Julio", DireccionUtils.nombreParaMostrar("9 de julio"));
+        assertEquals("Avenida Nestor Kirchner", DireccionUtils.nombreParaMostrar("avenida nestor kirchner"));
+        assertEquals("Las Heras", DireccionUtils.nombreParaMostrar("las heras"));
+    }
+
+    @Test
     void normalizaAcentosCasingYEspacios() {
         assertEquals("av peron", DireccionUtils.normalizar("  Av.  Perón "));
     }

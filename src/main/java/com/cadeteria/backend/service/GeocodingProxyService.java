@@ -127,10 +127,11 @@ public class GeocodingProxyService {
             // queda en cualquier punto de la calle y hasta con la localidad equivocada (bug del
             // 2026-09-24: "Colombia 4695" devolvía solo Yerba Buena). Se ignora y se busca en vivo.
             if (cacheado != null && !cacheado.approximate()) {
-                String base = cacheado.calleCanonica() + " " + numero;
+                String calle = DireccionUtils.nombreParaMostrar(cacheado.calleCanonica());
+                String base = calle + " " + numero;
                 String label = cacheado.localidad() != null && !cacheado.localidad().isBlank()
                         ? base + ", " + cacheado.localidad() : base;
-                return List.of(new GeoAddress(label, cacheado.calleCanonica(), numero, cacheado.localidad(),
+                return List.of(new GeoAddress(label, calle, numero, cacheado.localidad(),
                         cacheado.lat(), cacheado.lng(), cacheado.approximate(), PROVEEDOR_CACHE));
             }
         }
@@ -145,7 +146,7 @@ public class GeocodingProxyService {
             queryLocationIq(streetPart, null).forEach(r -> resultados.add(conNumero(r, numero)));
         }
         List<GeoAddress> out = dedupe(resultados);
-        if (numero != null && !out.isEmpty() && !out.get(0).approximate()) {
+        if (numero != null && !out.isEmpty() && !out.get(0).approximate() && esLaCalleTipeada(streetPart, out.get(0).street())) {
             GeoAddress mejor = out.get(0);
             direccionCache.guardar(streetPart, numero, mejor.street(), mejor.locality(),
                     mejor.lat(), mejor.lng(), mejor.approximate(), mejor.proveedor());
@@ -174,7 +175,7 @@ public class GeocodingProxyService {
         if (!google.isEmpty()) {
             List<GeoAddress> out = dedupe(google);
             GeoAddress mejor = out.get(0);
-            if (numero != null && !mejor.approximate()) {
+            if (numero != null && !mejor.approximate() && esLaCalleTipeada(m.group(1).trim(), mejor.street())) {
                 direccionCache.guardar(m.group(1).trim(), numero, mejor.street(), mejor.locality(),
                         mejor.lat(), mejor.lng(), false, PROVEEDOR_GOOGLE);
             }
@@ -329,14 +330,31 @@ public class GeocodingProxyService {
         String calleTipeada = m.group(1).trim();
         int numero = Integer.parseInt(m.group(2));
         GeoAddress r = reverse(lat, lng);
-        if (r != null && mismaCalle(calleTipeada, r.street())) {
+        if (r != null && (mismaCalle(calleTipeada, r.street()) || direccionCache.mismaCanonica(calleTipeada, r.street()))) {
             direccionCache.guardar(calleTipeada, numero, r.street(), r.locality(), lat, lng, false, fuente);
             return;
         }
         // El reverse (datos de OSM) no la confirma, pero el teléfono sí: se usa su nombre de calle.
-        if (calleTelefono != null && !calleTelefono.isBlank() && mismaCalle(calleTipeada, calleTelefono)) {
+        if (calleTelefono != null && !calleTelefono.isBlank()
+                && (mismaCalle(calleTipeada, calleTelefono) || direccionCache.mismaCanonica(calleTipeada, calleTelefono))) {
             direccionCache.guardar(calleTipeada, numero, DireccionUtils.expandirAbreviaturas(calleTelefono.trim()),
                     limpiarLocalidad(localidadTelefono == null ? "" : localidadTelefono), lat, lng, false, fuente);
+            return;
+        }
+        // Donde OSM no conoce la calle (2026-09-26, Colombia 4695: calles sin nombre y "Camino del
+        // Perú" a 113 m) el reverse nunca confirma y no se aprendía nunca. Se confía igual en:
+        // el link de Google Maps (el punto es de Google), y en el pin a mano si el reverse no trajo
+        // ninguna calle — este último con confianza baja, así lo pisa lo que aprenda un cadete.
+        boolean sinCalleEnReverse = r == null || r.street() == null || r.street().isBlank();
+        String fuenteSinConfirmar = DireccionCacheService.PROVEEDOR_GOOGLE_LINK.equals(fuente) ? fuente
+                : DireccionCacheService.PROVEEDOR_MANUAL.equals(fuente) && sinCalleEnReverse
+                        ? DireccionCacheService.PROVEEDOR_MANUAL_SIN_CONFIRMAR : null;
+        if (fuenteSinConfirmar != null) {
+            String localidad = r == null || r.locality() == null ? "" : limpiarLocalidad(r.locality());
+            direccionCache.guardar(calleTipeada, numero, DireccionUtils.expandirAbreviaturas(calleTipeada),
+                    localidad, lat, lng, false, fuenteSinConfirmar);
+            log.info("Pin de \"{}\" aprendido sin confirmar por el mapa ({}; el reverse dio \"{}\").", direccion,
+                    fuenteSinConfirmar, r == null ? null : r.street());
             return;
         }
         log.info("No se aprende el pin de \"{}\": el reverse dio \"{}\" y el teléfono \"{}\".", direccion,
@@ -346,6 +364,15 @@ public class GeocodingProxyService {
     private static final Set<String> PALABRAS_GENERICAS = Set.of(
             "av", "avda", "avenida", "calle", "pasaje", "pje", "gral", "general", "dr", "doctor",
             "de", "del", "la", "las", "los", "el", "san", "santa", "presidente", "pte");
+
+    /**
+     * Antes de guardar lo que devolvió un buscador para lo que tipeó alguien (2026-09-26): si el
+     * buscador devolvió OTRA calle ("Presidente Néstor Kirchner" -> "Presidente Perón"), guardarlo
+     * creaba un alias permanente equivocado y la próxima búsqueda de Kirchner daba Perón desde la cache.
+     */
+    private boolean esLaCalleTipeada(String tipeada, String devuelta) {
+        return mismaCalle(tipeada, devuelta) || direccionCache.mismaCanonica(tipeada, devuelta);
+    }
 
     /** "av mate de luna" vs "Avenida Mate de Luna": alcanza con compartir una palabra que no sea genérica. */
     static boolean mismaCalle(String tipeada, String reverse) {

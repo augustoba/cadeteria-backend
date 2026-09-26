@@ -49,6 +49,11 @@ public class DireccionCacheService {
     /** Pin sacado de un link de Google Maps pegado en el buscador. Vence solo con {@link #CONFIG_GOOGLE_LINK_VENCE}. */
     public static final String PROVEEDOR_GOOGLE_LINK = "google_link";
     /**
+     * Pin a mano que el mapa no pudo confirmar (el reverse no trajo calle, 2026-09-26). Se aprende
+     * igual pero con confianza de buscador gratuito: lo pisa lo que después aprenda un cadete.
+     */
+    public static final String PROVEEDOR_MANUAL_SIN_CONFIRMAR = "manual_sin_confirmar";
+    /**
      * GPS del cadete al marcar Retirado/Entregado en esa dirección (2026-09-26): la puerta real,
      * medida con buena precisión. No vence.
      */
@@ -89,6 +94,8 @@ public class DireccionCacheService {
     public ResultadoCache buscar(String calleTexto, int numero) {
         String norm = DireccionUtils.normalizar(calleTexto);
         return aliasRepository.findByVarianteNorm(norm)
+                // "Av. Gral. Roca" -> "avenida general roca" (2026-09-26), igual que canonicalizar().
+                .or(() -> aliasRepository.findByVarianteNorm(DireccionUtils.normalizar(DireccionUtils.expandirAbreviaturas(calleTexto))))
                 .map(alias -> coordsRepository.findByCalleCanonicaAndCuadra(alias.getCalleCanonica(), DireccionUtils.cuadra(numero))
                         // Las aproximadas (guardadas antes del 2026-09-24) no sirven como respuesta y
                         // hacían parecer ambigua una cuadra con una sola ubicación buena.
@@ -118,7 +125,10 @@ public class DireccionCacheService {
         if (approximate) return;
         // Días en 0 = no guardar nada de Google (y lo que ya hubiera se ignora al leer).
         if (vence(proveedor) && diasGoogle() <= 0) return;
-        String canonicaNorm = DireccionUtils.normalizar(calleCanonica);
+        // El nombre del proveedor también pasa por los alias (2026-09-26): Nominatim dice "General
+        // Lamadrid" y el teléfono "Lamadrid"; sin esto cada uno abría su propia fila y buscar con un
+        // nombre no veía lo aprendido con el otro, aunque los alias estuvieran curados.
+        String canonicaNorm = canonicalizar(calleCanonica);
 
         String varianteNorm = DireccionUtils.normalizar(calleTextoOriginal);
         if (aliasRepository.findByVarianteNorm(varianteNorm).isEmpty()) {
@@ -135,17 +145,29 @@ public class DireccionCacheService {
         coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra(canonicaNorm, localidadNorm, cuadra).ifPresentOrElse(
                 existente -> {
                     existente.setConfirmaciones(existente.getConfirmaciones() + 1);
-                    // Lo de Google se pisa: con una fuente propia deja de vencer, y con otra
-                    // consulta a Google es un dato recién obtenido (vuelve a contar desde hoy).
-                    // Y una fuente más confiable pisa a una menos confiable (2026-09-26): el GPS
-                    // del cadete en la puerta o un pin puesto a mano corrigen lo que había
-                    // interpolado un buscador gratuito.
-                    if (vence(existente.getProveedor()) || confianza(proveedor) > confianza(existente.getProveedor())) {
+                    String previo = existente.getProveedor();
+                    if (java.util.Objects.equals(previo, proveedor) && confianza(proveedor) <= 1) {
+                        // Otra pasada de la misma fuente "en movimiento" (buscador o teléfono): se
+                        // promedia en vez de quedarse con el primer punto, que suele ser una esquina
+                        // (2026-09-26: perú 3700 y paraguay 3800 quedaron en el mismo punto).
+                        promediar(existente, lat, lng);
+                        if (vence(previo)) existente.setCreadaEn(Instant.now());
+                    } else if (vence(previo) || confianza(proveedor) > confianza(previo)) {
+                        // Lo de Google se pisa: con una fuente propia deja de vencer, y con otra
+                        // consulta a Google es un dato recién obtenido (vuelve a contar desde hoy).
+                        // Y una fuente más confiable pisa a una menos confiable (2026-09-26): el GPS
+                        // del cadete en la puerta o un pin puesto a mano corrigen lo que había
+                        // interpolado un buscador gratuito.
                         existente.setLat(lat);
                         existente.setLng(lng);
+                        existente.setMuestras(1);
                         existente.setApproximate(false);
                         existente.setProveedor(proveedor == null ? "" : proveedor);
                         existente.setCreadaEn(Instant.now());
+                    } else if (confianza(proveedor) == confianza(previo) && confianza(proveedor) <= 1 && !vence(proveedor)) {
+                        // Dos buscadores gratuitos distintos (nominatim + geoapify): también se promedian.
+                        // Lo del teléfono (vence, datos de Google) no se mezcla en una fila que no vence.
+                        promediar(existente, lat, lng);
                     }
                     coordsRepository.save(existente);
                 },
@@ -160,9 +182,41 @@ public class DireccionCacheService {
                     c.setApproximate(approximate);
                     c.setProveedor(proveedor == null ? "" : proveedor);
                     c.setConfirmaciones(1);
+                    c.setMuestras(1);
                     coordsRepository.save(c);
                 }
         );
+    }
+
+    /** Tope del peso del promedio: una cuadra muy recorrida se sigue pudiendo corregir un poco. */
+    private static final int MUESTRAS_MAX_PESO = 20;
+
+    private static void promediar(CuadraCoords c, double lat, double lng) {
+        int peso = Math.min(c.getMuestras(), MUESTRAS_MAX_PESO);
+        c.setLat((c.getLat() * peso + lat) / (peso + 1));
+        c.setLng((c.getLng() * peso + lng) / (peso + 1));
+        c.setMuestras(c.getMuestras() + 1);
+    }
+
+    /**
+     * Nombre canónico de una calle: normalizado y, si esa variante tiene alias, el nombre elegido
+     * para ella ("general lamadrid" -> "lamadrid", lista curada en pendientes 3k). Sin alias, la
+     * misma variante normalizada.
+     */
+    public String canonicalizar(String calle) {
+        String norm = DireccionUtils.normalizar(calle);
+        return aliasRepository.findByVarianteNorm(norm).map(DireccionAlias::getCalleCanonica).orElseGet(() -> {
+            // "Av. Gral. Roca" -> "avenida general roca", por si el alias está con el nombre completo.
+            String expandida = DireccionUtils.normalizar(DireccionUtils.expandirAbreviaturas(calle));
+            return expandida.equals(norm) ? norm
+                    : aliasRepository.findByVarianteNorm(expandida).map(DireccionAlias::getCalleCanonica).orElse(norm);
+        });
+    }
+
+    /** Si dos nombres son la misma calle según los alias ("avenida general roca" = "avenida nestor kirchner"). */
+    public boolean mismaCanonica(String a, String b) {
+        String ca = canonicalizar(a);
+        return !ca.isEmpty() && ca.equals(canonicalizar(b));
     }
 
     /**

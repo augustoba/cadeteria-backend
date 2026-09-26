@@ -116,6 +116,32 @@ class MapeoCallesCadetesServiceTest {
         verify(geocodingProxyService).reverse(-26.90, -65.30);
     }
 
+    @Test
+    void noConsultaSiElTelefonoResolvioLaCalleHacePocoYCerca() {
+        when(configuracionService.getInt(MapeoCallesCadetesService.CONFIG_INTERVALO_SEG, 1200)).thenReturn(10);
+        Cadete c = cadete(true, -26.8100, -65.2000, Instant.now());
+        when(cadeteRepository.findAll()).thenReturn(List.of(c));
+        // Hace un momento, a ~55 m (el teléfono resuelve cada ~120 m o 2 min).
+        service.registrarCalleDelTelefono(c.getId(), -26.8105, -65.2000);
+
+        service.mapearSiCorresponde();
+
+        verify(geocodingProxyService, never()).reverse(anyDouble(), anyDouble());
+    }
+
+    @Test
+    void consultaSiElCadeteSeAlejoDeDondeElTelefonoResolvioLaCalle() {
+        when(configuracionService.getInt(MapeoCallesCadetesService.CONFIG_INTERVALO_SEG, 1200)).thenReturn(10);
+        Cadete c = cadete(true, -26.8100, -65.2000, Instant.now());
+        when(cadeteRepository.findAll()).thenReturn(List.of(c));
+        // ~330 m: ya está en otra cuadra, la calle del teléfono no la cubre.
+        service.registrarCalleDelTelefono(c.getId(), -26.8130, -65.2000);
+
+        service.mapearSiCorresponde();
+
+        verify(geocodingProxyService, times(1)).reverse(-26.8100, -65.2000);
+    }
+
     private Cadete cadete(boolean activo, Double lat, Double lng, Instant ubicacionActualizadaEn) {
         Cadete c = new Cadete();
         c.setId("cad-" + System.nanoTime());

@@ -451,6 +451,26 @@ Plan acordado (analizado también con otra IA, Kimi, que armó la lista):
 5. **Esquinas** (aparte, calidad): puntos idénticos guardados con dos calles (perú 3700 / paraguay
    3800). Promediar los puntos de cada cuadra con un contador **nuevo** de muestras — no con
    `confirmaciones`, que también suma en cada búsqueda.
+**Hecho el 2026-09-26 (rama `alias-curados`)**, nombre **corto** (como busca el cliente):
+- 1-2: `documentacion/sql/2026-09-26-alias-curados.sql` (23 variantes → 20 canónicas), probado
+  antes sobre una copia y corrido en la base local: 324 → 269 filas, 52 grupos fusionados con la
+  regla de confianza del código (no la que proponía Kimi: los pares a 0 m muestran que el respaldo
+  también guarda la posición del auto, no un centro de cuadra). Respaldos en `cadeteria\backups\`
+  y en la base (`bak_cuadra_coords_20260926`, `bak_direccion_alias_20260926`). **Falta correrlo
+  en producción.**
+- 3: `DireccionCacheService.canonicalizar()` (también con "Av." / "Gral." expandidos) en
+  `guardar()`, en `buscar()` y en `aprender()` (`mismaCanonica`).
+- 4: salteo del respaldo: 3 min y 120 m desde donde el teléfono resolvió (y solo si se guardó).
+- 5: columna `muestras`; dos pasadas de la misma fuente "en movimiento" se promedian (peso tope 20).
+  Lo del teléfono (vence) no se mezcla en una fila que no vence.
+- Extra: el buscador muestra la calle de la cache prolija ("Lamadrid 650", no "lamadrid 650"), y
+  **no guarda en la cache lo que un buscador devolvió para otra calle** (probando, "Avenida
+  Presidente Néstor Kirchner" mal codificado dio "Presidente Perón" y creó un alias permanente
+  Kirchner → Perón; borrado).
+- De 3j: link de Google Maps se aprende aunque Nominatim no confirme; pin a mano si el reverse no
+  trae calle (`manual_sin_confirmar`, confianza baja). Si el reverse trae OTRA calle (Colombia 4695
+  → "Camino del Perú") el pin a mano sigue sin aprenderse; el link sí.
+
 6. Próxima prueba: **con un pedido EN CURSO** (sin eso `pedido_ubicacion` queda vacía y no se ven
    huecos ni km reales) y los celulares en autos distintos.
 
