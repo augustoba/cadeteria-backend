@@ -95,7 +95,10 @@ pasarlos a mano, pero no es la idea.
       un mapa que no sea de Google).
 - [ ] **Direcciones encontradas con Google**: días de borrado = lo que permitan las condiciones
       de Google en ese momento (hoy 30).
-- [ ] **Marca**: nombre de la cadetería y teléfono de soporte.
+- [ ] **Marca**: nombre de la cadetería y teléfono de soporte. El nombre sale en los mensajes al
+      cliente (`{marca}`) y arriba de la página de seguimiento; sin cargar dice "Cadetería".
+- [ ] **Plantillas de SMS / vencimiento del link de seguimiento** (default 2 horas después de
+      terminado el pedido): revisar los textos y las horas.
 - [ ] Revisar **Salud del sistema** (al final de Configuración): todo en 🟢 o 🟡 a propósito.
 
 ---

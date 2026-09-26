@@ -129,6 +129,19 @@ de trazas (`spec-routing-propio.md`); la Fase C (tiempos por tramo) sigue sin um
 ### 5. Importador de direcciones del sistema viejo
 Esperando que se termine de limpiar a mano el Excel (`importador-direcciones/exportes/`).
 
+### 5a. Próxima etapa (antes de liberar `/pedir`): límite de pedidos por cliente
+Hoy hay un límite general por IP para todo `/api/publico/**` (60 por minuto, configurable con
+`rate_limit_publico_max` / `_ventana_seg`) más lo de `spec-antiabuso-pedidos-publicos.md`. Para
+abrir `/pedir` al público revisar: que el IP se tome bien detrás del proxy del hosting
+(`X-Forwarded-For` se puede falsificar si el backend queda expuesto directo), un tope por
+teléfono además de por IP, y límites más bajos para los endpoints que gastan cupo (buscar,
+buscar-ampliado con Google, link de Google Maps, cotizar).
+
+### 5c. Mensajes al cliente: hoy salen solo por SMS
+"El cadete aceptó" / "fue entregado" / "reenviar link" van por `SmsGatewayService`: sin el
+gateway de SMS no le llega nada al cliente, aunque el de WhatsApp esté conectado. Evaluar que
+salgan por WhatsApp (y SMS de respaldo), igual que el código de verificación.
+
 ### 5b. Idea a futuro: avisos de controles de tránsito entre cadetes (solo analizado)
 Pedido el 2026-09-25, estilo Waze: el cadete toca "Avisar control", queda registrado con su
 ubicación y hora, y a los cadetes que pasan a menos de ~500 m les llega "Control avisado a las

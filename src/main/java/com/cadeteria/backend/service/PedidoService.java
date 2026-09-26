@@ -274,10 +274,34 @@ public class PedidoService {
         return repo.findFirstByClienteTelefonoOrderByCreadoEnDesc(telefono).map(Pedido::getClienteNombre);
     }
 
+    /** Horas que el link de seguimiento sigue abriendo después de terminado el pedido (Configuración). */
+    public static final String CONFIG_SEGUIMIENTO_VENCE_HORAS = "seguimiento_vence_horas";
+
+    /**
+     * Único punto de entrada del link de seguimiento: todo lo público del pedido (ver, calificar,
+     * comprobante, repetir, push) pasa por acá, solo con el token del link — no hay búsqueda por
+     * número, teléfono ni nada más. Pasadas {@code seguimiento_vence_horas} (default 2) desde que el
+     * pedido terminó (entregado, cancelado o no entregado), el link deja de abrir. En 0, no vence.
+     */
     @Transactional(readOnly = true)
     public Pedido getPorToken(String token) {
-        return repo.findByTokenSeguimiento(token)
-                .orElseThrow(() -> ResourceNotFoundException.of("Pedido", token));
+        Pedido pedido = repo.findByTokenSeguimiento(token)
+                .orElseThrow(() -> new ResourceNotFoundException("No encontramos este pedido."));
+        Instant terminado = terminadoEn(pedido);
+        int horas = configuracionService.getInt(CONFIG_SEGUIMIENTO_VENCE_HORAS, 2);
+        if (terminado != null && horas > 0 && terminado.plus(java.time.Duration.ofHours(horas)).isBefore(Instant.now())) {
+            throw new BadRequestException("Este link de seguimiento ya venció.");
+        }
+        return pedido;
+    }
+
+    private static Instant terminadoEn(Pedido p) {
+        return switch (p.getEstado().getId()) {
+            case "FINALIZADO" -> p.getFinalizadoEn();
+            case "CANCELADO" -> p.getCanceladoEn();
+            case "NO_ENTREGADO" -> p.getNoEntregadoEn();
+            default -> null;
+        };
     }
 
     /** Mejora 89 — el cliente se suscribe a Web Push desde su propia página de seguimiento. */
@@ -996,7 +1020,7 @@ public class PedidoService {
 
         publisher.publicarPedido(PedidoResponse.from(pedido));
         smsGatewayService.enviar(pedido.getId(), pedido.getClienteTelefono(), armarSms("sms_template_aceptado",
-                "Tu pedido esta en camino, seguilo aca: {link}", pedido));
+                SMS_ACEPTADO_DEFAULT, pedido));
         webPushService.enviarA(pedido, "Tu pedido está en camino", "Un cadete ya está yendo a buscarlo.");
         return pedido;
     }
@@ -1134,7 +1158,7 @@ public class PedidoService {
 
         publisher.publicarPedido(PedidoResponse.from(pedido));
         smsGatewayService.enviar(pedido.getId(), pedido.getClienteTelefono(), armarSms("sms_template_finalizado",
-                "Tu pedido fue entregado. Mira el detalle, descarga el comprobante y calificanos aca: {link}", pedido));
+                SMS_FINALIZADO_DEFAULT, pedido));
         webPushService.enviarA(pedido, "Pedido entregado", "Tu pedido fue entregado. Descargá el comprobante y calificanos.");
         return pedido;
     }
@@ -1312,13 +1336,26 @@ public class PedidoService {
     public void reenviarSmsSeguimiento(String pedidoId) {
         Pedido pedido = get(pedidoId);
         smsGatewayService.enviar(pedido.getId(), pedido.getClienteTelefono(), armarSms("sms_template_reenvio",
-                "Seguí tu pedido acá: {link}", pedido));
+                SMS_REENVIO_DEFAULT, pedido));
     }
 
-    /** Plantillas de SMS editables desde Configuración (ronda 10, punto 106) — antes estaban hardcodeadas. */
+    /** Textos por defecto (2026-09-25): con el nombre de la cadetería y el número de pedido. */
+    public static final String SMS_ACEPTADO_DEFAULT =
+            "{marca} le informa que un cadete aceptó su pedido N° {numero}. Datos del cadete y del pedido: {link}";
+    public static final String SMS_FINALIZADO_DEFAULT =
+            "{marca}: su pedido N° {numero} fue entregado. Comprobante y calificación (disponible {horas} hs): {link}";
+    public static final String SMS_REENVIO_DEFAULT = "{marca} — seguí tu pedido N° {numero} acá: {link}";
+
+    /**
+     * Plantillas de SMS editables desde Configuración (ronda 10, punto 106). Variables: {link},
+     * {numero} (número de pedido), {marca} (nombre de la cadetería) y {horas} (vencimiento del link).
+     */
     private String armarSms(String claveConfiguracion, String porDefecto, Pedido pedido) {
         String plantilla = configuracionService.getString(claveConfiguracion, porDefecto);
-        return plantilla.replace("{link}", linkSeguimiento(pedido));
+        return plantilla.replace("{link}", linkSeguimiento(pedido))
+                .replace("{numero}", String.valueOf(pedido.getNumero()))
+                .replace("{marca}", configuracionService.getString("nombre_cadeteria", "Cadetería"))
+                .replace("{horas}", String.valueOf(configuracionService.getInt(CONFIG_SEGUIMIENTO_VENCE_HORAS, 2)));
     }
 
     // --- Jobs programados ---
