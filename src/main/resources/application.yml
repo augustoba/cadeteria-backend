@@ -21,6 +21,13 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+  # IP real del cliente detrás de un proxy (nginx/Caddy/Cloudflare): Tomcat usa X-Forwarded-For
+  # solo si el pedido llega desde un proxy de confianza. TRUSTED_PROXIES es una regex de IPs; por
+  # defecto, las privadas y localhost (proxy en el mismo servidor o en la red interna). 2026-09-26.
+  forward-headers-strategy: native
+  tomcat:
+    remoteip:
+      internal-proxies: '${TRUSTED_PROXIES:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3}|127\.\d{1,3}\.\d{1,3}\.\d{1,3}|0:0:0:0:0:0:0:1|::1}'
   compression:
     enabled: true
     mime-types: application/json,text/plain,text/css,application/javascript

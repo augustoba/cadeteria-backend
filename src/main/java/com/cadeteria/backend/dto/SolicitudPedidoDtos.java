@@ -1,8 +1,9 @@
 package com.cadeteria.backend.dto;
 
 import com.cadeteria.backend.model.SolicitudPedido;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import com.cadeteria.backend.common.Validaciones;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -13,19 +14,34 @@ public final class SolicitudPedidoDtos {
 
     /** Lo que completa el cliente en la página pública "/pedir". */
     public record SolicitudPedidoRequest(
-            @NotBlank String origenDireccion, @NotNull Double origenLat, @NotNull Double origenLng,
-            @NotBlank String destinoDireccion, @NotNull Double destinoLat, @NotNull Double destinoLng,
-            boolean llevaDinero, BigDecimal montoDeclarado,
+            @NotBlank(message = "Falta la dirección de retiro.") @Size(max = 255, message = "La dirección de retiro es demasiado larga.")
+            String origenDireccion,
+            @NotNull(message = "Falta ubicar la dirección de retiro en el mapa.") @DecimalMin("-90") @DecimalMax("90") Double origenLat,
+            @NotNull(message = "Falta ubicar la dirección de retiro en el mapa.") @DecimalMin("-180") @DecimalMax("180") Double origenLng,
+            @NotBlank(message = "Falta la dirección de entrega.") @Size(max = 255, message = "La dirección de entrega es demasiado larga.")
+            String destinoDireccion,
+            @NotNull(message = "Falta ubicar la dirección de entrega en el mapa.") @DecimalMin("-90") @DecimalMax("90") Double destinoLat,
+            @NotNull(message = "Falta ubicar la dirección de entrega en el mapa.") @DecimalMin("-180") @DecimalMax("180") Double destinoLng,
+            boolean llevaDinero,
+            @PositiveOrZero(message = "El monto no puede ser negativo.")
+            @Digits(integer = 10, fraction = 2, message = "El monto no es válido.") BigDecimal montoDeclarado,
             boolean llevaValores,
-            BigDecimal montoValores,
+            @PositiveOrZero(message = "El valor declarado no puede ser negativo.")
+            @Digits(integer = 10, fraction = 2, message = "El valor declarado no es válido.") BigDecimal montoValores,
             /** Lo pide el cliente (mejora 2026-09-24) — el admin lo puede cambiar al revisar. */
             boolean requiereMoto,
             boolean retornaAlOrigen,
-            @NotBlank String clienteNombre, @NotBlank String clienteTelefono,
-            String detalle,
+            @NotBlank(message = "Falta tu nombre.") @Pattern(regexp = Validaciones.NOMBRE_CLIENTE, message = Validaciones.MSJ_NOMBRE_CLIENTE)
+            String clienteNombre,
+            @NotBlank(message = "Falta tu teléfono.") @Pattern(regexp = Validaciones.TELEFONO, message = Validaciones.MSJ_TELEFONO) String clienteTelefono,
+            @Size(max = 1000, message = "El detalle puede tener hasta 1000 caracteres.") String detalle,
             /** Piso, depto y observaciones de cada dirección (mejora 2026-09-24), opcionales. */
-            String origenPiso, String origenDepto, String origenObservaciones,
-            String destinoPiso, String destinoDepto, String destinoObservaciones,
+            @Size(max = 20, message = "El piso puede tener hasta 20 caracteres.") String origenPiso,
+            @Size(max = 20, message = "El depto puede tener hasta 20 caracteres.") String origenDepto,
+            @Size(max = 300, message = "Las observaciones pueden tener hasta 300 caracteres.") String origenObservaciones,
+            @Size(max = 20, message = "El piso puede tener hasta 20 caracteres.") String destinoPiso,
+            @Size(max = 20, message = "El depto puede tener hasta 20 caracteres.") String destinoDepto,
+            @Size(max = 300, message = "Las observaciones pueden tener hasta 300 caracteres.") String destinoObservaciones,
             /** Token de VerificacionTelefonoService.verificarCodigo — confirma que el teléfono es real (mejora 2026-09-17). */
             /** Obligatorio solo con `verificacion_telefono_activa` prendida (lo valida el service). */
             String verificacionToken,
@@ -79,13 +95,16 @@ public final class SolicitudPedidoDtos {
 
     /** Confirmar directo (ya se acordó el precio) o mandar cotización (el cliente confirma solo) — mismos campos. */
     public record RevisarSolicitudRequest(
-            boolean requiereMoto, @NotNull BigDecimal precio, BigDecimal montoDeclarado
+            boolean requiereMoto,
+            @NotNull(message = "Falta el precio.") @PositiveOrZero(message = "El precio no puede ser negativo.")
+            @Digits(integer = 10, fraction = 2, message = "El precio no es válido.") BigDecimal precio,
+            @PositiveOrZero(message = "El monto no puede ser negativo.") BigDecimal montoDeclarado
     ) {}
 
-    public record RechazarSolicitudRequest(String motivo) {}
+    public record RechazarSolicitudRequest(@Size(max = 255, message = "El motivo puede tener hasta 255 caracteres.") String motivo) {}
 
     /** "Marcar como fraudulento" (spec-antiabuso Fase 4) — la nota queda en la ficha del cliente. */
-    public record FraudulentoRequest(String nota) {}
+    public record FraudulentoRequest(@Size(max = 500, message = "La nota puede tener hasta 500 caracteres.") String nota) {}
 
     /** Lo que ve la página pública "/confirmar-pedido/:token" antes (y después) de confirmar. */
     public record ConfirmacionPublicaResponse(

@@ -3,7 +3,6 @@ package com.cadeteria.backend.model;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
-import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
@@ -23,7 +22,8 @@ public class Incidencia {
     @Column(nullable = false)
     private String titulo;
 
-    @Lob
+    /** Texto largo: no usar @Lob, que en una base nueva de MySQL queda como TINYTEXT (255) — ver WhatsappMensaje.texto. */
+    @Column(length = 100_000)
     private String descripcion;
 
     /** "ABIERTA" | "CERRADA". */

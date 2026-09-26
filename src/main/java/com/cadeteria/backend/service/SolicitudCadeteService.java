@@ -1,6 +1,9 @@
 package com.cadeteria.backend.service;
 
+import com.cadeteria.backend.common.GoneException;
+import com.cadeteria.backend.common.ConflictException;
 import com.cadeteria.backend.common.BadRequestException;
+import com.cadeteria.backend.common.Validaciones;
 import com.cadeteria.backend.common.ResourceNotFoundException;
 import com.cadeteria.backend.config.AppProperties;
 import com.cadeteria.backend.dto.CadeteDtos.CadeteRequest;
@@ -108,18 +111,18 @@ public class SolicitudCadeteService {
     @Transactional(readOnly = true)
     public SolicitudCadete validarToken(String token) {
         SolicitudCadete s = repo.findByToken(token)
-                .orElseThrow(() -> new BadRequestException("Este link no es válido."));
+                .orElseThrow(() -> new ResourceNotFoundException("Este link no es válido."));
         switch (s.getEstado()) {
             case "PENDIENTE", "A_CORREGIR" -> { }
-            case "EN_REVISION" -> throw new BadRequestException(
+            case "EN_REVISION" -> throw new ConflictException(
                     "Ya recibimos tu formulario y lo estamos revisando. Si hay que corregir algo, te llega un mail.");
-            case "APROBADA" -> throw new BadRequestException(
+            case "APROBADA" -> throw new ConflictException(
                     "Ya estás dado de alta: revisá tu mail, ahí están tu usuario y tu contraseña.");
-            case "RECHAZADA" -> throw new BadRequestException("Esta solicitud fue rechazada.");
-            default -> throw new BadRequestException("Este link ya fue usado.");
+            case "RECHAZADA" -> throw new ConflictException("Esta solicitud fue rechazada.");
+            default -> throw new GoneException("Este link ya fue usado.");
         }
         if (s.getExpiraEn().isBefore(Instant.now())) {
-            throw new BadRequestException("Este link venció. Pedí uno nuevo.");
+            throw new GoneException("Este link venció. Pedí uno nuevo.");
         }
         return s;
     }
@@ -163,23 +166,37 @@ public class SolicitudCadeteService {
             }
         }
         // El usuario del cadete es su DNI: se acepta con puntos o espacios y se guarda solo con números.
-        String dni = req.dni().replaceAll("[.\\s]", "");
-        if (!dni.matches("^[0-9]{6,8}$")) {
-            throw new BadRequestException("El DNI tiene que ser solo números, hasta 8 dígitos (ej: 30111222).");
+        String dni = Validaciones.soloDigitos(req.dni());
+        if (!dni.matches("^[0-9]{7,8}$")) {
+            throw new BadRequestException(Validaciones.MSJ_DNI);
+        }
+        // Lo mismo que exige el formulario (2026-09-26): antes solo lo controlaba el front.
+        if (!req.mayorDeEdad()) {
+            throw new BadRequestException("Tenés que ser mayor de 18 años para anotarte como cadete.");
+        }
+        if (vacio(req.fotoUrl()) || vacio(req.fotoCarnetUrl()) || vacio(req.fotoCarnetDorsoUrl())) {
+            throw new BadRequestException("Faltan tu foto y/o las fotos de frente y dorso del DNI.");
+        }
+        boolean esMoto = "MOTO".equals(req.tipoVehiculoId());
+        if (esMoto && vacio(req.vehiculoPatente())) {
+            throw new BadRequestException("Para moto falta la patente (123ABC o A123BCD).");
+        }
+        if (esMoto && (vacio(req.fotoVehiculoUrl()) || vacio(req.fotoTarjetaVerdeUrl()) || vacio(req.fotoTarjetaVerdeDorsoUrl()))) {
+            throw new BadRequestException("Para moto faltan: foto del vehículo y las fotos de frente y dorso de la tarjeta verde.");
         }
         // Un DNI ya registrado NO se bloquea (2026-09-25): puede ser alguien que quiere volver.
         // El admin lo ve al revisar (cadeteExistenteDe) junto con el motivo de su baja.
         TipoVehiculo tipo = tipoVehiculoRepo.findById(req.tipoVehiculoId())
                 .orElseThrow(() -> ResourceNotFoundException.of("Tipo de vehiculo", req.tipoVehiculoId()));
 
-        s.setNombre(req.nombre().trim());
-        s.setApellido(req.apellido().trim());
+        s.setNombre(Validaciones.normalizarNombre(req.nombre()));
+        s.setApellido(Validaciones.normalizarNombre(req.apellido()));
         s.setDni(dni);
         s.setTelefono(req.telefono().trim());
         s.setEmail(req.email().trim());
         s.setTipoVehiculo(tipo);
         s.setVehiculoColor(blankToNull(req.vehiculoColor()));
-        s.setVehiculoPatente(blankToNull(req.vehiculoPatente()));
+        s.setVehiculoPatente(esMoto ? Validaciones.normalizarPatente(req.vehiculoPatente()) : null);
         s.setVehiculoMarca(blankToNull(req.vehiculoMarca()));
         s.setVehiculoModelo(blankToNull(req.vehiculoModelo()));
         s.setFotoUrl(blankToNull(req.fotoUrl()));
@@ -189,6 +206,7 @@ public class SolicitudCadeteService {
         s.setFotoTarjetaVerdeUrl(blankToNull(req.fotoTarjetaVerdeUrl()));
         s.setFotoTarjetaVerdeDorsoUrl(blankToNull(req.fotoTarjetaVerdeDorsoUrl()));
         s.setUsernamePropuesto(dni);
+        s.setMayorEdadDeclaradaEn(Instant.now());
         s.setObservaciones(null);
         s.setEstado("EN_REVISION");
         s.setEnviadaEn(Instant.now());
@@ -216,7 +234,7 @@ public class SolicitudCadeteService {
     public AprobacionResultado aprobar(String id, String username, String modalidadPago, String adminUsername) {
         SolicitudCadete s = get(id);
         if (!"EN_REVISION".equals(s.getEstado())) {
-            throw new BadRequestException("Esta solicitud no está pendiente de revisión.");
+            throw new ConflictException("Esta solicitud no está pendiente de revisión.");
         }
         Optional<Cadete> existente = buscarCadeteExistente(s);
         if (existente.isPresent()) {
@@ -230,8 +248,11 @@ public class SolicitudCadeteService {
                 s.getFotoCarnetDorsoUrl(), s.getFotoTarjetaVerdeUrl(), s.getFotoTarjetaVerdeDorsoUrl(),
                 username.trim(), passwordTemporal,
                 null, null, null, null, null, null,
-                modalidadPago == null || modalidadPago.isBlank() ? "SEMANAL" : modalidadPago, null);
-        Cadete cadete = cadeteService.create(cadeteReq);
+                modalidadPago == null || modalidadPago.isBlank() ? "SEMANAL" : modalidadPago, null, true);
+        Cadete cadete = cadeteService.create(cadeteReq, "postulante");
+        // La constancia es la del formulario (cuándo lo tildó), no la del momento de aprobar.
+        cadete.setMayorEdadDeclaradaEn(s.getMayorEdadDeclaradaEn());
+        cadeteRepo.save(cadete);
         cadeteService.marcarPasswordTemporal(cadete.getId(), Instant.now().plus(10, ChronoUnit.MINUTES));
 
         s.setEstado("APROBADA");
@@ -271,12 +292,16 @@ public class SolicitudCadeteService {
      */
     private AprobacionResultado reincorporar(SolicitudCadete s, Cadete c, String modalidadPago, String adminUsername) {
         if (c.isActivo()) {
-            throw new BadRequestException("Ya hay un cadete ACTIVO con ese DNI (" + c.getNombre() + " " + c.getApellido()
+            throw new ConflictException("Ya hay un cadete ACTIVO con ese DNI (" + c.getNombre() + " " + c.getApellido()
                     + "): no hace falta darlo de alta. Rechazá esta solicitud.");
         }
         c.setNombre(s.getNombre());
         c.setApellido(s.getApellido());
         c.setTelefono(s.getTelefono());
+        if (s.getMayorEdadDeclaradaEn() != null) {
+            c.setMayorEdadDeclaradaEn(s.getMayorEdadDeclaradaEn());
+            c.setMayorEdadDeclaradaPor("postulante");
+        }
         c.setEmail(s.getEmail());
         c.setTipoVehiculo(s.getTipoVehiculo());
         c.setVehiculoColor(s.getVehiculoColor());
@@ -312,7 +337,7 @@ public class SolicitudCadeteService {
     public SolicitudCadete rechazar(String id, String motivo) {
         SolicitudCadete s = get(id);
         if (!"EN_REVISION".equals(s.getEstado()) && !"A_CORREGIR".equals(s.getEstado())) {
-            throw new BadRequestException("Esta solicitud no está pendiente de revisión.");
+            throw new ConflictException("Esta solicitud no está pendiente de revisión.");
         }
         s.setEstado("RECHAZADA");
         s.setMotivoRechazo(motivo == null || motivo.isBlank() ? null : motivo.trim());
@@ -333,7 +358,7 @@ public class SolicitudCadeteService {
     public SolicitudCadete pedirCorreccion(String id, Map<String, String> observaciones) {
         SolicitudCadete s = get(id);
         if (!"EN_REVISION".equals(s.getEstado())) {
-            throw new BadRequestException("Esta solicitud no está pendiente de revisión.");
+            throw new ConflictException("Esta solicitud no está pendiente de revisión.");
         }
         Map<String, String> obs = new LinkedHashMap<>();
         if (observaciones != null) {
@@ -367,7 +392,7 @@ public class SolicitudCadeteService {
     public LinkReenviado reenviarLink(String id) {
         SolicitudCadete s = get(id);
         if (!"PENDIENTE".equals(s.getEstado()) && !"A_CORREGIR".equals(s.getEstado())) {
-            throw new BadRequestException("Solo se reenvía un link sin completar o con correcciones pendientes.");
+            throw new ConflictException("Solo se reenvía un link sin completar o con correcciones pendientes.");
         }
         s.setExpiraEn(Instant.now().plus(DIAS_LINK, ChronoUnit.DAYS));
         s = repo.save(s);
@@ -418,5 +443,9 @@ public class SolicitudCadeteService {
 
     private static String blankToNull(String v) {
         return (v == null || v.isBlank()) ? null : v.trim();
+    }
+
+    private static boolean vacio(String v) {
+        return v == null || v.isBlank();
     }
 }

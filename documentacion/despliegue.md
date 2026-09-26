@@ -52,6 +52,14 @@ pasarlos a mano, pero no es la idea.
 - [ ] `GEOAPIFY_KEY` / `LOCATIONIQ_KEY` — ⚠️ **el default de `application.yml` trae keys reales
       commiteadas** (de cuando estaban en el front). En producción cargar keys propias (mejor
       desde el panel, ver §3) y dar de baja las viejas.
+- [ ] `TRUSTED_PROXIES` (2026-09-26) — regex con las IPs de los proxies de confianza (nginx, Caddy,
+      Cloudflare). El backend toma la IP real del cliente de `X-Forwarded-For` **solo** si el pedido
+      llega desde una de esas IPs (sirve para el límite por IP de `/api/publico/**` y el registro de
+      accesos del login). Default: IPs privadas y localhost — alcanza si el proxy corre en el mismo
+      servidor o en la red interna. **Si hay Cloudflare u otro proxy con IP pública delante, cargar
+      sus rangos**; si no, todos los clientes van a compartir la IP del proxy y el límite de 60
+      pedidos por minuto los va a cortar a todos juntos. Probar: desde dos redes distintas, que el
+      límite corte a una sola.
 
 ---
 
@@ -120,6 +128,7 @@ pasarlos a mano, pero no es la idea.
 | Código de verificación del teléfono en `/pedir` | Configuración (`verificacion_telefono_activa`) | apagado a propósito hasta probarlo con WhatsApp/SMS real (pendientes 3) |
 | Keys de Geoapify/LocationIQ commiteadas | `application.yml` | keys propias, dar de baja las viejas |
 | `application-local.yml` de esta PC | raíz del backend (gitignoreado) | no se sube; en el servidor, variables de entorno propias |
+| `TRUSTED_PROXIES='192\.0\.2\.1'` (solo para probar en una PC que un `X-Forwarded-For` inventado no saltea el límite) | variable de entorno | **no** usarla: poner las IPs reales del proxy (§1) |
 
 ---
 

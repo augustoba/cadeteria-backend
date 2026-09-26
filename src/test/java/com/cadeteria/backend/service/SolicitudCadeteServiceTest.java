@@ -1,6 +1,7 @@
 package com.cadeteria.backend.service;
 
 import com.cadeteria.backend.common.BadRequestException;
+import com.cadeteria.backend.common.ConflictException;
 import com.cadeteria.backend.config.AppProperties;
 import com.cadeteria.backend.dto.SolicitudCadeteDtos.SolicitudFormRequest;
 import com.cadeteria.backend.model.Cadete;
@@ -138,7 +139,7 @@ class SolicitudCadeteServiceTest {
 
         var r = service.aprobar("s1", "30111222", "SEMANAL", "admin");
 
-        verify(cadeteService, never()).create(any());
+        verify(cadeteService, never()).create(any(), any());
         verify(cadeteService).setActivo(eq("c1"), eq(true), anyString(), eq("admin"));
         assertEquals("Temp12345", r.passwordTemporal());
         assertEquals("1133334444", viejo.getTelefono());
@@ -151,7 +152,7 @@ class SolicitudCadeteServiceTest {
         when(repo.findById("s1")).thenReturn(Optional.of(s));
         when(cadeteRepo.findByDni("30111222")).thenReturn(Optional.of(cadete(true)));
 
-        assertThrows(BadRequestException.class, () -> service.aprobar("s1", "30111222", "SEMANAL", "admin"));
+        assertThrows(ConflictException.class, () -> service.aprobar("s1", "30111222", "SEMANAL", "admin"));
     }
 
     private SolicitudCadete enRevision() {
@@ -176,8 +177,60 @@ class SolicitudCadeteServiceTest {
     }
 
     private SolicitudFormRequest form(String fotoCarnet) {
-        return new SolicitudFormRequest("Juan", "Pérez", "30.111.222", "381 555 1234", "juan@mail.com", "MOTO",
-                null, null, null, null, "https://img/foto.jpg", null, fotoCarnet, "https://img/dni-dorso.jpg", null, null);
+        return form(fotoCarnet, "30.111.222", "a 123 bcd", true);
+    }
+
+    private SolicitudFormRequest form(String fotoCarnet, String dni, String patente, boolean mayorDeEdad) {
+        return new SolicitudFormRequest("Juan", "Pérez", dni, "381 555 1234", "juan@mail.com", "MOTO",
+                "Rojo", patente, "Honda", "Wave", "https://img/foto.jpg", "https://img/moto.jpg", fotoCarnet,
+                "https://img/dni-dorso.jpg", "https://img/tv.jpg", "https://img/tv-dorso.jpg", mayorDeEdad);
+    }
+
+    // --- Validaciones del formulario (2026-09-26): antes solo las controlaba el front ---
+
+    @Test
+    void unMenorDeEdadNoSePuedeAnotar() {
+        when(repo.findByToken("tok")).thenReturn(Optional.of(pendiente()));
+        var e = assertThrows(BadRequestException.class,
+                () -> service.enviarFormulario("tok", form("https://img/dni.jpg", "30111222", "A123BCD", false)));
+        assertTrue(e.getMessage().contains("mayor de 18"));
+    }
+
+    @Test
+    void alAnotarseQuedaGuardadoCuandoDeclaroSerMayorYLaPatenteNormalizada() {
+        SolicitudCadete s = pendiente();
+        when(repo.findByToken("tok")).thenReturn(Optional.of(s));
+        when(repo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.enviarFormulario("tok", form("https://img/dni.jpg"));
+
+        assertNotNull(s.getMayorEdadDeclaradaEn());
+        assertEquals("A123BCD", s.getVehiculoPatente());
+        assertEquals("30111222", s.getDni());
+    }
+
+    @Test
+    void elDniTieneQueSerDe7u8Numeros() {
+        when(repo.findByToken("tok")).thenReturn(Optional.of(pendiente()));
+        assertThrows(BadRequestException.class,
+                () -> service.enviarFormulario("tok", form("https://img/dni.jpg", "301112", "A123BCD", true)));
+    }
+
+    @Test
+    void unaMotoSinPatenteNoSeAcepta() {
+        when(repo.findByToken("tok")).thenReturn(Optional.of(pendiente()));
+        var e = assertThrows(BadRequestException.class,
+                () -> service.enviarFormulario("tok", form("https://img/dni.jpg", "30111222", " ", true)));
+        assertTrue(e.getMessage().contains("patente"));
+    }
+
+    private SolicitudCadete pendiente() {
+        SolicitudCadete s = new SolicitudCadete();
+        s.setId("s2");
+        s.setToken("tok");
+        s.setEstado("PENDIENTE");
+        s.setExpiraEn(Instant.now().plus(1, ChronoUnit.DAYS));
+        return s;
     }
 
     private Cadete cadete(boolean activo) {

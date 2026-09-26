@@ -1,5 +1,6 @@
 package com.cadeteria.backend.service;
 
+import com.cadeteria.backend.common.ConflictException;
 import com.cadeteria.backend.common.BadRequestException;
 import com.cadeteria.backend.common.ResourceNotFoundException;
 import com.cadeteria.backend.dto.AdminUsuarioDtos.AdminUsuarioResponse;
@@ -55,7 +56,7 @@ public class AdminUsuarioService {
     public CrearAdminResponse crear(CrearAdminRequest req) {
         String username = req.username().trim();
         if (repo.findByUsername(username).isPresent()) {
-            throw new BadRequestException("Ya existe un usuario admin con ese nombre.");
+            throw new ConflictException("Ya existe un usuario admin con ese nombre.");
         }
         if (!rolRepo.existsById(req.rol())) {
             throw new BadRequestException("Ese rol no existe.");
@@ -79,7 +80,7 @@ public class AdminUsuarioService {
             throw new BadRequestException("Ese rol no existe.");
         }
         if (rolService.esUltimoConPermiso(admin, "roles") && !rolService.permisosEfectivos(rol).contains("roles")) {
-            throw new BadRequestException("No podés sacarle el permiso \"roles\" al último admin que lo tiene.");
+            throw new ConflictException("No podés sacarle el permiso \"roles\" al último admin que lo tiene.");
         }
         admin.setRol(rol);
         repo.save(admin);
@@ -89,7 +90,7 @@ public class AdminUsuarioService {
     public AdminUsuarioResponse habilitar(String id, boolean enabled) {
         Admin admin = get(id);
         if (!enabled && rolService.esUltimoConPermiso(admin, "roles")) {
-            throw new BadRequestException("No podés deshabilitar al último admin con permiso para administrar roles.");
+            throw new ConflictException("No podés deshabilitar al último admin con permiso para administrar roles.");
         }
         admin.setEnabled(enabled);
         if (!enabled) {

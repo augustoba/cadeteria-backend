@@ -64,11 +64,11 @@ public class ChatService {
         boolean sinAudio = audioUrl == null || audioUrl.isBlank();
         boolean sinImagen = imagenUrl == null || imagenUrl.isBlank();
         if (sinTexto && sinAudio && sinImagen) {
-            throw new BadRequestException("El mensaje no puede estar vacio.");
+            throw new BadRequestException("El mensaje no puede estar vacío.");
         }
         Cadete cadete = cadeteService.get(cadeteId);
         AutorMensaje autor = autorRepo.findById(autorId)
-                .orElseThrow(() -> new BadRequestException("Autor de mensaje invalido: " + autorId));
+                .orElseThrow(() -> new BadRequestException("Autor de mensaje inválido: " + autorId));
         ChatMensaje m = new ChatMensaje();
         m.setId(UUID.randomUUID().toString());
         m.setCadete(cadete);

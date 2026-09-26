@@ -1,5 +1,7 @@
 package com.cadeteria.backend.service;
 
+import com.cadeteria.backend.common.GoneException;
+import com.cadeteria.backend.common.ConflictException;
 import com.cadeteria.backend.common.BadRequestException;
 import com.cadeteria.backend.common.ResourceNotFoundException;
 import com.cadeteria.backend.dto.PedidoDtos.DireccionFrecuenteResponse;
@@ -30,6 +32,9 @@ import com.cadeteria.backend.repository.PedidoPrecioLogRepository;
 import com.cadeteria.backend.repository.PedidoParadaRepository;
 import com.cadeteria.backend.repository.PedidoUbicacionRepository;
 import com.cadeteria.backend.repository.ResultadoOfertaRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -59,6 +64,10 @@ import java.util.stream.Collectors;
 @Service
 @Transactional
 public class PedidoService {
+
+    /** Para los bloqueos de fila (ver {@link #bloquear}); lo inyecta Spring, en los tests va un mock. */
+    @PersistenceContext
+    private EntityManager em;
 
     private static final List<String> ESTADOS_ACTIVOS = List.of("SIN_ASIGNAR", "PENDIENTE", "EN_CURSO", "NO_ENTREGADO");
     private static final List<String> ESTADOS_FINALES = List.of("FINALIZADO", "CANCELADO");
@@ -130,7 +139,7 @@ public class PedidoService {
     /** El cadete deja una nota de texto libre sobre su propio viaje (ej. "entregado en porteria a Fulano"). */
     public PedidoComentario agregarComentario(String pedidoId, String cadeteUsername, String texto) {
         if (texto == null || texto.isBlank()) {
-            throw new BadRequestException("El comentario no puede estar vacio.");
+            throw new BadRequestException("El comentario no puede estar vacío.");
         }
         Pedido pedido = get(pedidoId);
         Cadete cadete = cadeteDelUsername(cadeteUsername);
@@ -158,7 +167,7 @@ public class PedidoService {
 
     public PedidoComentario agregarComentarioAdmin(String pedidoId, String adminUsername, String texto) {
         if (texto == null || texto.isBlank()) {
-            throw new BadRequestException("El comentario no puede estar vacio.");
+            throw new BadRequestException("El comentario no puede estar vacío.");
         }
         Pedido pedido = get(pedidoId);
         PedidoComentario comentario = new PedidoComentario();
@@ -179,11 +188,11 @@ public class PedidoService {
     /** El admin edita el precio de un pedido ya cargado (antes no se podía tocar después de crearlo). */
     public Pedido editarPrecio(String pedidoId, java.math.BigDecimal nuevoPrecio, String adminUsername) {
         if (nuevoPrecio == null || nuevoPrecio.signum() < 0) {
-            throw new BadRequestException("El precio tiene que ser un numero valido.");
+            throw new BadRequestException("El precio tiene que ser un número válido.");
         }
         Pedido pedido = get(pedidoId);
         if (ESTADOS_FINALES.contains(pedido.getEstado().getId())) {
-            throw new BadRequestException("No se puede editar el precio de un pedido finalizado o cancelado.");
+            throw new ConflictException("No se puede editar el precio de un pedido finalizado o cancelado.");
         }
         if (pedido.getPrecio().compareTo(nuevoPrecio) == 0) {
             return pedido;
@@ -209,6 +218,24 @@ public class PedidoService {
     @Transactional(readOnly = true)
     public Pedido get(String id) {
         return repo.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Pedido", id));
+    }
+
+    /**
+     * Para las acciones que cambian el pedido (2026-09-26): lo lee bloqueando la fila, así dos
+     * acciones simultáneas sobre el mismo pedido (doble toque, reintento de la app, dos admins) se
+     * hacen una detrás de la otra y la segunda ve lo que hizo la primera.
+     */
+    private Pedido getParaActualizar(String id) {
+        return repo.findByIdParaActualizar(id).orElseThrow(() -> ResourceNotFoundException.of("Pedido", id));
+    }
+
+    /**
+     * Relee la entidad desde la base bloqueando su fila. Para el crédito del cadete (lo tocan aceptar,
+     * los reembolsos y la carga de crédito del admin) y para los jobs, que leen primero una lista y
+     * recién después actúan sobre cada elemento. Descarta cambios no guardados de esa entidad.
+     */
+    private void bloquear(Object entidad) {
+        em.refresh(entidad, LockModeType.PESSIMISTIC_WRITE);
     }
 
     /**
@@ -291,7 +318,7 @@ public class PedidoService {
         // (si no, un reclamo a las 23:50 dejaba al cliente sin los botones para responder).
         boolean reclamoProblemaAbierto = "PROBLEMA_ENTREGA".equals(pedido.getReclamoTipo()) && pedido.isReclamoAbierto();
         if (terminado != null && !reclamoProblemaAbierto && Instant.now().isAfter(finDelDia(terminado))) {
-            throw new BadRequestException("Este link de seguimiento ya venció.");
+            throw new GoneException("Este link de seguimiento ya venció.");
         }
         return pedido;
     }
@@ -338,10 +365,10 @@ public class PedidoService {
             if (texto.length() > 300) texto = texto.substring(0, 300);
             detalle = "El cliente reclama problemas en la entrega del pedido N° " + pedido.getNumero() + ": \"" + texto + "\".";
         } else {
-            throw new BadRequestException("En este momento no se puede enviar un reclamo para este pedido.");
+            throw new ConflictException("En este momento no se puede enviar un reclamo para este pedido.");
         }
         if (cadete == null) {
-            throw new BadRequestException("Este pedido no tiene un cadete asignado.");
+            throw new ConflictException("Este pedido no tiene un cadete asignado.");
         }
         String paraCliente = "Se está informando al cadete sobre la novedad. Pronto se comunicará con usted.";
         if (pedido.getUltimoReclamoEn() != null
@@ -413,7 +440,7 @@ public class PedidoService {
 
     private void exigirSinReclamoAbierto(Cadete cadete) {
         if (tieneReclamoAbierto(cadete.getId())) {
-            throw new BadRequestException("El cadete tiene un incidente abierto por un reclamo de un cliente: "
+            throw new ConflictException("El cadete tiene un incidente abierto por un reclamo de un cliente: "
                     + "no puede recibir pedidos hasta que se cierre (se cierra solo, o cerralo desde el panel).");
         }
     }
@@ -625,7 +652,7 @@ public class PedidoService {
     public Pedido repetirPorToken(String token) {
         Pedido original = getPorToken(token);
         if (!"FINALIZADO".equals(original.getEstado().getId())) {
-            throw new BadRequestException("Solo se puede repetir un pedido ya finalizado.");
+            throw new ConflictException("Solo se puede repetir un pedido ya finalizado.");
         }
         PedidoRequest req = new PedidoRequest(
                 original.getClienteTelefono(), original.getClienteNombre(),
@@ -861,6 +888,7 @@ public class PedidoService {
      */
     private void reembolsarComisionSiCorresponde(Pedido pedido, Cadete cadete) {
         if (cadete == null || pedido.getComisionDescontada() == null) return;
+        bloquear(cadete);
         BigDecimal comision = pedido.getComisionDescontada();
         cadete.setCreditoDisponible(cadete.getCreditoDisponible().add(comision));
         pedido.setComisionDescontada(null);
@@ -901,21 +929,21 @@ public class PedidoService {
 
     /** El admin confirma un candidato (sugerido o elegido a mano) — dispara la primera oferta. */
     public Pedido asignar(String pedidoId, String cadeteId, String adminUsername) {
-        Pedido pedido = get(pedidoId);
+        Pedido pedido = getParaActualizar(pedidoId);
         if (!"SIN_ASIGNAR".equals(pedido.getEstado().getId())) {
-            throw new BadRequestException("El pedido ya tiene una asignacion en curso.");
+            throw new ConflictException("El pedido ya tiene una asignación en curso.");
         }
         Cadete cadete = cadeteRepo.findById(cadeteId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Cadete", cadeteId));
         if (!cadete.isActivo() || !"LIBRE".equals(cadete.getEstado().getId())) {
-            throw new BadRequestException("El cadete no esta libre.");
+            throw new ConflictException("El cadete no está libre.");
         }
         exigirSinReclamoAbierto(cadete);
         if (!puedeRecibirViajes(cadete)) {
-            throw new BadRequestException("El cadete todavia no pago la cuota semanal — no se le puede asignar.");
+            throw new ConflictException("El cadete todavía no pagó la cuota semanal — no se le puede asignar.");
         }
         if (!dentroDeTopes(cadete, pedido)) {
-            throw new BadRequestException("El cadete supera su tope de viajes, de dinero transportado o no le alcanza el crédito.");
+            throw new ConflictException("El cadete supera su tope de viajes, de dinero transportado o no le alcanza el crédito.");
         }
         pedido.setAsignadoPorUsername(adminUsername);
         ofertar(pedido, cadete);
@@ -934,13 +962,15 @@ public class PedidoService {
         if (pedidoIds == null || pedidoIds.isEmpty()) {
             throw new BadRequestException("Elegí al menos un pedido.");
         }
+        // Primero los bloqueos (antes de cualquier otra lectura), en orden de id para no cruzarse con otro lote.
+        pedidoIds.stream().distinct().sorted().forEach(this::getParaActualizar);
         Cadete cadete = cadeteRepo.findById(cadeteId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Cadete", cadeteId));
         if (!cadete.isActivo() || !"LIBRE".equals(cadete.getEstado().getId())) {
-            throw new BadRequestException("El cadete no esta libre.");
+            throw new ConflictException("El cadete no está libre.");
         }
         if (!puedeRecibirViajes(cadete)) {
-            throw new BadRequestException("El cadete todavia no pago la cuota semanal — no se le puede asignar.");
+            throw new ConflictException("El cadete todavía no pagó la cuota semanal — no se le puede asignar.");
         }
         exigirSinReclamoAbierto(cadete);
         List<Pedido> pedidos = pedidoIds.stream().map(this::get).toList();
@@ -948,7 +978,7 @@ public class PedidoService {
         Pedido primero = pedidos.get(0);
         for (Pedido p : pedidos) {
             if (!"SIN_ASIGNAR".equals(p.getEstado().getId())) {
-                throw new BadRequestException("El pedido #" + p.getNumero() + " ya tiene una asignacion en curso.");
+                throw new ConflictException("El pedido #" + p.getNumero() + " ya tiene una asignación en curso.");
             }
             double distancia = GeocodingService.distanciaKm(
                     primero.getOrigenLat(), primero.getOrigenLng(), p.getOrigenLat(), p.getOrigenLng());
@@ -958,7 +988,7 @@ public class PedidoService {
         }
         for (Pedido p : pedidos) {
             if (!dentroDeTopes(cadete, p)) {
-                throw new BadRequestException(
+                throw new ConflictException(
                         "El cadete supera su tope de viajes simultáneos o de dinero transportado con este lote.");
             }
             p.setAsignadoPorUsername(adminUsername);
@@ -1003,24 +1033,24 @@ public class PedidoService {
      * 40) — antes había que "Quitar" (vuelve a SIN_ASIGNAR) y asignar de nuevo desde cero.
      */
     public Pedido reasignar(String pedidoId, String nuevoCadeteId, String adminUsername) {
-        Pedido pedido = get(pedidoId);
+        Pedido pedido = getParaActualizar(pedidoId);
         Cadete actual = pedido.getCadeteAsignado();
         if (actual == null) {
-            throw new BadRequestException("El pedido no tiene cadete asignado.");
+            throw new ConflictException("El pedido no tiene cadete asignado.");
         }
         Cadete nuevo = cadeteRepo.findById(nuevoCadeteId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Cadete", nuevoCadeteId));
         if (nuevo.getId().equals(actual.getId())) {
-            throw new BadRequestException("Ese cadete ya tiene el pedido asignado.");
+            throw new ConflictException("Ese cadete ya tiene el pedido asignado.");
         }
         if (!nuevo.isActivo() || !"LIBRE".equals(nuevo.getEstado().getId())) {
-            throw new BadRequestException("El cadete no esta libre.");
+            throw new ConflictException("El cadete no está libre.");
         }
         if (!puedeRecibirViajes(nuevo)) {
-            throw new BadRequestException("El cadete todavia no pago la cuota semanal — no se le puede asignar.");
+            throw new ConflictException("El cadete todavía no pagó la cuota semanal — no se le puede asignar.");
         }
         if (!dentroDeTopes(nuevo, pedido)) {
-            throw new BadRequestException("El cadete supera su tope de viajes, de dinero transportado o no le alcanza el crédito.");
+            throw new ConflictException("El cadete supera su tope de viajes, de dinero transportado o no le alcanza el crédito.");
         }
 
         cerrarOfertaPendienteSiExiste(pedido, actual, "QUITADO_ADMIN");
@@ -1055,10 +1085,10 @@ public class PedidoService {
      * rechazo — ver {@link PedidoCadeteExcluido}.
      */
     public Pedido quitarCadete(String pedidoId, boolean devolverComision) {
-        Pedido pedido = get(pedidoId);
+        Pedido pedido = getParaActualizar(pedidoId);
         Cadete cadete = pedido.getCadeteAsignado();
         if (cadete == null) {
-            throw new BadRequestException("El pedido no tiene cadete asignado.");
+            throw new ConflictException("El pedido no tiene cadete asignado.");
         }
         cerrarOfertaPendienteSiExiste(pedido, cadete, "QUITADO_ADMIN");
         if (devolverComision) {
@@ -1096,9 +1126,9 @@ public class PedidoService {
 
     /** Boton "Anular": cancela el pedido en cualquier estado activo. Motivo ("CLIENTE"/"OTRO") es para métricas. */
     public Pedido cancelar(String pedidoId, String motivo, String adminUsername) {
-        Pedido pedido = get(pedidoId);
+        Pedido pedido = getParaActualizar(pedidoId);
         if (ESTADOS_FINALES.contains(pedido.getEstado().getId())) {
-            throw new BadRequestException("El pedido ya esta cerrado.");
+            throw new ConflictException("El pedido ya está cerrado.");
         }
         Cadete cadete = pedido.getCadeteAsignado();
         if (cadete != null) {
@@ -1125,18 +1155,24 @@ public class PedidoService {
     // --- Acciones del cadete ---
 
     public Pedido aceptar(String pedidoId, String cadeteUsername) {
-        Pedido pedido = get(pedidoId);
+        Pedido pedido = getParaActualizar(pedidoId);
         Cadete cadete = cadeteDelUsername(cadeteUsername);
         validarPertenencia(pedido, cadete);
+        // Ya lo aceptó (doble toque o la app reintentó porque no le llegó la respuesta): se
+        // devuelve el pedido como está, sin volver a cobrar la comisión ni mandar otro SMS.
+        if ("EN_CURSO".equals(pedido.getEstado().getId())) {
+            return pedido;
+        }
         OfertaPedido oferta = ofertaPendiente(pedidoId, cadete.getId());
         if (oferta.getExpiraEn().isBefore(Instant.now())) {
-            throw new BadRequestException("El tiempo para aceptar este viaje ya vencio.");
+            throw new ConflictException("El tiempo para aceptar este viaje ya venció.");
         }
         oferta.setResultado(resultado("ACEPTADO"));
         oferta.setRespondidoEn(Instant.now());
         ofertaRepo.save(oferta);
 
         if ("PORCENTAJE".equals(cadete.getModalidadPago())) {
+            bloquear(cadete);
             BigDecimal comision = comisionDe(pedido);
             cadete.setCreditoDisponible(cadete.getCreditoDisponible().subtract(comision));
             pedido.setComisionDescontada(comision);
@@ -1157,7 +1193,7 @@ public class PedidoService {
     }
 
     public Pedido rechazar(String pedidoId, String cadeteUsername, String motivo) {
-        Pedido pedido = get(pedidoId);
+        Pedido pedido = getParaActualizar(pedidoId);
         Cadete cadete = cadeteDelUsername(cadeteUsername);
         validarPertenencia(pedido, cadete);
         OfertaPedido oferta = ofertaPendiente(pedidoId, cadete.getId());
@@ -1178,14 +1214,16 @@ public class PedidoService {
      */
     public Pedido registrarRecepcion(String pedidoId, String cadeteUsername, String fotoUrl, Double lat, Double lng,
                                      boolean archivoPerdido) {
-        Pedido pedido = get(pedidoId);
+        Pedido pedido = getParaActualizar(pedidoId);
         Cadete cadete = cadeteDelUsername(cadeteUsername);
         validarPertenencia(pedido, cadete);
-        if (!"EN_CURSO".equals(pedido.getEstado().getId())) {
-            throw new BadRequestException("El pedido no esta en curso.");
-        }
+        // Ya estaba retirado: la cola sin conexión de la app reintenta hasta recibir OK — si el
+        // primer envío llegó pero se perdió la respuesta, antes quedaba trabada para siempre.
         if (pedido.getRetiradoEn() != null) {
-            throw new BadRequestException("El pedido ya fue marcado como retirado.");
+            return pedido;
+        }
+        if (!"EN_CURSO".equals(pedido.getEstado().getId())) {
+            throw new ConflictException("El pedido no está en curso.");
         }
         boolean sinFotoRetiro = fotoUrl == null || fotoUrl.isBlank();
         if (sinFotoRetiro && !archivoPerdido && configuracionService.getBoolean("foto_retiro_obligatoria", false)) {
@@ -1215,11 +1253,11 @@ public class PedidoService {
      * pedido entero, y exige que todas las paradas ya estén entregadas.
      */
     public Pedido marcarParadaEntregada(String pedidoId, String cadeteUsername, String paradaId) {
-        Pedido pedido = get(pedidoId);
+        Pedido pedido = getParaActualizar(pedidoId);
         Cadete cadete = cadeteDelUsername(cadeteUsername);
         validarPertenencia(pedido, cadete);
         if (!"EN_CURSO".equals(pedido.getEstado().getId())) {
-            throw new BadRequestException("El pedido no esta en curso.");
+            throw new ConflictException("El pedido no está en curso.");
         }
         PedidoParada parada = pedido.getParadas().stream()
                 .filter(p -> p.getId().equals(paradaId))
@@ -1234,7 +1272,7 @@ public class PedidoService {
     }
 
     public Pedido finalizar(String pedidoId, String cadeteUsername, FinalizarRequest req) {
-        Pedido pedido = get(pedidoId);
+        Pedido pedido = getParaActualizar(pedidoId);
         Cadete cadete = cadeteDelUsername(cadeteUsername);
         validarPertenencia(pedido, cadete);
         return finalizarInterno(pedido, cadete, req, true);
@@ -1246,21 +1284,25 @@ public class PedidoService {
      * cierre normal, no exige nombre de receptor ni foto — es una excepcion que confirma el admin.
      */
     public Pedido finalizarComoAdmin(String pedidoId, FinalizarRequest req) {
-        Pedido pedido = get(pedidoId);
+        Pedido pedido = getParaActualizar(pedidoId);
         Cadete cadete = pedido.getCadeteAsignado();
         if (cadete == null) {
-            throw new BadRequestException("El pedido no tiene cadete asignado.");
+            throw new ConflictException("El pedido no tiene cadete asignado.");
         }
         return finalizarInterno(pedido, cadete, req, false);
     }
 
     private Pedido finalizarInterno(Pedido pedido, Cadete cadete, FinalizarRequest req, boolean exigirComprobante) {
+        // Ya finalizado (doble toque o reintento de la cola sin conexión): OK sin repetir SMS ni push.
+        if ("FINALIZADO".equals(pedido.getEstado().getId())) {
+            return pedido;
+        }
         if (!"EN_CURSO".equals(pedido.getEstado().getId())) {
-            throw new BadRequestException("El pedido no esta en curso.");
+            throw new ConflictException("El pedido no está en curso.");
         }
         long paradasSinEntregar = pedido.getParadas().stream().filter(p -> p.getEntregadoEn() == null).count();
         if (exigirComprobante && paradasSinEntregar > 0) {
-            throw new BadRequestException("Todavia faltan " + paradasSinEntregar + " parada(s) por entregar.");
+            throw new BadRequestException("Todavía faltan " + paradasSinEntregar + " parada(s) por entregar.");
         }
         boolean sinReceptor = req.receptorNombre() == null || req.receptorNombre().isBlank();
         boolean sinFoto = req.fotoUrl() == null || req.fotoUrl().isBlank();
@@ -1269,13 +1311,13 @@ public class PedidoService {
         // archivoPerdido = la app la sacó pero el archivo desapareció antes de subirse (cola offline).
         boolean perdido = req.seperdioElArchivo();
         if (exigirComprobante && sinReceptor) {
-            throw new BadRequestException("Hace falta el nombre y apellido de quien recibio.");
+            throw new BadRequestException("Hace falta el nombre y apellido de quien recibió.");
         }
         if (exigirComprobante && sinFoto && !perdido && configuracionService.getBoolean("foto_entrega_obligatoria", true)) {
             throw new BadRequestException("Hace falta una foto de la entrega.");
         }
         if (exigirComprobante && sinFirma && !perdido && configuracionService.getBoolean("firma_receptor_obligatoria", false)) {
-            throw new BadRequestException("Hace falta la firma digital de quien recibio.");
+            throw new BadRequestException("Hace falta la firma digital de quien recibió.");
         }
         if (exigirComprobante && perdido && (sinFoto || sinFirma)) {
             dejarComentarioArchivoPerdido(pedido, cadete, "entrega");
@@ -1308,11 +1350,11 @@ public class PedidoService {
      * con {@link #reintentarEntrega} en vez de cargarlo de cero).
      */
     public Pedido marcarNoEntregado(String pedidoId, String cadeteUsername, String motivo) {
-        Pedido pedido = get(pedidoId);
+        Pedido pedido = getParaActualizar(pedidoId);
         Cadete cadete = cadeteDelUsername(cadeteUsername);
         validarPertenencia(pedido, cadete);
         if (!"EN_CURSO".equals(pedido.getEstado().getId())) {
-            throw new BadRequestException("El pedido no esta en curso.");
+            throw new ConflictException("El pedido no está en curso.");
         }
         pedido.setEstado(estado("NO_ENTREGADO"));
         pedido.setMotivoNoEntrega(motivo == null || motivo.isBlank() ? null : motivo.trim());
@@ -1331,9 +1373,9 @@ public class PedidoService {
      * que pase de nuevo por la asignación normal, sin anularlo ni cargarlo de cero.
      */
     public Pedido reintentarEntrega(String pedidoId) {
-        Pedido pedido = get(pedidoId);
+        Pedido pedido = getParaActualizar(pedidoId);
         if (!"NO_ENTREGADO".equals(pedido.getEstado().getId())) {
-            throw new BadRequestException("Este pedido no esta en 'No se pudo entregar'.");
+            throw new ConflictException("Este pedido no está en 'No se pudo entregar'.");
         }
         pedido.setEstado(estado("SIN_ASIGNAR"));
         pedido.setCadeteAsignado(null);
@@ -1358,13 +1400,13 @@ public class PedidoService {
     public Pedido calificar(String token, int estrellas, String comentario) {
         Pedido pedido = getPorToken(token);
         if (!"FINALIZADO".equals(pedido.getEstado().getId())) {
-            throw new BadRequestException("Todavia no se puede calificar este pedido.");
+            throw new ConflictException("Todavía no se puede calificar este pedido.");
         }
         if (pedido.getCalificadoEn() != null) {
-            throw new BadRequestException("Este pedido ya fue calificado.");
+            throw new ConflictException("Este pedido ya fue calificado.");
         }
         if (estrellas < 1 || estrellas > 5) {
-            throw new BadRequestException("La calificacion tiene que ser de 1 a 5 estrellas.");
+            throw new BadRequestException("La calificación tiene que ser de 1 a 5 estrellas.");
         }
         pedido.setCalificacionEstrellas(estrellas);
         pedido.setCalificacionComentario(comentario == null || comentario.isBlank() ? null : comentario.trim());
@@ -1453,13 +1495,13 @@ public class PedidoService {
 
     private void validarPertenencia(Pedido pedido, Cadete cadete) {
         if (pedido.getCadeteAsignado() == null || !pedido.getCadeteAsignado().getId().equals(cadete.getId())) {
-            throw new BadRequestException("Este viaje ya no te pertenece.");
+            throw new ConflictException("Este viaje ya no te pertenece.");
         }
     }
 
     private OfertaPedido ofertaPendiente(String pedidoId, String cadeteId) {
         return ofertaRepo.findFirstByPedidoIdAndCadeteIdAndResultadoId(pedidoId, cadeteId, "PENDIENTE")
-                .orElseThrow(() -> new BadRequestException("La oferta de este viaje ya no esta vigente."));
+                .orElseThrow(() -> new ConflictException("La oferta de este viaje ya no está vigente."));
     }
 
     private Cadete cadeteDelUsername(String username) {
@@ -1512,6 +1554,14 @@ public class PedidoService {
     public void expirarOfertasVencidas() {
         List<OfertaPedido> vencidas = ofertaRepo.findByResultadoIdAndExpiraEnBefore("PENDIENTE", Instant.now());
         for (OfertaPedido oferta : vencidas) {
+            // El cadete pudo haber aceptado/rechazado justo entre la lista y acá: con el pedido bloqueado
+            // y releído, si ya no está esperando a ESTE cadete, la oferta ya se respondió (2026-09-26).
+            Pedido pedido = oferta.getPedido();
+            bloquear(pedido);
+            if (!"PENDIENTE".equals(pedido.getEstado().getId()) || pedido.getCadeteAsignado() == null
+                    || !pedido.getCadeteAsignado().getId().equals(oferta.getCadete().getId())) {
+                continue;
+            }
             oferta.setResultado(resultado("EXPIRADO"));
             ofertaRepo.save(oferta);
             liberarYReasignar(oferta.getPedido(), oferta.getCadete());
@@ -1545,6 +1595,8 @@ public class PedidoService {
 
         List<Pedido> sinCandidato = new ArrayList<>();
         for (Pedido p : sinAsignar) {
+            bloquear(p);
+            if (!"SIN_ASIGNAR".equals(p.getEstado().getId())) continue; // lo asignó un admin mientras tanto
             Optional<Cadete> candidato = buscarCandidato(p, 1);
             if (candidato.isPresent()) {
                 ofertar(p, candidato.get());

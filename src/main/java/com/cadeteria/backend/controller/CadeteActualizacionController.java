@@ -1,5 +1,6 @@
 package com.cadeteria.backend.controller;
 
+import jakarta.validation.Valid;
 import com.cadeteria.backend.dto.CadeteActualizacionDtos.ActualizacionCadeteRequest;
 import com.cadeteria.backend.dto.CadeteActualizacionDtos.ActualizacionResponse;
 import com.cadeteria.backend.model.CadeteActualizacion;
@@ -22,7 +23,7 @@ public class CadeteActualizacionController {
     }
 
     @PostMapping
-    public ResponseEntity<ActualizacionResponse> crear(Authentication auth, @RequestBody ActualizacionCadeteRequest req) {
+    public ResponseEntity<ActualizacionResponse> crear(Authentication auth, @Valid @RequestBody ActualizacionCadeteRequest req) {
         CadeteActualizacion lote = service.crear(auth.getName(), req);
         return ResponseEntity.status(201).body(ActualizacionResponse.from(lote, service.camposDe(lote.getId())));
     }

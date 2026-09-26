@@ -1,8 +1,18 @@
 package com.cadeteria.backend.dto;
 
+import com.cadeteria.backend.common.Validaciones;
 import com.cadeteria.backend.model.Cadete;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -12,43 +22,55 @@ public final class CadeteDtos {
 
     private CadeteDtos() {}
 
-    /** El usuario de login del cadete es su DNI: solo dígitos, hasta 8 (nada de letras ni más largo). */
-    static final String REGEX_USERNAME_DNI = "^[0-9]{1,8}$";
-    static final String MENSAJE_USERNAME_DNI = "El usuario debe ser el DNI: solo números, sin puntos ni letras, máximo 8 dígitos";
+    /** El usuario de login del cadete es su DNI: 7 u 8 dígitos (nada de letras, puntos ni más largo). */
+    static final String REGEX_USERNAME_DNI = "^[0-9]{7,8}$";
+    static final String MENSAJE_USERNAME_DNI = "El usuario debe ser el DNI: solo números, sin puntos ni letras, 7 u 8 dígitos.";
 
     /** password es obligatoria solo al crear (el service la ignora si viene null en un update). */
     public record CadeteRequest(
-            @NotBlank String nombre,
-            @NotBlank String apellido,
-            @NotBlank String dni,
-            @NotBlank String telefono,
-            String email,
-            String fotoUrl,
-            @NotBlank String tipoVehiculoId,
-            String vehiculoColor,
-            String vehiculoPatente,
-            String vehiculoMarca,
-            String vehiculoModelo,
+            @NotBlank(message = "Falta el nombre.") @Size(max = 60, message = "El nombre puede tener hasta 60 letras.")
+            @Pattern(regexp = Validaciones.NOMBRE_PERSONA, message = Validaciones.MSJ_NOMBRE) String nombre,
+            @NotBlank(message = "Falta el apellido.") @Size(max = 60, message = "El apellido puede tener hasta 60 letras.")
+            @Pattern(regexp = Validaciones.NOMBRE_PERSONA, message = Validaciones.MSJ_APELLIDO) String apellido,
+            @NotBlank(message = "Falta el DNI.") @Pattern(regexp = Validaciones.DNI, message = Validaciones.MSJ_DNI) String dni,
+            @NotBlank(message = "Falta el teléfono.") @Pattern(regexp = Validaciones.TELEFONO, message = Validaciones.MSJ_TELEFONO) String telefono,
+            @Size(max = 120, message = "El email puede tener hasta 120 caracteres.")
+            @Pattern(regexp = Validaciones.VACIO_O + Validaciones.EMAIL, message = Validaciones.MSJ_EMAIL) String email,
+            @Size(max = 500) String fotoUrl,
+            @NotBlank(message = "Elegí el tipo de vehículo.") String tipoVehiculoId,
+            @Pattern(regexp = Validaciones.VACIO_O + Validaciones.COLOR, message = Validaciones.MSJ_COLOR) String vehiculoColor,
+            @Pattern(regexp = Validaciones.VACIO_O + Validaciones.PATENTE_MOTO, message = Validaciones.MSJ_PATENTE) String vehiculoPatente,
+            @Pattern(regexp = Validaciones.VACIO_O + Validaciones.MARCA_MODELO, message = Validaciones.MSJ_MARCA) String vehiculoMarca,
+            @Pattern(regexp = Validaciones.VACIO_O + Validaciones.MARCA_MODELO, message = Validaciones.MSJ_MODELO) String vehiculoModelo,
+            @Min(value = 1950, message = "El año del vehículo no es válido.") @Max(value = 2100, message = "El año del vehículo no es válido.")
             Integer vehiculoAnio,
-            String fotoVehiculoUrl,
-            String fotoCarnetUrl,
-            String fotoCarnetDorsoUrl,
-            String fotoTarjetaVerdeUrl,
-            String fotoTarjetaVerdeDorsoUrl,
+            @Size(max = 500) String fotoVehiculoUrl,
+            @Size(max = 500) String fotoCarnetUrl,
+            @Size(max = 500) String fotoCarnetDorsoUrl,
+            @Size(max = 500) String fotoTarjetaVerdeUrl,
+            @Size(max = 500) String fotoTarjetaVerdeDorsoUrl,
             @NotBlank @Pattern(regexp = REGEX_USERNAME_DNI, message = MENSAJE_USERNAME_DNI) String username,
-            String password,
+            @Size(min = Validaciones.PASSWORD_MIN, max = Validaciones.PASSWORD_MAX, message = Validaciones.MSJ_PASSWORD) String password,
+            @PositiveOrZero(message = "El monto máximo transportado no puede ser negativo.")
+            @Digits(integer = 10, fraction = 2, message = "El monto máximo transportado no es válido.")
             BigDecimal montoMaximoTransportado,
+            @Min(value = 1, message = "Los viajes simultáneos tienen que ser 1 o más.") @Max(value = 20, message = "Hasta 20 viajes simultáneos.")
             Integer maxViajesSimultaneos,
             /** null = sin tope — máximo de viajes FINALIZADOS por día/semana (ronda 6, punto 33). */
-            Integer maxViajesDiarios,
-            Integer maxViajesSemanales,
+            @Positive(message = "El tope diario tiene que ser mayor a 0.") Integer maxViajesDiarios,
+            @Positive(message = "El tope semanal tiene que ser mayor a 0.") Integer maxViajesSemanales,
             /** Ambos null = sin turno fijo, disponible siempre (comportamiento previo). */
             LocalTime turnoInicio,
             LocalTime turnoFin,
             /** "SEMANAL" | "PORCENTAJE" — null/blank se toma como "SEMANAL" (ronda 7). */
             String modalidadPago,
             /** Notas libres del admin sobre este cadete (ronda 10, punto 103). */
-            String notasInternas
+            @Size(max = 4000, message = "Las notas pueden tener hasta 4000 caracteres.") String notasInternas,
+            /**
+             * El admin confirma que verificó que tiene 18 años o más (2026-09-26). Obligatorio al crear;
+             * al editar se ignora (la constancia ya quedó guardada).
+             */
+            Boolean mayorDeEdad
     ) {}
 
     public record CadeteResponse(
@@ -145,20 +167,27 @@ public final class CadeteDtos {
      * montoSemanal es opcional — si viene, se guarda como el nuevo precio de la cuota semanal
      * de este cadete (pantalla "Pagos" unificada).
      */
-    public record HabilitarPagoSemanalRequest(@jakarta.validation.constraints.NotNull BigDecimal montoPagado, Instant venceEn,
-                                               BigDecimal montoSemanal) {}
+    public record HabilitarPagoSemanalRequest(
+            @NotNull(message = "Falta el monto pagado.") @PositiveOrZero(message = "El monto pagado no puede ser negativo.")
+            @Digits(integer = 10, fraction = 2, message = "El monto pagado no es válido.") BigDecimal montoPagado,
+            Instant venceEn,
+            @PositiveOrZero(message = "La cuota semanal no puede ser negativa.") BigDecimal montoSemanal) {}
 
     /** Cargar crédito a un cadete PORCENTAJE tras recibir su transferencia (ronda 7). */
-    public record AcreditarRequest(@jakarta.validation.constraints.NotNull BigDecimal monto) {}
+    public record AcreditarRequest(
+            @NotNull(message = "Falta el monto.") @Positive(message = "El monto tiene que ser mayor a 0.")
+            @Digits(integer = 10, fraction = 2, message = "El monto no es válido.") BigDecimal monto) {}
 
     /** Cambiar el modelo de cobro de un cadete desde la pantalla "Pagos" (antes solo se podía al crear/editar el cadete). */
-    public record ModalidadPagoRequest(@NotBlank String modalidadPago) {}
+    public record ModalidadPagoRequest(
+            @NotBlank(message = "Elegí la modalidad de pago.")
+            @Pattern(regexp = "SEMANAL|PORCENTAJE", message = "La modalidad de pago tiene que ser SEMANAL o PORCENTAJE.") String modalidadPago) {}
 
     /** El admin la ve por si no le llegó el mail al cadete (mejora 2026-09-17). */
     public record ReenviarPasswordResponse(String passwordTemporal) {}
 
     /** motivo: por qué se dio de baja/reactivó (ronda 10, punto 96) — opcional. */
-    public record ActivoRequest(boolean activo, String motivo) {}
+    public record ActivoRequest(boolean activo, @Size(max = 255, message = "El motivo puede tener hasta 255 caracteres.") String motivo) {}
 
     public record CadeteEstadoLogResponse(String id, boolean activo, String motivo, Instant cambiadoEn, String cambiadoPorUsername) {}
 
@@ -180,23 +209,34 @@ public final class CadeteDtos {
             Long pedidoNumero, Instant creadoEn, String creadoPorUsername
     ) {}
 
-    public record EstadoRequest(@NotBlank String estadoId) {}
+    public record EstadoRequest(
+            @NotBlank(message = "Falta el estado.")
+            @Pattern(regexp = "LIBRE|OCUPADO|DESCONECTADO", message = "El estado tiene que ser LIBRE, OCUPADO o DESCONECTADO.") String estadoId) {}
 
-    public record UbicacionRequest(double lat, double lng) {}
+    public record UbicacionRequest(
+            @DecimalMin(value = "-90", message = "Latitud inválida.") @DecimalMax(value = "90", message = "Latitud inválida.") double lat,
+            @DecimalMin(value = "-180", message = "Longitud inválida.") @DecimalMax(value = "180", message = "Longitud inválida.") double lng) {}
 
     public record FcmTokenRequest(@NotBlank String fcmToken) {}
 
     /** El cadete cambia su propia contraseña desde la app (spec: se le puede romper el celular). */
-    public record CambiarPasswordRequest(@NotBlank String actual, @NotBlank String nueva) {}
+    public record CambiarPasswordRequest(
+            @NotBlank(message = "Falta la contraseña actual.") String actual,
+            @NotBlank(message = "Falta la contraseña nueva.")
+            @Size(min = Validaciones.PASSWORD_MIN, max = Validaciones.PASSWORD_MAX, message = Validaciones.MSJ_PASSWORD) String nueva) {}
 
     /** El cadete cambia su propio teléfono desde la app (si cambia de celular/línea). */
-    public record TelefonoRequest(@NotBlank String telefono) {}
+    public record TelefonoRequest(
+            @NotBlank(message = "Falta el teléfono.") @Pattern(regexp = Validaciones.TELEFONO, message = Validaciones.MSJ_TELEFONO) String telefono) {}
 
     /** El cadete carga sus propios datos de cobro (para que el cliente le transfiera). */
-    public record CuentaRequest(String cbu, String aliasCbu) {}
+    public record CuentaRequest(
+            @Pattern(regexp = Validaciones.VACIO_O + Validaciones.CBU, message = Validaciones.MSJ_CBU) String cbu,
+            @Pattern(regexp = Validaciones.VACIO_O + Validaciones.ALIAS_CBU, message = Validaciones.MSJ_ALIAS) String aliasCbu) {}
 
     /** Aviso general del admin a todos los cadetes conectados ahora mismo (spec: "cerramos temprano", etc). */
-    public record AvisoGeneralRequest(@NotBlank String mensaje) {}
+    public record AvisoGeneralRequest(
+            @NotBlank(message = "Escribí el aviso.") @Size(max = 1000, message = "El aviso puede tener hasta 1000 caracteres.") String mensaje) {}
 
     /** Para el panel: cuántos de los cadetes que recibieron el aviso ya lo confirmaron. */
     public record AvisoGeneralResponse(String id, String mensaje, Instant enviadoEn, int totalDestinatarios, long totalLeido) {

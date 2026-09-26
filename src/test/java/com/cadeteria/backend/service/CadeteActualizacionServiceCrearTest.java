@@ -1,6 +1,7 @@
 package com.cadeteria.backend.service;
 
 import com.cadeteria.backend.common.BadRequestException;
+import com.cadeteria.backend.common.ConflictException;
 import com.cadeteria.backend.dto.CadeteActualizacionDtos.ActualizacionCadeteRequest;
 import com.cadeteria.backend.model.Cadete;
 import com.cadeteria.backend.model.CadeteActualizacion;
@@ -86,7 +87,7 @@ class CadeteActualizacionServiceCrearTest {
         cadeteActual();
         when(campoRepo.existePendientePara("c1", "PENDIENTE")).thenReturn(true);
 
-        assertThrows(BadRequestException.class, () ->
+        assertThrows(ConflictException.class, () ->
                 service.crear("jperez", new ActualizacionCadeteRequest(
                         null, null, null, null, null, null, "Azul", null, null)));
     }

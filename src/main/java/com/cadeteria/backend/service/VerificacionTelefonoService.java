@@ -1,5 +1,6 @@
 package com.cadeteria.backend.service;
 
+import com.cadeteria.backend.common.TooManyRequestsException;
 import com.cadeteria.backend.common.BadRequestException;
 import com.cadeteria.backend.config.AppProperties;
 import com.cadeteria.backend.dto.VerificacionTelefonoDtos.EnviarCodigoResponse;
@@ -72,7 +73,7 @@ public class VerificacionTelefonoService {
             throw new BadRequestException("Ingresá un teléfono válido.");
         }
         if (!rateLimitService.permitir("otp-tel:" + telefono, 3, Duration.ofMinutes(10))) {
-            throw new BadRequestException("Ya te mandamos un código hace poco — esperá unos minutos antes de pedir otro.");
+            throw new TooManyRequestsException("Ya te mandamos un código hace poco — esperá unos minutos antes de pedir otro.");
         }
 
         // Lista blanca (Fase 2): un teléfono que ya pasó el código no lo vuelve a pedir.

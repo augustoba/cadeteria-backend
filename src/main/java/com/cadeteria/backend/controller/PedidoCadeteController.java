@@ -1,5 +1,6 @@
 package com.cadeteria.backend.controller;
 
+import com.cadeteria.backend.common.ConflictException;
 import com.cadeteria.backend.common.BadRequestException;
 import com.cadeteria.backend.dto.PedidoDtos.ComentarioRequest;
 import com.cadeteria.backend.dto.PedidoDtos.ComentarioResponse;
@@ -37,7 +38,11 @@ public class PedidoCadeteController {
     private final ReporteClienteService reporteClienteService;
 
     /** "Reportar al cliente" desde la pantalla del viaje (spec-antiabuso Fase 3). tipo: DEMORO | NO_DECLARO_VALORES | PEDIDO_FALSO | OTRO. */
-    public record ReporteRequest(String tipo, String nota) {}
+    public record ReporteRequest(
+            @jakarta.validation.constraints.NotBlank(message = "Elegí el motivo del reporte.")
+            @jakarta.validation.constraints.Pattern(regexp = "DEMORO|NO_DECLARO_VALORES|PEDIDO_FALSO|OTRO",
+                    message = "El motivo del reporte no es válido.") String tipo,
+            @jakarta.validation.constraints.Size(max = 500, message = "La nota puede tener hasta 500 caracteres.") String nota) {}
 
     public PedidoCadeteController(PedidoService service, CadeteService cadeteService, RutaService rutaService,
                                   ReporteClienteService reporteClienteService) {
@@ -104,12 +109,12 @@ public class PedidoCadeteController {
 
     /** Solo acumula contra el teléfono del cliente: no bloquea ni marca nada (el admin decide). */
     @PostMapping("/{id}/reporte")
-    public void reportarCliente(@PathVariable String id, @RequestBody ReporteRequest req, Authentication auth) {
+    public void reportarCliente(@PathVariable String id, @Valid @RequestBody ReporteRequest req, Authentication auth) {
         reporteClienteService.reportar(id, auth.getName(), req.tipo(), req.nota());
     }
 
     @PostMapping("/{id}/rechazar")
-    public PedidoResponse rechazar(@PathVariable String id, @RequestBody(required = false) RechazarRequest req, Authentication auth) {
+    public PedidoResponse rechazar(@PathVariable String id, @Valid @RequestBody(required = false) RechazarRequest req, Authentication auth) {
         return PedidoResponse.paraCadete(service.rechazar(id, auth.getName(), req == null ? null : req.motivo()));
     }
 
@@ -121,13 +126,13 @@ public class PedidoCadeteController {
     }
 
     @PostMapping("/{id}/finalizar")
-    public PedidoResponse finalizar(@PathVariable String id, @RequestBody FinalizarRequest req, Authentication auth) {
+    public PedidoResponse finalizar(@PathVariable String id, @Valid @RequestBody FinalizarRequest req, Authentication auth) {
         return PedidoResponse.paraCadete(service.finalizar(id, auth.getName(), req));
     }
 
     /** Botón "No se pudo entregar" (ej. el cliente no atendió) — el pedido no se anula, el admin lo puede reintentar. */
     @PostMapping("/{id}/no-entregado")
-    public PedidoResponse noEntregado(@PathVariable String id, @RequestBody(required = false) NoEntregadoRequest req,
+    public PedidoResponse noEntregado(@PathVariable String id, @Valid @RequestBody(required = false) NoEntregadoRequest req,
                                        Authentication auth) {
         return PedidoResponse.paraCadete(service.marcarNoEntregado(id, auth.getName(), req == null ? null : req.motivo()));
     }
@@ -150,7 +155,7 @@ public class PedidoCadeteController {
     public Map<String, Object> ruta(@PathVariable String id, Authentication auth) {
         Cadete cadete = cadeteService.getByUsername(auth.getName());
         if (cadete.getLat() == null || cadete.getLng() == null) {
-            throw new BadRequestException("Todavia no se registro tu ubicacion.");
+            throw new ConflictException("Todavía no se registró tu ubicación.");
         }
         Pedido pedido = service.get(id);
         return rutaService.calcularRuta(cadete.getLat(), cadete.getLng(),

@@ -3,7 +3,9 @@ package com.cadeteria.backend.repository;
 import com.cadeteria.backend.model.Pedido;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -13,6 +15,16 @@ import java.util.Optional;
 
 public interface PedidoRepository extends JpaRepository<Pedido, String> {
     Optional<Pedido> findByTokenSeguimiento(String tokenSeguimiento);
+
+    /**
+     * Lee el pedido bloqueando la fila hasta que termine la transacción (2026-09-26): si llegan dos
+     * acciones a la vez sobre el mismo pedido (doble toque en "Aceptar", la app que reintenta, dos
+     * admins), la segunda espera a la primera y ve el resultado — no se cobra la comisión dos veces.
+     * Tiene que ser la PRIMERA lectura de la transacción para que MySQL no use una foto vieja.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from Pedido p where p.id = :id")
+    Optional<Pedido> findByIdParaActualizar(@Param("id") String id);
 
     List<Pedido> findByEstadoIdInOrderByCreadoEnDesc(List<String> estadoIds);
 

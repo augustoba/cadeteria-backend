@@ -1,5 +1,8 @@
 package com.cadeteria.backend.dto;
 
+import com.cadeteria.backend.common.Validaciones;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -11,14 +14,16 @@ public final class ClienteDtos {
 
     public record ClienteRequest(
             /** Va siempre por la URL (@PathVariable); acá es opcional, el controller la pisa igual. */
-            String telefono,
-            String nombreContacto,
-            String empresa,
-            BigDecimal tarifaEspecial,
+            @Pattern(regexp = Validaciones.VACIO_O + Validaciones.TELEFONO, message = Validaciones.MSJ_TELEFONO) String telefono,
+            @Pattern(regexp = Validaciones.VACIO_O + Validaciones.NOMBRE_CLIENTE, message = Validaciones.MSJ_NOMBRE_CLIENTE) String nombreContacto,
+            @Size(max = 100, message = "La empresa puede tener hasta 100 caracteres.") String empresa,
+            @PositiveOrZero(message = "La tarifa especial no puede ser negativa.")
+            @Digits(integer = 10, fraction = 2, message = "La tarifa especial no es válida.") BigDecimal tarifaEspecial,
             boolean problematico,
-            String notasProblematico,
+            @Size(max = 255, message = "Las notas pueden tener hasta 255 caracteres.") String notasProblematico,
             boolean activo,
             /** "CONTADO" | "CUENTA_CORRIENTE" (ronda 10, punto 100) — null/blank se toma como "CONTADO". */
+            @Pattern(regexp = "^$|CONTADO|CUENTA_CORRIENTE", message = "La facturación tiene que ser CONTADO o CUENTA_CORRIENTE.")
             String modalidadFacturacion
     ) {}
 

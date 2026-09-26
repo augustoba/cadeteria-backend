@@ -1,6 +1,8 @@
 package com.cadeteria.backend.service;
 
 import com.cadeteria.backend.common.BadRequestException;
+import com.cadeteria.backend.common.ConflictException;
+import com.cadeteria.backend.common.GoneException;
 import com.cadeteria.backend.common.ResourceNotFoundException;
 import com.cadeteria.backend.config.AppProperties;
 import com.cadeteria.backend.model.EstadoPedido;
@@ -33,6 +35,9 @@ class PedidoServiceSeguimientoTest {
     @BeforeEach
     void setUp() {
         repo = mock(PedidoRepository.class);
+        // La lectura con bloqueo (2026-09-26) devuelve lo mismo que findById en estos tests.
+        when(repo.findByIdParaActualizar(org.mockito.ArgumentMatchers.anyString()))
+                .thenAnswer(inv -> repo.findById(inv.getArgument(0)));
         config = mock(ConfiguracionService.class);
         publisher = mock(WebSocketPublisher.class);
         fcm = mock(FcmService.class);
@@ -46,6 +51,8 @@ class PedidoServiceSeguimientoTest {
                 mock(PedidoPrecioLogRepository.class), mock(WebPushService.class),
                 mock(PedidoParadaRepository.class), mock(MovimientoCreditoRepository.class),
                 incidenciaRepo, mock(PedidoCadeteExcluidoRepository.class), new AppProperties());
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "em",
+                mock(jakarta.persistence.EntityManager.class));
     }
 
     @Test
@@ -63,7 +70,7 @@ class PedidoServiceSeguimientoTest {
     @Test
     void entregadoAyerYaNoAbre() {
         tokenDe(pedido("FINALIZADO", Instant.now().minus(Duration.ofDays(1))));
-        assertThrows(BadRequestException.class, () -> service.getPorToken("tok"));
+        assertThrows(GoneException.class, () -> service.getPorToken("tok"));
     }
 
     @Test
@@ -78,7 +85,7 @@ class PedidoServiceSeguimientoTest {
         Pedido p = pedido("CANCELADO", null);
         p.setCanceladoEn(Instant.now().minus(Duration.ofDays(2)));
         tokenDe(p);
-        assertThrows(BadRequestException.class, () -> service.getPorToken("tok"));
+        assertThrows(GoneException.class, () -> service.getPorToken("tok"));
     }
 
     @Test
@@ -166,14 +173,14 @@ class PedidoServiceSeguimientoTest {
         when(cadeteRepo.findById("c1")).thenReturn(Optional.of(c));
         when(incidenciaRepo.existsByCadeteIdAndOrigenAndEstado("c1", PedidoService.ORIGEN_RECLAMO, "ABIERTA")).thenReturn(true);
 
-        var error = assertThrows(BadRequestException.class, () -> service.asignar("p1", "c1", "admin"));
+        var error = assertThrows(ConflictException.class, () -> service.asignar("p1", "c1", "admin"));
         org.junit.jupiter.api.Assertions.assertTrue(error.getMessage().contains("reclamo"), error.getMessage());
     }
 
     @Test
     void sinCadeteOCanceladoNoSePuedeReclamar() {
         tokenDe(pedido("SIN_ASIGNAR", null));
-        assertThrows(BadRequestException.class, () -> service.reclamoDelCliente("tok"));
+        assertThrows(ConflictException.class, () -> service.reclamoDelCliente("tok"));
     }
 
     private Pedido conCadete(Pedido p) {

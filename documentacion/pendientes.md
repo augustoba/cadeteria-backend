@@ -140,6 +140,42 @@ Direcciones que el buscador no encuentra — para ir llenando la base propia sin
   de cadete no se creaba (`columnDefinition` entre comillas); el job de reclamos deshacía el cierre
   si fallaba un envío.
 
+## Hecho el 2026-09-26 (noche): errores, validaciones y doble toque
+
+- **Cada error con su código HTTP** (antes casi todo era 400 o 500): 400 dato inválido, 401 login,
+  403 sin permiso, 404, 405, 409 conflicto (la oferta venció, ya lo asignó otro admin, el reclamo
+  ya se cerró, DNI duplicado), 410 link vencido o ya usado, 413 archivo grande, 415, 429 demasiados
+  intentos, 503 servicio externo sin cupo. El cuerpo trae `codigo` fijo (ej. `CONFLICTO`,
+  `VALIDACION`) además del `message`, y en validaciones `fieldErrors` campo por campo.
+- **Los 500 ya no muestran el error interno** (podía traer el SQL): dicen "avisá a soporte con el
+  código XXXX" y ese código queda en el log con el detalle. Antes no se logueaban.
+- **Los errores siempre en JSON**: sin encabezado `Accept` (la APK no lo manda) salían en XML.
+- **Validaciones en backend + panel + APK** con las mismas reglas (`common/Validaciones.java`,
+  `core/utils/validaciones.ts`, `util/Validaciones.kt`): nombre y apellido solo letras, DNI 7 u 8
+  números, teléfono 7 a 15 dígitos, email, patente de moto 123ABC o A123BCD (se guarda en
+  mayúsculas sin espacios), color, marca y modelo, CBU 22 números, alias 6-20, contraseña 6-72,
+  código de 6 números, montos no negativos, coordenadas válidas y largos máximos de cada texto
+  (antes un texto largo tiraba 500). El nombre del **cliente** acepta números (puede ser un comercio).
+- **Formulario de alta de cadete**: DNI de 7 u 8 números, patente obligatoria para moto, fotos
+  obligatorias también en el backend (antes solo las pedía el front) y casilla **"Declaro que soy
+  mayor de 18 años"**: se guarda cuándo la tildó y el panel lo muestra al revisar la solicitud. Al
+  crear un cadete desde el panel, el admin tiene que tildar "Verifiqué que es mayor de 18" (queda
+  guardado quién y cuándo).
+- **Doble toque / reintento de la app**: aceptar, retirar y finalizar repetidos devuelven OK sin
+  cobrar otra vez la comisión ni mandar otro SMS. Antes la cola sin conexión de la APK quedaba
+  trabada para siempre si se perdía la respuesta. Las acciones sobre un pedido y el crédito del
+  cadete ahora bloquean la fila, así que dos a la vez van una detrás de otra.
+- **Límite por IP**: ya no se saltea con un `X-Forwarded-For` inventado (ver `TRUSTED_PROXIES` en
+  `despliegue.md`).
+- **Login**: ahora dice el motivo real (contraseña mal 401, cuenta bloqueada 429, cuota impaga 403,
+  temporal vencida 401), también en la APK. Y **el bloqueo por intentos fallidos no andaba**: la
+  excepción deshacía la transacción y el contador nunca subía. Arreglado y probado en vivo.
+- **Columnas `@Lob`** (`incidencia.descripcion`, `zona.poligono`, `cadete.notas_internas`,
+  `whatsapp_respuesta.texto`): en una base nueva quedaban TINYTEXT (255) — en producción guardar un
+  polígono de zona habría fallado. Ahora tienen largo explícito.
+- Tests: backend 178 (antes 158), panel 13, APK 14. En vivo contra `cadeteria_prueba_claude`: 16
+  chequeos (códigos, login y bloqueo, 3 "Aceptar" a la vez → comisión una vez, retiro repetido, IP).
+
 ## ⚠️ Falta probar (no se probó todavía)
 
 Lo de arriba se probó con tests (153 del backend), compilando panel y APK, y en su mayoría con
@@ -160,6 +196,12 @@ pruebas contra el backend en la base `cadeteria_prueba_claude`. **No se probó:*
 - **Link corto de Google Maps** de la app del celular (`maps.app.goo.gl`): no se probó con uno real.
 - **Registro de cadete con DNI repetido** en la base real (se probó en la de prueba).
 - Que el QR se lea desde otro celular (necesita `FRONT_BASE_URL` pública; con `localhost` no abre).
+- **Validaciones en pantalla (2026-09-26)**: el formulario de alta con la casilla de mayor de 18 y
+  la patente, el alta de cadete del panel, nuevo pedido y `/pedir` — solo se compiló el panel. En
+  la APK: mensajes del servidor al aceptar/finalizar/login y las validaciones del perfil (solo se
+  compiló y corrieron los tests).
+- **Cadetes ya cargados con datos que no cumplen el formato nuevo** (ej. una patente de auto o un
+  nombre con números): al editarlos, el panel va a pedir corregir ese dato antes de guardar.
 
 ## Abierto
 
@@ -247,6 +289,9 @@ corto), qué pasa con avisos falsos, y el tema legal (ver la conversación).
   deja modificado en git.
 - Con JDK 21 el `assembleDebug` falla en `jlink` (AGP 8.5): compilar con un JDK 17
   (`-Dorg.gradle.java.home=...jbr-17...`).
-- `whatsapp_respuesta.texto` también es TINYTEXT (`@Lob`): una respuesta de un cliente de más de 255
-  caracteres fallaría al guardarse. Mismo arreglo que `whatsapp_mensaje` (length 4000).
+- Con `DEMO_ENABLED=true`, en el primer minuto después de arrancar el job `avisosDemora` puede
+  chocar (deadlock) con el cargador de la demo que borra y vuelve a crear los pedidos. Se reintenta
+  solo al minuto; en producción no hay demo. Ya pasaba antes.
+- La ficha del cadete todavía no muestra la constancia de mayor de edad (sí la revisión de la
+  solicitud); el dato está guardado en `cadete.mayor_edad_declarada_en/por`.
 - La vista **Kanban** del dashboard todavía no muestra los colores de reclamos ni de sin asignar.

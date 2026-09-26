@@ -1,5 +1,6 @@
 package com.cadeteria.backend.controller;
 
+import jakarta.validation.Valid;
 import com.cadeteria.backend.dto.CadeteActualizacionDtos.CampoPendienteAdminResponse;
 import com.cadeteria.backend.dto.CadeteActualizacionDtos.CampoResponse;
 import com.cadeteria.backend.dto.CadeteActualizacionDtos.RechazarCampoRequest;
@@ -33,7 +34,7 @@ public class CadeteActualizacionAdminController {
     }
 
     @PostMapping("/campos/{id}/rechazar")
-    public CampoResponse rechazar(@PathVariable String id, @RequestBody(required = false) RechazarCampoRequest req, Authentication auth) {
+    public CampoResponse rechazar(@PathVariable String id, @Valid @RequestBody(required = false) RechazarCampoRequest req, Authentication auth) {
         return CampoResponse.from(service.rechazarCampo(id, req == null ? null : req.motivo(), auth.getName()));
     }
 

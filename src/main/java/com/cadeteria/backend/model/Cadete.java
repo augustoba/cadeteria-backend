@@ -183,7 +183,8 @@ public class Cadete {
     private boolean alertaCreditoBajoEnviada = false;
 
     /** Notas libres del admin sobre este cadete (ej. "llega tarde seguido") — ronda 10, punto 103. */
-    @jakarta.persistence.Lob
+    /** Texto largo: no usar @Lob, que en una base nueva de MySQL queda como TINYTEXT (255) — ver WhatsappMensaje.texto. */
+    @Column(length = 100_000)
     private String notasInternas;
 
     /**
@@ -194,6 +195,13 @@ public class Cadete {
      */
     @Column(nullable = false)
     private boolean debeCambiarPassword = false;
+
+    /**
+     * Constancia de mayoría de edad (2026-09-26): cuándo se declaró que tiene 18 años o más y quién
+     * ("postulante" si lo tildó en el formulario de alta, o el usuario del admin que lo cargó).
+     */
+    private java.time.Instant mayorEdadDeclaradaEn;
+    private String mayorEdadDeclaradaPor;
     private Instant passwordTemporalExpira;
 
     /** Última versión de APK con la que se logueó — visibilidad para el admin (mejora 2026-09-17), no bloquea nada. */
@@ -596,6 +604,22 @@ public class Cadete {
 
     public void setDebeCambiarPassword(boolean debeCambiarPassword) {
         this.debeCambiarPassword = debeCambiarPassword;
+    }
+
+    public java.time.Instant getMayorEdadDeclaradaEn() {
+        return mayorEdadDeclaradaEn;
+    }
+
+    public void setMayorEdadDeclaradaEn(java.time.Instant mayorEdadDeclaradaEn) {
+        this.mayorEdadDeclaradaEn = mayorEdadDeclaradaEn;
+    }
+
+    public String getMayorEdadDeclaradaPor() {
+        return mayorEdadDeclaradaPor;
+    }
+
+    public void setMayorEdadDeclaradaPor(String mayorEdadDeclaradaPor) {
+        this.mayorEdadDeclaradaPor = mayorEdadDeclaradaPor;
     }
 
     public Instant getPasswordTemporalExpira() {

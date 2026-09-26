@@ -1,5 +1,6 @@
 package com.cadeteria.backend.service;
 
+import com.cadeteria.backend.common.ConflictException;
 import com.cadeteria.backend.common.BadRequestException;
 import com.cadeteria.backend.common.ResourceNotFoundException;
 import com.cadeteria.backend.config.AppProperties;
@@ -223,7 +224,7 @@ public class ReclamoService {
 
     private void exigirReclamoDeProblemaAbierto(Pedido p) {
         if (!"PROBLEMA_ENTREGA".equals(p.getReclamoTipo()) || !p.isReclamoAbierto()) {
-            throw new BadRequestException("Este pedido no tiene un reclamo abierto.");
+            throw new ConflictException("Este pedido no tiene un reclamo abierto.");
         }
     }
 

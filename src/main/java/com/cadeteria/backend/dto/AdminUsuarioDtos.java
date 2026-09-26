@@ -1,6 +1,8 @@
 package com.cadeteria.backend.dto;
 
-import jakarta.validation.constraints.NotBlank;
+import com.cadeteria.backend.common.Validaciones;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
 
 import java.time.Instant;
 
@@ -11,7 +13,9 @@ public final class AdminUsuarioDtos {
 
     public record AdminUsuarioResponse(String id, String username, String rol, boolean enabled, Instant createdAt) {}
 
-    public record CrearAdminRequest(@NotBlank String username, @NotBlank String rol) {}
+    public record CrearAdminRequest(
+            @NotBlank(message = "Falta el usuario.") @Pattern(regexp = Validaciones.USUARIO_ADMIN, message = Validaciones.MSJ_USUARIO_ADMIN) String username,
+            @NotBlank(message = "Elegí el rol.") String rol) {}
 
     public record CrearAdminResponse(AdminUsuarioResponse admin, String passwordTemporal) {}
 

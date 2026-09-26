@@ -1,5 +1,6 @@
 package com.cadeteria.backend.service;
 
+import com.cadeteria.backend.common.ConflictException;
 import com.cadeteria.backend.common.BadRequestException;
 import com.cadeteria.backend.model.Cadete;
 import com.cadeteria.backend.model.Pedido;
@@ -47,7 +48,7 @@ public class ReporteClienteService {
         Pedido pedido = pedidoService.getDeCadete(pedidoId, cadeteUsername);
         Cadete cadete = pedido.getCadeteAsignado();
         if (!"OTRO".equals(tipo) && repo.existsByPedidoIdAndCadeteIdAndTipo(pedido.getId(), cadete.getId(), tipo)) {
-            throw new BadRequestException("Ya reportaste esto para este viaje.");
+            throw new ConflictException("Ya reportaste esto para este viaje.");
         }
 
         ReporteCliente r = new ReporteCliente();

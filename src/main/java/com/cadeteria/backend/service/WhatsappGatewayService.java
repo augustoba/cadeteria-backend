@@ -1,5 +1,6 @@
 package com.cadeteria.backend.service;
 
+import com.cadeteria.backend.common.ConflictException;
 import com.cadeteria.backend.common.BadRequestException;
 import com.cadeteria.backend.common.ResourceNotFoundException;
 import com.cadeteria.backend.config.AppProperties;
@@ -223,7 +224,7 @@ public class WhatsappGatewayService {
     public void eliminarChip(String chipId) {
         WhatsappChip chip = chipRepo.findById(chipId).orElseThrow(() -> ResourceNotFoundException.of("Chip", chipId));
         if (!"BAJA".equals(chip.getEstado())) {
-            throw new BadRequestException("Primero hay que dar de baja el chip antes de eliminarlo.");
+            throw new ConflictException("Primero hay que dar de baja el chip antes de eliminarlo.");
         }
         chipRepo.delete(chip);
         publisher.publicarPanelWhatsapp("CHIP");

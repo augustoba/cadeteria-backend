@@ -1,5 +1,6 @@
 package com.cadeteria.backend.service;
 
+import com.cadeteria.backend.common.ConflictException;
 import com.cadeteria.backend.common.BadRequestException;
 import com.cadeteria.backend.common.ResourceNotFoundException;
 import com.cadeteria.backend.dto.IncidenciaDtos.IncidenciaRequest;
@@ -85,7 +86,7 @@ public class IncidenciaService {
     public Incidencia cerrar(String id, String adminUsername) {
         Incidencia i = get(id);
         if ("CERRADA".equals(i.getEstado())) {
-            throw new BadRequestException("La incidencia ya está cerrada.");
+            throw new ConflictException("La incidencia ya está cerrada.");
         }
         i.setEstado("CERRADA");
         i.setCerradaEn(Instant.now());

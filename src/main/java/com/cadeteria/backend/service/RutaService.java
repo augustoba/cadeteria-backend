@@ -1,5 +1,6 @@
 package com.cadeteria.backend.service;
 
+import com.cadeteria.backend.common.ServiceUnavailableException;
 import com.cadeteria.backend.common.BadRequestException;
 import com.cadeteria.backend.config.AppProperties;
 import org.slf4j.Logger;
@@ -85,7 +86,7 @@ public class RutaService {
         for (int intento = 0; intento < MAX_INTENTOS_POR_PROVEEDOR; intento++) {
             String key = apiKeyPool.siguienteClave(PROVEEDOR_ORS, CONFIG_ORS_KEYS);
             if (key == null) {
-                throw new BadRequestException("No hay ninguna API key de OpenRouteService con cupo disponible en Configuración.");
+                throw new ServiceUnavailableException("No hay ninguna API key de OpenRouteService con cupo disponible en Configuración.");
             }
             try {
                 apiKeyPool.registrarUso(PROVEEDOR_ORS, CONFIG_ORS_KEYS, key);
@@ -106,7 +107,7 @@ public class RutaService {
                 throw e;
             }
         }
-        throw new BadRequestException("No hay ninguna API key de OpenRouteService con cupo disponible en Configuración.");
+        throw new ServiceUnavailableException("No hay ninguna API key de OpenRouteService con cupo disponible en Configuración.");
     }
 
     /**

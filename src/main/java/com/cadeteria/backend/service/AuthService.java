@@ -7,6 +7,8 @@ import com.cadeteria.backend.model.Cadete;
 import com.cadeteria.backend.repository.AccesoLogRepository;
 import com.cadeteria.backend.repository.AdminRepository;
 import com.cadeteria.backend.repository.CadeteRepository;
+import com.cadeteria.backend.common.ForbiddenException;
+import com.cadeteria.backend.common.TooManyRequestsException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -47,17 +49,19 @@ public class AuthService {
     }
 
     /** Registra el acceso (ronda 5, punto 50) — ip es opcional, viene del controller. */
-    @Transactional
+    // noRollbackFor (2026-09-26): el intento fallido se tiene que guardar aunque el login tire error — antes
+    // la excepción deshacía la transacción, el contador nunca subía y el bloqueo por intentos no se activaba.
+    @Transactional(noRollbackFor = {BadCredentialsException.class, TooManyRequestsException.class, ForbiddenException.class})
     public JwtService.TokenData loginAdmin(String username, String rawPassword, String ip) {
         Admin admin = admins.findByUsername(username == null ? "" : username.trim())
                 .filter(Admin::isEnabled)
                 .orElse(null);
         if (admin != null && bloqueado(admin.getBloqueadoHasta())) {
-            throw new BadCredentialsException(mensajeBloqueo(admin.getBloqueadoHasta()));
+            throw new TooManyRequestsException(mensajeBloqueo(admin.getBloqueadoHasta()));
         }
         if (admin == null || !passwordEncoder.matches(rawPassword, admin.getPasswordHash())) {
             if (admin != null) registrarFalloAdmin(admin);
-            throw new BadCredentialsException("Usuario o contrasena incorrectos");
+            throw new BadCredentialsException("Usuario o contraseña incorrectos.");
         }
         if (admin.isDebeCambiarPassword()) {
             if (passwordTemporalVencida(admin.getPasswordTemporalExpira())) {
@@ -98,17 +102,19 @@ public class AuthService {
         return loginCadete(username, rawPassword, null);
     }
 
-    @Transactional
+    // noRollbackFor (2026-09-26): el intento fallido se tiene que guardar aunque el login tire error — antes
+    // la excepción deshacía la transacción, el contador nunca subía y el bloqueo por intentos no se activaba.
+    @Transactional(noRollbackFor = {BadCredentialsException.class, TooManyRequestsException.class, ForbiddenException.class})
     public JwtService.TokenData loginCadete(String username, String rawPassword, Integer versionApp) {
         Cadete cadete = cadetes.findByUsername(username == null ? "" : username.trim())
                 .filter(Cadete::isActivo)
                 .orElse(null);
         if (cadete != null && bloqueado(cadete.getBloqueadoHasta())) {
-            throw new BadCredentialsException(mensajeBloqueo(cadete.getBloqueadoHasta()));
+            throw new TooManyRequestsException(mensajeBloqueo(cadete.getBloqueadoHasta()));
         }
         if (cadete == null || !passwordEncoder.matches(rawPassword, cadete.getPasswordHash())) {
             if (cadete != null) registrarFalloCadete(cadete);
-            throw new BadCredentialsException("Usuario o contrasena incorrectos");
+            throw new BadCredentialsException("Usuario o contraseña incorrectos.");
         }
         if (cadete.isDebeCambiarPassword()) {
             if (passwordTemporalVencida(cadete.getPasswordTemporalExpira())) {
@@ -119,7 +125,7 @@ public class AuthService {
             cadete.setPasswordTemporalExpira(null);
         }
         if ("SEMANAL".equals(cadete.getModalidadPago()) && !cadete.isHabilitadoPago()) {
-            throw new BadCredentialsException("No podes ingresar: falta pagar la cuota semanal. Comunicate con la cadeteria.");
+            throw new ForbiddenException("No podés ingresar: falta pagar la cuota semanal. Comunicate con la cadetería.");
         }
         cadete.setIntentosFallidos(0);
         cadete.setBloqueadoHasta(null);

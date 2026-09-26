@@ -1,6 +1,8 @@
 package com.cadeteria.backend.service;
 
 import com.cadeteria.backend.common.BadRequestException;
+import com.cadeteria.backend.common.ConflictException;
+import com.cadeteria.backend.common.Validaciones;
 import com.cadeteria.backend.common.ResourceNotFoundException;
 import com.cadeteria.backend.dto.CadeteDtos.AvisoGeneralResponse;
 import com.cadeteria.backend.dto.CadeteDtos.CadeteFichaResponse;
@@ -157,25 +159,47 @@ public class CadeteService {
         return repo.findByUsername(username).orElseThrow(() -> ResourceNotFoundException.of("Cadete", username));
     }
 
-    public Cadete create(CadeteRequest req) {
+    /**
+     * @param declaradoPor quién declaró que es mayor de edad: el usuario del admin que lo carga, o
+     *                     "postulante" si viene del formulario de alta.
+     */
+    public Cadete create(CadeteRequest req, String declaradoPor) {
         if (req.password() == null || req.password().isBlank()) {
-            throw new BadRequestException("La contrasena es obligatoria al crear un cadete.");
+            throw new BadRequestException("La contraseña es obligatoria al crear un cadete.");
         }
+        if (!Boolean.TRUE.equals(req.mayorDeEdad())) {
+            throw new BadRequestException("Confirmá que el cadete es mayor de 18 años: no se puede dar de alta a un menor.");
+        }
+        exigirDniYUsuarioLibres(null, req);
         Cadete c = new Cadete();
         c.setId(UUID.randomUUID().toString());
         c.setPasswordHash(passwordEncoder.encode(req.password()));
         c.setEstado(estadoLibre());
+        c.setMayorEdadDeclaradaEn(Instant.now());
+        c.setMayorEdadDeclaradaPor(declaradoPor);
         apply(c, req);
         return repo.save(c);
     }
 
     public Cadete update(String id, CadeteRequest req) {
         Cadete c = get(id);
+        exigirDniYUsuarioLibres(id, req);
         if (req.password() != null && !req.password().isBlank()) {
             c.setPasswordHash(passwordEncoder.encode(req.password()));
         }
         apply(c, req);
         return repo.save(c);
+    }
+
+    /** DNI y usuario son únicos: 409 con un mensaje claro en vez del error de la base (2026-09-26). */
+    private void exigirDniYUsuarioLibres(String idPropio, CadeteRequest req) {
+        String dni = Validaciones.soloDigitos(req.dni());
+        repo.findByDni(dni).filter(o -> !o.getId().equals(idPropio)).ifPresent(o -> {
+            throw new ConflictException("Ya hay un cadete con el DNI " + dni + " (" + o.getNombre() + " " + o.getApellido() + ").");
+        });
+        repo.findByUsername(req.username().trim()).filter(o -> !o.getId().equals(idPropio)).ifPresent(o -> {
+            throw new ConflictException("El usuario " + req.username().trim() + " ya lo usa " + o.getNombre() + " " + o.getApellido() + ".");
+        });
     }
 
     /** motivo + registro en el historial (ronda 10, punto 96) — antes no quedaba ningún rastro de altas/bajas. */
@@ -256,7 +280,7 @@ public class CadeteService {
         if (blank(c.getFotoTarjetaVerdeUrl())) faltantes.add("tarjeta verde");
         if (blank(c.getFotoVehiculoUrl())) faltantes.add("foto del vehículo");
         if (!faltantes.isEmpty()) {
-            throw new BadRequestException(
+            throw new ConflictException(
                     "Te falta cargar: " + String.join(", ", faltantes) + ". Pedile al admin que te ayude a completarlo antes de activarte.");
         }
     }
@@ -352,6 +376,9 @@ public class CadeteService {
     /** El cadete cambia su propio teléfono desde la app (si cambia de celular/línea). */
     public Cadete actualizarTelefonoPropio(String username, String telefono) {
         Cadete c = getByUsername(username);
+        if (telefono == null || !telefono.matches(Validaciones.TELEFONO)) {
+            throw new BadRequestException(Validaciones.MSJ_TELEFONO);
+        }
         c.setTelefono(telefono.trim());
         return repo.save(c);
     }
@@ -359,6 +386,12 @@ public class CadeteService {
     /** El cadete carga sus propios datos de cobro, para que el cliente le transfiera. */
     public Cadete actualizarCuenta(String username, String cbu, String aliasCbu) {
         Cadete c = getByUsername(username);
+        if (cbu != null && !cbu.isBlank() && !cbu.trim().matches(Validaciones.CBU)) {
+            throw new BadRequestException(Validaciones.MSJ_CBU);
+        }
+        if (aliasCbu != null && !aliasCbu.isBlank() && !aliasCbu.trim().matches(Validaciones.ALIAS_CBU)) {
+            throw new BadRequestException(Validaciones.MSJ_ALIAS);
+        }
         c.setCbu(blankToNull(cbu));
         c.setAliasCbu(blankToNull(aliasCbu));
         return repo.save(c);
@@ -469,7 +502,7 @@ public class CadeteService {
     /** Mejora: cambiar el modelo de cobro desde la pantalla "Pagos" unificada, sin pasar por el form completo de edición. */
     public Cadete cambiarModalidadPago(String id, String modalidadPago) {
         if (!"SEMANAL".equals(modalidadPago) && !"PORCENTAJE".equals(modalidadPago)) {
-            throw new BadRequestException("Modalidad de pago invalida: " + modalidadPago);
+            throw new BadRequestException("Modalidad de pago inválida: " + modalidadPago);
         }
         Cadete c = get(id);
         c.setModalidadPago(modalidadPago);
@@ -481,7 +514,8 @@ public class CadeteService {
         if (monto == null || monto.signum() <= 0) {
             throw new BadRequestException("El monto a acreditar tiene que ser mayor a cero.");
         }
-        Cadete c = get(id);
+        // Con bloqueo: si justo acepta un viaje (que descuenta comisión), una operación espera a la otra.
+        Cadete c = repo.findByIdParaActualizar(id).orElseThrow(() -> ResourceNotFoundException.of("Cadete", id));
         c.setCreditoDisponible(c.getCreditoDisponible().add(monto));
         c.setAlertaCreditoBajoEnviada(false);
         repo.save(c);
@@ -554,9 +588,9 @@ public class CadeteService {
     }
 
     private void apply(Cadete c, CadeteRequest req) {
-        c.setNombre(req.nombre().trim());
-        c.setApellido(req.apellido().trim());
-        c.setDni(req.dni().trim());
+        c.setNombre(Validaciones.normalizarNombre(req.nombre()));
+        c.setApellido(Validaciones.normalizarNombre(req.apellido()));
+        c.setDni(Validaciones.soloDigitos(req.dni()));
         c.setTelefono(req.telefono().trim());
         c.setEmail(blankToNull(req.email()));
         c.setFotoUrl(blankToNull(req.fotoUrl()));
@@ -564,7 +598,7 @@ public class CadeteService {
                 .orElseThrow(() -> ResourceNotFoundException.of("Tipo de vehiculo", req.tipoVehiculoId()));
         c.setTipoVehiculo(tipo);
         c.setVehiculoColor(blankToNull(req.vehiculoColor()));
-        c.setVehiculoPatente(blankToNull(req.vehiculoPatente()));
+        c.setVehiculoPatente(Validaciones.normalizarPatente(req.vehiculoPatente()));
         c.setVehiculoMarca(blankToNull(req.vehiculoMarca()));
         c.setVehiculoModelo(blankToNull(req.vehiculoModelo()));
         c.setVehiculoAnio(req.vehiculoAnio());

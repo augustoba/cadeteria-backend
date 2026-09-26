@@ -29,8 +29,8 @@ public class AuthController {
 
     @PostMapping("/login/admin")
     public ResponseEntity<TokenResponse> loginAdmin(@Valid @RequestBody LoginRequest req, HttpServletRequest http) {
-        String ip = http.getHeader("X-Forwarded-For");
-        if (ip == null || ip.isBlank()) ip = http.getRemoteAddr();
+        // La IP real ya viene resuelta por Tomcat desde el proxy de confianza (ver RateLimitFilter).
+        String ip = http.getRemoteAddr();
         JwtService.TokenData data = authService.loginAdmin(req.username(), req.password(), ip);
         return ResponseEntity.ok(TokenResponse.bearer(data.token(), data.tipo(), data.expiresAt()));
     }

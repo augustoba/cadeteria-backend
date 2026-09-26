@@ -1,5 +1,8 @@
 package com.cadeteria.backend.dto;
 
+import com.cadeteria.backend.common.Validaciones;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
 import com.cadeteria.backend.model.CadeteActualizacion;
 import com.cadeteria.backend.model.CadeteActualizacionCampo;
 
@@ -12,13 +15,17 @@ public final class CadeteActualizacionDtos {
 
     /** Todos los campos son opcionales — el cadete manda solo los que quiere cambiar. */
     public record ActualizacionCadeteRequest(
-            String fotoUrl, String fotoVehiculoUrl,
-            String fotoTarjetaVerdeUrl, String fotoTarjetaVerdeDorsoUrl,
-            String vehiculoMarca, String vehiculoModelo, String vehiculoColor,
-            String vehiculoPatente, Integer vehiculoAnio
+            @Size(max = 500) String fotoUrl, @Size(max = 500) String fotoVehiculoUrl,
+            @Size(max = 500) String fotoTarjetaVerdeUrl, @Size(max = 500) String fotoTarjetaVerdeDorsoUrl,
+            @Pattern(regexp = Validaciones.VACIO_O + Validaciones.MARCA_MODELO, message = Validaciones.MSJ_MARCA) String vehiculoMarca,
+            @Pattern(regexp = Validaciones.VACIO_O + Validaciones.MARCA_MODELO, message = Validaciones.MSJ_MODELO) String vehiculoModelo,
+            @Pattern(regexp = Validaciones.VACIO_O + Validaciones.COLOR, message = Validaciones.MSJ_COLOR) String vehiculoColor,
+            @Pattern(regexp = Validaciones.VACIO_O + Validaciones.PATENTE_MOTO, message = Validaciones.MSJ_PATENTE) String vehiculoPatente,
+            @Min(value = 1950, message = "El año del vehículo no es válido.") @Max(value = 2100, message = "El año del vehículo no es válido.")
+            Integer vehiculoAnio
     ) {}
 
-    public record RechazarCampoRequest(String motivo) {}
+    public record RechazarCampoRequest(@Size(max = 255, message = "El motivo puede tener hasta 255 caracteres.") String motivo) {}
 
     public record CampoResponse(
             String id, String campo, String valorAnterior, String valorPropuesto,

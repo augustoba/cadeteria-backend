@@ -3,7 +3,6 @@ package com.cadeteria.backend.model;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
-import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
@@ -26,8 +25,8 @@ public class WhatsappRespuesta {
 
     private String chipId;
 
-    @Lob
-    @Column(nullable = false)
+    /** Hasta 4000 caracteres (2026-09-26): con @Lob quedaba TINYTEXT (255), igual que WhatsappMensaje.texto. */
+    @Column(nullable = false, length = 4000)
     private String texto;
 
     @Column(nullable = false)

@@ -47,6 +47,9 @@ class PedidoServiceAsignarLoteTest {
     @BeforeEach
     void setUp() {
         repo = mock(PedidoRepository.class);
+        // La lectura con bloqueo (2026-09-26) devuelve lo mismo que findById en estos tests.
+        when(repo.findByIdParaActualizar(org.mockito.ArgumentMatchers.anyString()))
+                .thenAnswer(inv -> repo.findById(inv.getArgument(0)));
         cadeteRepo = mock(CadeteRepository.class);
         ofertaRepo = mock(OfertaPedidoRepository.class);
         estadoPedidoRepo = mock(EstadoPedidoRepository.class);
@@ -61,6 +64,8 @@ class PedidoServiceAsignarLoteTest {
                 mock(PedidoPrecioLogRepository.class), mock(WebPushService.class),
                 mock(PedidoParadaRepository.class), mock(MovimientoCreditoRepository.class),
                 mock(IncidenciaRepository.class), mock(PedidoCadeteExcluidoRepository.class), new AppProperties());
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "em",
+                mock(jakarta.persistence.EntityManager.class));
 
         EstadoCadete libre = new EstadoCadete();
         libre.setId("LIBRE");

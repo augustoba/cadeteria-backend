@@ -1,6 +1,7 @@
 package com.cadeteria.backend.service;
 
 import com.cadeteria.backend.common.BadRequestException;
+import com.cadeteria.backend.common.ConflictException;
 import com.cadeteria.backend.config.AppProperties;
 import com.cadeteria.backend.model.Incidencia;
 import com.cadeteria.backend.model.Pedido;
@@ -168,6 +169,6 @@ class ReclamoServiceTest {
     @Test
     void sinReclamoAbiertoLosBotonesNoHacenNada() {
         pedido.setReclamoEstado("CERRADO");
-        assertThrows(BadRequestException.class, () -> service.clienteSolucionado("tok"));
+        assertThrows(ConflictException.class, () -> service.clienteSolucionado("tok"));
     }
 }

@@ -48,7 +48,7 @@ public class ZonaController {
 
     /** Desactivar/reactivar sin borrar (ronda 10, punto 99). */
     @PatchMapping("/{id}/activo")
-    public ZonaResponse setActivo(@PathVariable String id, @RequestBody com.cadeteria.backend.dto.CadeteDtos.ActivoRequest req) {
+    public ZonaResponse setActivo(@PathVariable String id, @Valid @RequestBody com.cadeteria.backend.dto.CadeteDtos.ActivoRequest req) {
         return ZonaResponse.from(service.setActivo(id, req.activo()));
     }
 

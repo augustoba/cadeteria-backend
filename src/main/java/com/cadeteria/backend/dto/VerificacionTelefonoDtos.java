@@ -1,15 +1,20 @@
 package com.cadeteria.backend.dto;
 
-import jakarta.validation.constraints.NotBlank;
+import com.cadeteria.backend.common.Validaciones;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
 
 /** Verificación de teléfono para "/pedir" sin login (ver VerificacionTelefonoService). */
 public final class VerificacionTelefonoDtos {
 
     private VerificacionTelefonoDtos() {}
 
-    public record EnviarCodigoRequest(@NotBlank String telefono) {}
+    public record EnviarCodigoRequest(
+            @NotBlank(message = "Falta el teléfono.") @Pattern(regexp = Validaciones.TELEFONO, message = Validaciones.MSJ_TELEFONO) String telefono) {}
 
-    public record VerificarCodigoRequest(@NotBlank String telefono, @NotBlank String codigo) {}
+    public record VerificarCodigoRequest(
+            @NotBlank(message = "Falta el teléfono.") @Pattern(regexp = Validaciones.TELEFONO, message = Validaciones.MSJ_TELEFONO) String telefono,
+            @NotBlank(message = "Falta el código.") @Pattern(regexp = Validaciones.CODIGO_6, message = Validaciones.MSJ_CODIGO) String codigo) {}
 
     public record VerificarCodigoResponse(String token) {}
 

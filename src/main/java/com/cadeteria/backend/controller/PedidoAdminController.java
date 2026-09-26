@@ -123,7 +123,7 @@ public class PedidoAdminController {
 
     /** Mejora 93 — marcar/desmarcar un pedido como prioritario/urgente. */
     @PutMapping("/{id}/prioritario")
-    public PedidoResponse setPrioritario(@PathVariable String id, @RequestBody java.util.Map<String, Boolean> body) {
+    public PedidoResponse setPrioritario(@PathVariable String id, @Valid @RequestBody java.util.Map<String, Boolean> body) {
         return PedidoResponse.from(service.setPrioritario(id, Boolean.TRUE.equals(body.get("prioritario"))));
     }
 
@@ -205,14 +205,14 @@ public class PedidoAdminController {
      * no devolverla.
      */
     @PostMapping("/{id}/quitar")
-    public PedidoResponse quitar(@PathVariable String id, @RequestBody(required = false) QuitarRequest req) {
+    public PedidoResponse quitar(@PathVariable String id, @Valid @RequestBody(required = false) QuitarRequest req) {
         boolean devolverComision = req == null || req.devolverComision() == null || req.devolverComision();
         return PedidoResponse.from(service.quitarCadete(id, devolverComision));
     }
 
     /** Boton "Anular". */
     @PostMapping("/{id}/cancelar")
-    public PedidoResponse cancelar(@PathVariable String id, @RequestBody(required = false) CancelarRequest req, Authentication auth) {
+    public PedidoResponse cancelar(@PathVariable String id, @Valid @RequestBody(required = false) CancelarRequest req, Authentication auth) {
         return PedidoResponse.from(service.cancelar(id, req == null ? null : req.motivo(), auth.getName()));
     }
 
@@ -224,7 +224,7 @@ public class PedidoAdminController {
 
     /** Boton "Finalizar": cierre manual para cuando el cadete no tiene internet para hacerlo el mismo. */
     @PostMapping("/{id}/finalizar")
-    public PedidoResponse finalizar(@PathVariable String id, @RequestBody FinalizarRequest req) {
+    public PedidoResponse finalizar(@PathVariable String id, @Valid @RequestBody FinalizarRequest req) {
         return PedidoResponse.from(service.finalizarComoAdmin(id, req));
     }
 

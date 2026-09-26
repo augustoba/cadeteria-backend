@@ -1,5 +1,6 @@
 package com.cadeteria.backend.service;
 
+import com.cadeteria.backend.common.ConflictException;
 import com.cadeteria.backend.common.BadRequestException;
 import com.cadeteria.backend.common.ResourceNotFoundException;
 import com.cadeteria.backend.dto.RolDtos.PermisoResponse;
@@ -82,7 +83,7 @@ public class RolService {
     public RolResponse crear(RolRequest req) {
         String id = normalizarId(req.nombre());
         if (rolRepo.existsById(id)) {
-            throw new BadRequestException("Ya existe un rol con ese nombre.");
+            throw new ConflictException("Ya existe un rol con ese nombre.");
         }
         Rol rol = new Rol();
         rol.setId(id);
@@ -109,11 +110,11 @@ public class RolService {
     public void eliminar(String id) {
         Rol rol = get(id);
         if (rol.isEsSistema()) {
-            throw new BadRequestException("Los roles del sistema (\"admin\", \"operador\") no se pueden borrar.");
+            throw new ConflictException("Los roles del sistema (\"admin\", \"operador\") no se pueden borrar.");
         }
         boolean enUso = adminRepo.findAll().stream().anyMatch(a -> id.equals(a.getRol()));
         if (enUso) {
-            throw new BadRequestException("No se puede borrar un rol que todavía tiene usuarios asignados.");
+            throw new ConflictException("No se puede borrar un rol que todavía tiene usuarios asignados.");
         }
         rolRepo.delete(rol);
     }
@@ -124,7 +125,7 @@ public class RolService {
                 .filter(Admin::isEnabled)
                 .anyMatch(a -> !rolIdExcluidoDePermiso.equals(a.getRol()) && tienePermiso(a, "roles"));
         if (!quedaAlguno) {
-            throw new BadRequestException("No podés sacarle el permiso \"roles\" a este rol — quedaría nadie con acceso para administrar roles.");
+            throw new ConflictException("No podés sacarle el permiso \"roles\" a este rol — quedaría nadie con acceso para administrar roles.");
         }
     }
 

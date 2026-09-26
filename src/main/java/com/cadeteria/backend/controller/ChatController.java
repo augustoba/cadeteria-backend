@@ -1,5 +1,6 @@
 package com.cadeteria.backend.controller;
 
+import com.cadeteria.backend.common.ForbiddenException;
 import com.cadeteria.backend.common.BadRequestException;
 import com.cadeteria.backend.dto.ChatDtos.MensajeRequest;
 import com.cadeteria.backend.dto.ChatDtos.MensajeResponse;
@@ -57,7 +58,7 @@ public class ChatController {
         if (esAdmin(auth)) return;
         String propioId = cadeteService.getByUsername(auth.getName()).getId();
         if (!propioId.equals(cadeteId)) {
-            throw new BadRequestException("No podes acceder al chat de otro cadete.");
+            throw new ForbiddenException("No podés acceder al chat de otro cadete.");
         }
     }
 }

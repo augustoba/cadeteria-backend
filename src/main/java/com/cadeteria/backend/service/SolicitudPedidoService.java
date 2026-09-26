@@ -1,5 +1,6 @@
 package com.cadeteria.backend.service;
 
+import com.cadeteria.backend.common.ConflictException;
 import com.cadeteria.backend.common.BadRequestException;
 import com.cadeteria.backend.common.ResourceNotFoundException;
 import com.cadeteria.backend.config.AppProperties;
@@ -223,7 +224,7 @@ public class SolicitudPedidoService {
             return pedidoService.get(s.getPedidoCreadoId());
         }
         if (!"COTIZADO".equals(s.getEstado())) {
-            throw new BadRequestException("Esta solicitud no tiene una cotización esperando confirmación.");
+            throw new ConflictException("Esta solicitud no tiene una cotización esperando confirmación.");
         }
         Pedido pedido = crearPedidoDesde(s, s.isRequiereMoto(), s.getPrecio(), s.getMontoDeclarado());
         s.setEstado("CONFIRMADA");
@@ -290,7 +291,7 @@ public class SolicitudPedidoService {
     private SolicitudPedido exigirPendiente(String id) {
         SolicitudPedido s = get(id);
         if (!"PENDIENTE".equals(s.getEstado())) {
-            throw new BadRequestException("Esta solicitud ya fue revisada.");
+            throw new ConflictException("Esta solicitud ya fue revisada.");
         }
         return s;
     }

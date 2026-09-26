@@ -71,8 +71,10 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint((req, res, e) -> writeError(res, mapper, HttpStatus.UNAUTHORIZED, "No autenticado"))
-                        .accessDeniedHandler((req, res, e) -> writeError(res, mapper, HttpStatus.FORBIDDEN, "Acceso denegado"))
+                        .authenticationEntryPoint((req, res, e) -> writeError(res, mapper, HttpStatus.UNAUTHORIZED,
+                                "NO_AUTENTICADO", "Tu sesión venció o no iniciaste sesión."))
+                        .accessDeniedHandler((req, res, e) -> writeError(res, mapper, HttpStatus.FORBIDDEN,
+                                "SIN_PERMISO", "No tenés permiso para hacer eso."))
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(rateLimitFilter, JwtAuthFilter.class);
@@ -81,11 +83,10 @@ public class SecurityConfig {
     }
 
     private void writeError(jakarta.servlet.http.HttpServletResponse res, ObjectMapper mapper,
-                             HttpStatus status, String message) throws java.io.IOException {
+                             HttpStatus status, String codigo, String message) throws java.io.IOException {
         res.setStatus(status.value());
-        res.setContentType("application/json");
-        mapper.writeValue(res.getWriter(),
-                ApiError.of(status.value(), status.getReasonPhrase(), message, null));
+        res.setContentType("application/json;charset=UTF-8");
+        mapper.writeValue(res.getWriter(), ApiError.of(status.value(), status.getReasonPhrase(), codigo, message));
     }
 
     private CorsConfigurationSource corsSource() {

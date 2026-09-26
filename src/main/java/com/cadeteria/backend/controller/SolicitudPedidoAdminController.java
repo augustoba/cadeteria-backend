@@ -41,7 +41,7 @@ public class SolicitudPedidoAdminController {
     }
 
     @PostMapping("/{id}/fraudulento")
-    public SolicitudPedidoResponse fraudulento(@PathVariable String id, @RequestBody(required = false) FraudulentoRequest req,
+    public SolicitudPedidoResponse fraudulento(@PathVariable String id, @Valid @RequestBody(required = false) FraudulentoRequest req,
                                                Authentication auth) {
         return conAviso(service.marcarFraudulenta(id, req == null ? null : req.nota(), auth.getName()));
     }
@@ -76,7 +76,7 @@ public class SolicitudPedidoAdminController {
     }
 
     @PostMapping("/{id}/rechazar")
-    public SolicitudPedidoResponse rechazar(@PathVariable String id, @RequestBody(required = false) RechazarSolicitudRequest req) {
+    public SolicitudPedidoResponse rechazar(@PathVariable String id, @Valid @RequestBody(required = false) RechazarSolicitudRequest req) {
         return SolicitudPedidoResponse.from(service.rechazar(id, req == null ? null : req.motivo()));
     }
 }

@@ -1,5 +1,7 @@
 package com.cadeteria.backend.controller;
 
+import com.cadeteria.backend.common.ConflictException;
+import jakarta.validation.Valid;
 import com.cadeteria.backend.common.BadRequestException;
 import com.cadeteria.backend.dto.PublicoDtos.CalificarRequest;
 import com.cadeteria.backend.dto.PublicoDtos.SeguimientoResponse;
@@ -62,26 +64,30 @@ public class PublicoController {
 
     /** El cliente califica desde esta misma página, una sola vez, cuando el pedido ya está FINALIZADO. */
     @PostMapping("/calificacion")
-    public SeguimientoResponse calificar(@PathVariable String token, @RequestBody CalificarRequest req) {
+    public SeguimientoResponse calificar(@PathVariable String token, @Valid @RequestBody CalificarRequest req) {
         return SeguimientoResponse.from(service.calificar(token, req.estrellas(), req.comentario()));
     }
 
-    public record PushSubscribeRequest(String endpoint, String p256dh, String auth) {}
+    public record PushSubscribeRequest(
+            @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 1000) String endpoint,
+            @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 255) String p256dh,
+            @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 255) String auth) {}
 
     /** Mejora 89 — el cliente se suscribe a Web Push desde su propia página de seguimiento. */
     @PostMapping("/push-subscribe")
-    public void pushSubscribe(@PathVariable String token, @RequestBody PushSubscribeRequest req) {
+    public void pushSubscribe(@PathVariable String token, @Valid @RequestBody PushSubscribeRequest req) {
         service.suscribirPush(token, req.endpoint(), req.p256dh(), req.auth());
     }
 
     public record ReclamoResponse(boolean avisado, String mensaje) {}
 
     /** texto: lo que pasó — obligatorio solo al reportar un problema con la entrega. */
-    public record ReclamoRequest(String texto) {}
+    public record ReclamoRequest(
+            @jakarta.validation.constraints.Size(max = 300, message = "Contanos el problema en hasta 300 caracteres.") String texto) {}
 
     /** Botón de reclamo del seguimiento (2026-09-25): el tipo lo decide el estado del pedido. */
     @PostMapping("/reclamo")
-    public ReclamoResponse reclamo(@PathVariable String token, @RequestBody(required = false) ReclamoRequest req) {
+    public ReclamoResponse reclamo(@PathVariable String token, @Valid @RequestBody(required = false) ReclamoRequest req) {
         var r = service.reclamoDelCliente(token, req == null ? null : req.texto());
         return new ReclamoResponse(r.avisado(), r.mensaje());
     }
@@ -116,7 +122,7 @@ public class PublicoController {
         // de quién lo lleva; al entregar suma quién recibió y cuándo.
         String estado = pedido.getEstado().getId();
         if (!"FINALIZADO".equals(estado) && !"EN_CURSO".equals(estado)) {
-            throw new BadRequestException("El comprobante todavia no esta disponible.");
+            throw new ConflictException("El comprobante todavía no está disponible.");
         }
         byte[] pdf = pdfService.generar(pedido);
         return ResponseEntity.ok()

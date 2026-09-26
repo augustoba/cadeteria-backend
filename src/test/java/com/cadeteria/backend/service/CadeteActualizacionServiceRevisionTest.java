@@ -1,6 +1,7 @@
 package com.cadeteria.backend.service;
 
 import com.cadeteria.backend.common.BadRequestException;
+import com.cadeteria.backend.common.ConflictException;
 import com.cadeteria.backend.model.Cadete;
 import com.cadeteria.backend.model.CadeteActualizacion;
 import com.cadeteria.backend.model.CadeteActualizacionCampo;
@@ -74,7 +75,7 @@ class CadeteActualizacionServiceRevisionTest {
         CadeteActualizacionCampo campo = campoPendiente("VEHICULO_COLOR", "Azul");
         campo.setEstado("APROBADO");
 
-        assertThrows(BadRequestException.class, () -> service.aprobarCampo("campo1", "admin"));
+        assertThrows(ConflictException.class, () -> service.aprobarCampo("campo1", "admin"));
     }
 
     @Test

@@ -1,6 +1,8 @@
 package com.cadeteria.backend.config;
 
+import com.cadeteria.backend.common.ApiError;
 import com.cadeteria.backend.service.ConfiguracionService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.cadeteria.backend.service.RateLimitService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -22,6 +24,8 @@ import java.time.Duration;
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
 
+    private static final ObjectMapper JSON = new ObjectMapper().findAndRegisterModules();
+
     private final RateLimitService rateLimitService;
     private final ConfiguracionService configuracionService;
 
@@ -39,19 +43,17 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
         int maxIntentos = configuracionService.getInt("rate_limit_publico_max", 60);
         int ventanaSeg = configuracionService.getInt("rate_limit_publico_ventana_seg", 60);
-        String ip = obtenerIp(request);
+        // IP real del cliente: con server.forward-headers-strategy=native, Tomcat ya la sacó del
+        // X-Forwarded-For SOLO si el pedido vino de un proxy de confianza (TRUSTED_PROXIES). Antes se
+        // leía el header directo y cualquiera se salteaba el límite mandando uno inventado (2026-09-26).
+        String ip = request.getRemoteAddr();
         if (!rateLimitService.permitir("ip:" + ip, maxIntentos, Duration.ofSeconds(ventanaSeg))) {
             response.setStatus(429);
             response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write("{\"error\":\"Demasiadas solicitudes — esperá un momento y probá de nuevo.\"}");
+            JSON.writeValue(response.getWriter(), ApiError.of(429, "Too Many Requests", "DEMASIADAS_SOLICITUDES",
+                    "Demasiadas solicitudes — esperá un momento y probá de nuevo."));
             return;
         }
         filterChain.doFilter(request, response);
-    }
-
-    private String obtenerIp(HttpServletRequest request) {
-        String xff = request.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isBlank()) return xff.split(",")[0].trim();
-        return request.getRemoteAddr();
     }
 }

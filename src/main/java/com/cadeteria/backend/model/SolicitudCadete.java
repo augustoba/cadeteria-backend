@@ -37,6 +37,9 @@ public class SolicitudCadete {
 
     private Instant enviadaEn;
 
+    /** Cuándo tildó "Soy mayor de 18 años" en el formulario (2026-09-26) — no se puede dar de alta a un menor. */
+    private Instant mayorEdadDeclaradaEn;
+
     private String nombre;
     private String apellido;
     private String dni;
@@ -128,6 +131,14 @@ public class SolicitudCadete {
 
     public void setEnviadaEn(Instant enviadaEn) {
         this.enviadaEn = enviadaEn;
+    }
+
+    public Instant getMayorEdadDeclaradaEn() {
+        return mayorEdadDeclaradaEn;
+    }
+
+    public void setMayorEdadDeclaradaEn(Instant mayorEdadDeclaradaEn) {
+        this.mayorEdadDeclaradaEn = mayorEdadDeclaradaEn;
     }
 
     public String getNombre() {

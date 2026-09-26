@@ -37,7 +37,8 @@ public class Zona {
      * centroLat/centroLng/radioM, que además siempre se guarda como fallback y como
      * referencia visual del centro de la zona.
      */
-    @Lob
+    /** Texto largo: no usar @Lob, que en una base nueva de MySQL queda como TINYTEXT (255) — ver WhatsappMensaje.texto. */
+    @Column(length = 100_000)
     private String poligono;
 
     /** Desactivar temporalmente sin borrar (ronda 10, punto 99) — no participa de la asignación mientras esté en false. */

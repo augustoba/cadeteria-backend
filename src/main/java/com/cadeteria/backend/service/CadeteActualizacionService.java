@@ -1,5 +1,6 @@
 package com.cadeteria.backend.service;
 
+import com.cadeteria.backend.common.ConflictException;
 import com.cadeteria.backend.common.BadRequestException;
 import com.cadeteria.backend.common.ResourceNotFoundException;
 import com.cadeteria.backend.dto.CadeteActualizacionDtos.ActualizacionCadeteRequest;
@@ -42,7 +43,7 @@ public class CadeteActualizacionService {
     public CadeteActualizacion crear(String username, ActualizacionCadeteRequest req) {
         Cadete cadete = getCadete(username);
         if (campoRepo.existePendientePara(cadete.getId(), "PENDIENTE")) {
-            throw new BadRequestException("Ya tenés una actualización esperando revisión — esperá a que se resuelva antes de mandar otra.");
+            throw new ConflictException("Ya tenés una actualización esperando revisión — esperá a que se resuelva antes de mandar otra.");
         }
 
         List<CampoCandidato> candidatos = new ArrayList<>();
@@ -131,7 +132,7 @@ public class CadeteActualizacionService {
 
     private void exigirPendiente(CadeteActualizacionCampo campo) {
         if (!"PENDIENTE".equals(campo.getEstado())) {
-            throw new BadRequestException("Este campo ya fue resuelto.");
+            throw new ConflictException("Este campo ya fue resuelto.");
         }
     }
 

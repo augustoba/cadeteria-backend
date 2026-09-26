@@ -1,8 +1,9 @@
 package com.cadeteria.backend.dto;
 
 import com.cadeteria.backend.model.Zona;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import com.cadeteria.backend.common.Validaciones;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -13,17 +14,20 @@ public final class ZonaDtos {
     private ZonaDtos() {}
 
     /** Vértice de un polígono libre de zona (ronda 3, punto 27). */
-    public record PuntoDto(Double lat, Double lng) {}
+    public record PuntoDto(@NotNull @DecimalMin("-90") @DecimalMax("90") Double lat,
+                           @NotNull @DecimalMin("-180") @DecimalMax("180") Double lng) {}
 
     public record ZonaRequest(
-            @NotBlank String nombre,
-            @NotNull Double centroLat,
-            @NotNull Double centroLng,
-            @NotNull Integer radioM,
+            @NotBlank(message = "Falta el nombre de la zona.") @Size(max = 60, message = "El nombre de la zona puede tener hasta 60 caracteres.")
+            String nombre,
+            @NotNull(message = "Falta el centro de la zona.") @DecimalMin("-90") @DecimalMax("90") Double centroLat,
+            @NotNull(message = "Falta el centro de la zona.") @DecimalMin("-180") @DecimalMax("180") Double centroLng,
+            @NotNull(message = "Falta el radio.") @Min(value = 50, message = "El radio tiene que ser de al menos 50 m.")
+            @Max(value = 100_000, message = "El radio puede ser de hasta 100 km.") Integer radioM,
             /** Precio sugerido al cargar un pedido en esta zona — null = sin sugerencia. */
-            BigDecimal tarifaSugerida,
+            @PositiveOrZero(message = "La tarifa sugerida no puede ser negativa.") BigDecimal tarifaSugerida,
             /** null o menos de 3 puntos = la zona sigue siendo el círculo de siempre. */
-            List<PuntoDto> poligono
+            @Size(max = 500, message = "El polígono puede tener hasta 500 puntos.") List<@Valid PuntoDto> poligono
     ) {}
 
     public record ZonaResponse(

@@ -86,8 +86,8 @@ public class CadeteController {
     }
 
     @PostMapping("/api/admin/cadetes")
-    public ResponseEntity<CadeteResponse> create(@Valid @RequestBody CadeteRequest req) {
-        return ResponseEntity.status(201).body(CadeteResponse.from(service.create(req)));
+    public ResponseEntity<CadeteResponse> create(@Valid @RequestBody CadeteRequest req, Authentication auth) {
+        return ResponseEntity.status(201).body(CadeteResponse.from(service.create(req, auth.getName())));
     }
 
     @PutMapping("/api/admin/cadetes/{id}")
@@ -97,7 +97,7 @@ public class CadeteController {
 
     /** motivo opcional + queda registrado en el historial (ronda 10, punto 96). */
     @PatchMapping("/api/admin/cadetes/{id}/activo")
-    public CadeteResponse setActivo(@PathVariable String id, @RequestBody ActivoRequest req, Authentication auth) {
+    public CadeteResponse setActivo(@PathVariable String id, @Valid @RequestBody ActivoRequest req, Authentication auth) {
         return CadeteResponse.from(service.setActivo(id, req.activo(), req.motivo(), auth.getName()));
     }
 
@@ -171,7 +171,7 @@ public class CadeteController {
     }
 
     @PatchMapping("/api/cadetes/me/ubicacion")
-    public CadeteResponse actualizarUbicacion(Authentication auth, @RequestBody UbicacionRequest req) {
+    public CadeteResponse actualizarUbicacion(Authentication auth, @Valid @RequestBody UbicacionRequest req) {
         Cadete c = service.actualizarUbicacion(auth.getName(), req.lat(), req.lng());
         publisher.publicarUbicacion(c);
         return CadeteResponse.from(c);
@@ -215,7 +215,7 @@ public class CadeteController {
 
     /** El cadete carga sus propios datos de cobro (CBU/alias), para que el cliente le transfiera. */
     @PatchMapping("/api/cadetes/me/cuenta")
-    public CadeteResponse actualizarCuenta(Authentication auth, @RequestBody CuentaRequest req) {
+    public CadeteResponse actualizarCuenta(Authentication auth, @Valid @RequestBody CuentaRequest req) {
         return CadeteResponse.from(service.actualizarCuenta(auth.getName(), req.cbu(), req.aliasCbu()));
     }
 

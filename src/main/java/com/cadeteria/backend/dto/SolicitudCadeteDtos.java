@@ -1,8 +1,9 @@
 package com.cadeteria.backend.dto;
 
 import com.cadeteria.backend.model.SolicitudCadete;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
+import com.cadeteria.backend.common.Validaciones;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
 
 import java.time.Instant;
 import java.util.List;
@@ -40,29 +41,36 @@ public final class SolicitudCadeteDtos {
                                           String motivoUltimaBaja, Instant fechaUltimaBaja) {}
 
     /** El admin marca qué corregir: campo -> motivo (ver SolicitudCadeteService.CAMPOS_REVISABLES). */
-    public record PedirCorreccionRequest(Map<String, String> observaciones) {}
+    public record PedirCorreccionRequest(
+            @NotEmpty(message = "Marcá al menos un dato para corregir.") Map<String, @Size(max = 300) String> observaciones) {}
 
     /** mailEnviado=false: el mail no está configurado o no hay email — el admin le pasa el link a mano. */
     public record ReenviarLinkResponse(String url, Instant expiraEn, boolean mailEnviado) {}
 
     public record SolicitudFormRequest(
-            @NotBlank String nombre,
-            @NotBlank String apellido,
-            @NotBlank String dni,
-            @NotBlank String telefono,
-            @NotBlank String email,
-            @NotBlank String tipoVehiculoId,
-            String vehiculoColor,
-            String vehiculoPatente,
-            String vehiculoMarca,
-            String vehiculoModelo,
-            String fotoUrl,
-            String fotoVehiculoUrl,
-            String fotoCarnetUrl,
-            String fotoCarnetDorsoUrl,
-            String fotoTarjetaVerdeUrl,
+            @NotBlank(message = "Falta el nombre.") @Size(max = 60, message = "El nombre puede tener hasta 60 letras.")
+            @Pattern(regexp = Validaciones.NOMBRE_PERSONA, message = Validaciones.MSJ_NOMBRE) String nombre,
+            @NotBlank(message = "Falta el apellido.") @Size(max = 60, message = "El apellido puede tener hasta 60 letras.")
+            @Pattern(regexp = Validaciones.NOMBRE_PERSONA, message = Validaciones.MSJ_APELLIDO) String apellido,
+            @NotBlank(message = "Falta el DNI.") @Pattern(regexp = Validaciones.DNI, message = Validaciones.MSJ_DNI) String dni,
+            @NotBlank(message = "Falta el teléfono.") @Pattern(regexp = Validaciones.TELEFONO, message = Validaciones.MSJ_TELEFONO) String telefono,
+            @NotBlank(message = "Falta el email.") @Size(max = 120, message = "El email puede tener hasta 120 caracteres.")
+            @Pattern(regexp = Validaciones.EMAIL, message = Validaciones.MSJ_EMAIL) String email,
+            @NotBlank(message = "Elegí el tipo de vehículo.") String tipoVehiculoId,
+            @Pattern(regexp = Validaciones.VACIO_O + Validaciones.COLOR, message = Validaciones.MSJ_COLOR) String vehiculoColor,
+            /** Obligatoria para moto (lo valida el service); 123ABC o A123BCD. */
+            @Pattern(regexp = Validaciones.VACIO_O + Validaciones.PATENTE_MOTO, message = Validaciones.MSJ_PATENTE) String vehiculoPatente,
+            @Pattern(regexp = Validaciones.VACIO_O + Validaciones.MARCA_MODELO, message = Validaciones.MSJ_MARCA) String vehiculoMarca,
+            @Pattern(regexp = Validaciones.VACIO_O + Validaciones.MARCA_MODELO, message = Validaciones.MSJ_MODELO) String vehiculoModelo,
+            @Size(max = 500) String fotoUrl,
+            @Size(max = 500) String fotoVehiculoUrl,
+            @Size(max = 500) String fotoCarnetUrl,
+            @Size(max = 500) String fotoCarnetDorsoUrl,
+            @Size(max = 500) String fotoTarjetaVerdeUrl,
             /** Ya no se pide "usuario" (2026-09-25): el usuario es el DNI, ver SolicitudCadeteService. */
-            String fotoTarjetaVerdeDorsoUrl
+            @Size(max = 500) String fotoTarjetaVerdeDorsoUrl,
+            /** Tildó "Soy mayor de 18 años" (2026-09-26): sin esto no se acepta el formulario. */
+            @AssertTrue(message = "Tenés que ser mayor de 18 años para anotarte como cadete.") boolean mayorDeEdad
     ) {}
 
     public record SolicitudResponse(
@@ -75,7 +83,9 @@ public final class SolicitudCadeteDtos {
             String usernamePropuesto, String motivoRechazo, String cadeteCreadoId,
             List<ObservacionResponse> observaciones, int correcciones,
             /** null = ese DNI nunca estuvo registrado como cadete. */
-            CadeteExistenteResponse cadeteExistente
+            CadeteExistenteResponse cadeteExistente,
+            /** Cuándo tildó "Soy mayor de 18 años" (2026-09-26); null en solicitudes anteriores a esa casilla. */
+            Instant mayorEdadDeclaradaEn
     ) {
         public static SolicitudResponse from(SolicitudCadete s) {
             return from(s, null);
@@ -92,7 +102,8 @@ public final class SolicitudCadeteDtos {
                     s.getUsernamePropuesto(), s.getMotivoRechazo(), s.getCadeteCreadoId(),
                     com.cadeteria.backend.service.SolicitudCadeteService.observacionesDe(s),
                     s.getCorrecciones() == null ? 0 : s.getCorrecciones(),
-                    cadeteExistente);
+                    cadeteExistente,
+                    s.getMayorEdadDeclaradaEn());
         }
     }
 
@@ -105,5 +116,5 @@ public final class SolicitudCadeteDtos {
     /** passwordTemporal: por si el mail no está configurado todavía, el admin se la puede pasar a mano. */
     public record AprobarResponse(SolicitudResponse solicitud, String username, String passwordTemporal) {}
 
-    public record RechazarRequest(String motivo) {}
+    public record RechazarRequest(@Size(max = 255, message = "El motivo puede tener hasta 255 caracteres.") String motivo) {}
 }

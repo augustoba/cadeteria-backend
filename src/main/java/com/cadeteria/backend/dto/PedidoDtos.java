@@ -2,9 +2,9 @@ package com.cadeteria.backend.dto;
 
 import com.cadeteria.backend.model.Cadete;
 import com.cadeteria.backend.model.Pedido;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
+import com.cadeteria.backend.common.Validaciones;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -15,29 +15,44 @@ public final class PedidoDtos {
     private PedidoDtos() {}
 
     public record PedidoRequest(
-            @NotBlank String clienteTelefono,
-            @NotBlank String clienteNombre,
-            @NotBlank String origenDireccion,
-            @NotNull Double origenLat,
-            @NotNull Double origenLng,
-            @NotBlank String destinoDireccion,
-            @NotNull Double destinoLat,
-            @NotNull Double destinoLng,
-            @NotNull BigDecimal precio,
-            BigDecimal montoDeclarado,
+            @NotBlank(message = "Falta el teléfono del cliente.")
+            @Pattern(regexp = Validaciones.TELEFONO, message = Validaciones.MSJ_TELEFONO) String clienteTelefono,
+            @NotBlank(message = "Falta el nombre del cliente.")
+            @Pattern(regexp = Validaciones.NOMBRE_CLIENTE, message = Validaciones.MSJ_NOMBRE_CLIENTE) String clienteNombre,
+            @NotBlank(message = "Falta la dirección de retiro.") @Size(max = 500, message = "La dirección de retiro es demasiado larga.")
+            String origenDireccion,
+            @NotNull(message = "Falta ubicar la dirección de retiro en el mapa.") @DecimalMin(value = "-90", message = "Latitud inválida.")
+            @DecimalMax(value = "90", message = "Latitud inválida.") Double origenLat,
+            @NotNull(message = "Falta ubicar la dirección de retiro en el mapa.") @DecimalMin(value = "-180", message = "Longitud inválida.")
+            @DecimalMax(value = "180", message = "Longitud inválida.") Double origenLng,
+            @NotBlank(message = "Falta la dirección de entrega.") @Size(max = 500, message = "La dirección de entrega es demasiado larga.")
+            String destinoDireccion,
+            @NotNull(message = "Falta ubicar la dirección de entrega en el mapa.") @DecimalMin(value = "-90", message = "Latitud inválida.")
+            @DecimalMax(value = "90", message = "Latitud inválida.") Double destinoLat,
+            @NotNull(message = "Falta ubicar la dirección de entrega en el mapa.") @DecimalMin(value = "-180", message = "Longitud inválida.")
+            @DecimalMax(value = "180", message = "Longitud inválida.") Double destinoLng,
+            @NotNull(message = "Falta el precio.") @PositiveOrZero(message = "El precio no puede ser negativo.")
+            @Digits(integer = 10, fraction = 2, message = "El precio no es válido.") BigDecimal precio,
+            @PositiveOrZero(message = "El monto declarado no puede ser negativo.")
+            @Digits(integer = 10, fraction = 2, message = "El monto declarado no es válido.") BigDecimal montoDeclarado,
             /** Declarado por el cliente (mejora 2026-09-23) — ver Pedido.llevaValores. */
             boolean llevaValores,
             /** Valor declarado de los objetos de valor (2026-09-24), null si no lleva. */
-            BigDecimal montoValores,
-            String detalle,
+            @PositiveOrZero(message = "El valor declarado no puede ser negativo.")
+            @Digits(integer = 10, fraction = 2, message = "El valor declarado no es válido.") BigDecimal montoValores,
+            @Size(max = 1000, message = "El detalle puede tener hasta 1000 caracteres.") String detalle,
             /** Piso, depto y observaciones de cada dirección (mejora 2026-09-24), opcionales. */
-            String origenPiso, String origenDepto, String origenObservaciones,
-            String destinoPiso, String destinoDepto, String destinoObservaciones,
+            @Size(max = 20, message = "El piso puede tener hasta 20 caracteres.") String origenPiso,
+            @Size(max = 20, message = "El depto puede tener hasta 20 caracteres.") String origenDepto,
+            @Size(max = 300, message = "Las observaciones pueden tener hasta 300 caracteres.") String origenObservaciones,
+            @Size(max = 20, message = "El piso puede tener hasta 20 caracteres.") String destinoPiso,
+            @Size(max = 20, message = "El depto puede tener hasta 20 caracteres.") String destinoDepto,
+            @Size(max = 300, message = "Las observaciones pueden tener hasta 300 caracteres.") String destinoObservaciones,
             boolean requiereMoto,
             boolean programado,
             Instant fechaProgramada,
             /** Paradas intermedias, en orden (ronda 3, punto 38) — null o vacío si el pedido es simple. */
-            List<ParadaRequest> paradasAdicionales,
+            @Size(max = 20, message = "Hasta 20 paradas por pedido.") List<@Valid ParadaRequest> paradasAdicionales,
             /**
              * De dónde salió el pin de cada dirección (2026-09-25): "manual" (ubicado a mano) o
              * "google_link" (link de Google Maps pegado) se aprenden en la cache de direcciones
@@ -47,7 +62,11 @@ public final class PedidoDtos {
     ) {}
 
     /** Una parada intermedia al cargar el pedido (spec: repartos con varias entregas en una vuelta). */
-    public record ParadaRequest(@NotBlank String direccion, @NotNull Double lat, @NotNull Double lng) {}
+    public record ParadaRequest(
+            @NotBlank(message = "Falta la dirección de la parada.") @Size(max = 500, message = "La dirección de la parada es demasiado larga.")
+            String direccion,
+            @NotNull(message = "Falta ubicar la parada en el mapa.") @DecimalMin("-90") @DecimalMax("90") Double lat,
+            @NotNull(message = "Falta ubicar la parada en el mapa.") @DecimalMin("-180") @DecimalMax("180") Double lng) {}
 
     public record ParadaResponse(String id, int orden, String direccion, Double lat, Double lng, Instant entregadoEn) {
         public static ParadaResponse from(com.cadeteria.backend.model.PedidoParada p) {
@@ -196,7 +215,8 @@ public final class PedidoDtos {
     public record AsignarLoteRequest(@NotBlank String cadeteId, @NotEmpty List<String> pedidoIds) {}
 
     /** Boton "Anular": motivo "CLIENTE" u "OTRO" (para métricas), null si no se especifica. */
-    public record CancelarRequest(String motivo) {}
+    public record CancelarRequest(
+            @Pattern(regexp = "^$|CLIENTE|OTRO", message = "El motivo de anulación tiene que ser CLIENTE u OTRO.") String motivo) {}
 
     public static final class MotivoCancelacion {
         private MotivoCancelacion() {}
@@ -214,13 +234,16 @@ public final class PedidoDtos {
      * de la foto ya no existía (se limpió la cache). Se acepta sin foto aunque sea obligatoria,
      * antes que dejar el viaje trabado en la cola para siempre — y queda un comentario.
      */
-    public record RecepcionRequest(String fotoUrl, Double lat, Double lng, Boolean archivoPerdido) {}
+    public record RecepcionRequest(@Size(max = 500) String fotoUrl,
+                                   @DecimalMin("-90") @DecimalMax("90") Double lat,
+                                   @DecimalMin("-180") @DecimalMax("180") Double lng,
+                                   Boolean archivoPerdido) {}
 
     /** Botón "Rechazar": motivo opcional, texto libre (spec Métricas: detectar patrones de rechazo). */
-    public record RechazarRequest(String motivo) {}
+    public record RechazarRequest(@Size(max = 300, message = "El motivo puede tener hasta 300 caracteres.") String motivo) {}
 
     /** Botón "No se pudo entregar" (ej. el cliente no atendió): motivo opcional, texto libre. */
-    public record NoEntregadoRequest(String motivo) {}
+    public record NoEntregadoRequest(@Size(max = 500, message = "El motivo puede tener hasta 500 caracteres.") String motivo) {}
 
     /**
      * receptorNombre y fotoUrl obligatorios al finalizar; firmaUrl es obligatoria u opcional
@@ -228,8 +251,12 @@ public final class PedidoDtos {
      * lat/lng: ubicación del cadete al finalizar (opcional), misma idea que en RecepcionRequest.
      */
     /** archivoPerdido: igual que en {@link RecepcionRequest}, para la foto y la firma de la entrega. */
-    public record FinalizarRequest(String receptorNombre, String fotoUrl, String firmaUrl, Double lat, Double lng,
-                                   Boolean archivoPerdido) {
+    public record FinalizarRequest(
+            @Size(max = 100, message = "El nombre de quien recibe puede tener hasta 100 letras.")
+            @Pattern(regexp = Validaciones.VACIO_O + Validaciones.NOMBRE_PERSONA, message = Validaciones.MSJ_RECEPTOR) String receptorNombre,
+            @Size(max = 500) String fotoUrl, @Size(max = 500) String firmaUrl,
+            @DecimalMin("-90") @DecimalMax("90") Double lat, @DecimalMin("-180") @DecimalMax("180") Double lng,
+            Boolean archivoPerdido) {
         public boolean seperdioElArchivo() {
             return Boolean.TRUE.equals(archivoPerdido);
         }
@@ -245,10 +272,13 @@ public final class PedidoDtos {
     }
 
     /** Nota de texto libre que el cadete deja sobre el pedido (ej. "entregado en porteria a Fulano"). */
-    public record ComentarioRequest(@NotBlank String texto) {}
+    public record ComentarioRequest(
+            @NotBlank(message = "Escribí el comentario.") @Size(max = 500, message = "El comentario puede tener hasta 500 caracteres.") String texto) {}
 
     /** Mejora 75 — editar el precio de un pedido ya cargado. */
-    public record PrecioRequest(@jakarta.validation.constraints.NotNull @jakarta.validation.constraints.PositiveOrZero java.math.BigDecimal precio) {}
+    public record PrecioRequest(
+            @NotNull(message = "Falta el precio.") @PositiveOrZero(message = "El precio no puede ser negativo.")
+            @Digits(integer = 10, fraction = 2, message = "El precio no es válido.") java.math.BigDecimal precio) {}
 
     public record PrecioLogResponse(String id, java.math.BigDecimal precioAnterior, java.math.BigDecimal precioNuevo,
                                      String cambiadoPorUsername, Instant cambiadoEn) {

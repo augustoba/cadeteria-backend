@@ -97,7 +97,10 @@ public final class PublicoDtos {
     }
 
     /** Body de POST /api/publico/pedidos/{token}/calificacion — comentario es opcional. */
-    public record CalificarRequest(int estrellas, String comentario) {}
+    public record CalificarRequest(
+            @jakarta.validation.constraints.Min(value = 1, message = "La calificación tiene que ser de 1 a 5 estrellas.")
+            @jakarta.validation.constraints.Max(value = 5, message = "La calificación tiene que ser de 1 a 5 estrellas.") int estrellas,
+            @jakarta.validation.constraints.Size(max = 500, message = "El comentario puede tener hasta 500 caracteres.") String comentario) {}
 
     public record CadeteInfo(
             String nombre,

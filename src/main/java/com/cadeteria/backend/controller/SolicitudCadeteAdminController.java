@@ -52,7 +52,7 @@ public class SolicitudCadeteAdminController {
 
     /** Devuelve la solicitud al postulante con lo que tiene que corregir (le llega por mail). */
     @PostMapping("/{id}/pedir-correccion")
-    public SolicitudResponse pedirCorreccion(@PathVariable String id, @RequestBody PedirCorreccionRequest req) {
+    public SolicitudResponse pedirCorreccion(@PathVariable String id, @Valid @RequestBody PedirCorreccionRequest req) {
         return SolicitudResponse.from(service.pedirCorreccion(id, req.observaciones()));
     }
 
@@ -64,7 +64,7 @@ public class SolicitudCadeteAdminController {
     }
 
     @PostMapping("/{id}/rechazar")
-    public SolicitudResponse rechazar(@PathVariable String id, @RequestBody(required = false) RechazarRequest req) {
+    public SolicitudResponse rechazar(@PathVariable String id, @Valid @RequestBody(required = false) RechazarRequest req) {
         return SolicitudResponse.from(service.rechazar(id, req == null ? null : req.motivo()));
     }
 }

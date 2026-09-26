@@ -42,7 +42,7 @@ public class AdminUsuarioController {
     }
 
     @PatchMapping("/{id}/habilitado")
-    public AdminUsuarioResponse habilitar(@PathVariable String id, @RequestBody Map<String, Boolean> body) {
+    public AdminUsuarioResponse habilitar(@PathVariable String id, @Valid @RequestBody Map<String, Boolean> body) {
         return service.habilitar(id, Boolean.TRUE.equals(body.get("enabled")));
     }
 
