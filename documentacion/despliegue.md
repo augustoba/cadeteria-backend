@@ -130,6 +130,12 @@ teléfonos; **volver a producción antes de tener cadetes reales**.
 
 - [ ] **Cloudinary**: cloud name + upload preset unsigned. Sin esto el cadete no puede
       finalizar pedidos (la foto de entrega es obligatoria).
+      ⚠️ **Hoy se usa una cuenta de prueba** (cloud `jitutkbc`, preset `estilospequenos`, de otro
+      proyecto). Para producción: **cuenta propia de Cadem**, preset unsigned nuevo y, con la API key
+      y el secret de esa cuenta, `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` en el servidor (§1)
+      — sin eso la purga de 60 días no borra los archivos y el espacio crece para siempre.
+      Consumo estimado (2026-09-26, APK que achica las fotos a 1600 px): ~0,3 MB por foto, ~45 MB/día
+      a 70 viajes, ~2,7 GB guardados con 60 días → entra en el plan gratis (~25 créditos/mes).
 - [ ] **Tarifas**: mínimo, km cubiertos, precio por km, factor de línea recta, recargo por dinero
       declarado y **recargo por volver al origen** (default 50%).
 - [ ] **Direcciones — keys**: Geoapify y LocationIQ (cuentas gratuitas propias).
