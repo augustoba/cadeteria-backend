@@ -210,8 +210,10 @@ Todo lo del 2026-09-24 se probó con tests, con un script de punta a punta contr
 (22 chequeos) y en el emulador. Falta el teléfono real: sonido del contador, recordatorio de
 30 minutos (tarda 30 minutos en aparecer) y las tipografías en un celular chico.
 
-### 2. Mergear `pendientes-2026-09-24` → `develop` → `main`
-En los 3 repos. El backend se edita también desde otra PC: pullear antes de mergear.
+### 2. Pasar `develop` → `main`
+El 2026-09-26 `pendientes-2026-09-24` se pasó a `develop` en los 3 repos (avance directo, sin
+conflictos: `develop` no tenía nada nuevo de la otra PC) y se pusheó todo. Falta `main`, cuando se
+pruebe lo de "Falta probar". En la otra PC: pullear `develop` antes de seguir trabajando.
 
 ### 3. ⚠️ Probar y prender el código de verificación de `/pedir`
 **Apagado a propósito el 2026-09-24** para poder probar `/pedir` sin SMS ni WhatsApp: hoy el
