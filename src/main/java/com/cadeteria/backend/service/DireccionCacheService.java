@@ -48,6 +48,11 @@ public class DireccionCacheService {
     public static final String PROVEEDOR_MANUAL = "manual";
     /** Pin sacado de un link de Google Maps pegado en el buscador. Vence solo con {@link #CONFIG_GOOGLE_LINK_VENCE}. */
     public static final String PROVEEDOR_GOOGLE_LINK = "google_link";
+    /**
+     * GPS del cadete al marcar Retirado/Entregado en esa dirección (2026-09-26): la puerta real,
+     * medida con buena precisión. No vence.
+     */
+    public static final String PROVEEDOR_CADETE_GPS = "cadete_gps";
     private static final String PROVEEDOR_GOOGLE = "google";
     public static final String CONFIG_DIAS_GOOGLE = "google_cache_dias";
     public static final String CONFIG_PAUSAR_BORRADO = "google_cache_pausar_borrado";
@@ -126,7 +131,10 @@ public class DireccionCacheService {
                     existente.setConfirmaciones(existente.getConfirmaciones() + 1);
                     // Lo de Google se pisa: con una fuente propia deja de vencer, y con otra
                     // consulta a Google es un dato recién obtenido (vuelve a contar desde hoy).
-                    if (vence(existente.getProveedor())) {
+                    // Y una fuente más confiable pisa a una menos confiable (2026-09-26): el GPS
+                    // del cadete en la puerta o un pin puesto a mano corrigen lo que había
+                    // interpolado un buscador gratuito.
+                    if (vence(existente.getProveedor()) || confianza(proveedor) > confianza(existente.getProveedor())) {
                         existente.setLat(lat);
                         existente.setLng(lng);
                         existente.setApproximate(false);
@@ -149,6 +157,21 @@ public class DireccionCacheService {
                     coordsRepository.save(c);
                 }
         );
+    }
+
+    /**
+     * Qué fuente pisa a cuál en una misma cuadra (2026-09-26): pin puesto a mano por una persona
+     * &gt; GPS del cadete en la puerta y link de Google Maps &gt; buscadores gratuitos &gt; Google API
+     * (que además vence). A igual confianza gana la primera y solo se suma una confirmación.
+     */
+    static int confianza(String proveedor) {
+        if (proveedor == null) return 1;
+        return switch (proveedor) {
+            case PROVEEDOR_MANUAL -> 4;
+            case PROVEEDOR_CADETE_GPS, PROVEEDOR_GOOGLE_LINK -> 3;
+            case GeocodingProxyService.PROVEEDOR_GOOGLE -> 0;
+            default -> 1; // nominatim, geoapify, locationiq
+        };
     }
 
     /**

@@ -277,6 +277,36 @@ class DireccionCacheServiceTest {
                 eq(java.util.Set.of("google", DireccionCacheService.PROVEEDOR_GOOGLE_LINK)), any());
     }
 
+    // --- Qué fuente pisa a cuál (2026-09-26) ---
+
+    @Test
+    void elGpsDelCadeteEnLaPuertaCorrigeLoQueHabiaInterpoladoUnBuscador() {
+        CuadraCoords existente = coords("colombia", SMT, 4600, -26.80, -65.25, 1); // nominatim
+        when(aliasRepository.findByVarianteNorm(anyString())).thenReturn(Optional.of(alias("colombia", "colombia")));
+        when(coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra("colombia", SMT, 4600)).thenReturn(Optional.of(existente));
+
+        service.guardar("Colombia", 4695, "Colombia", SMT, -26.7955, -65.2569, false, DireccionCacheService.PROVEEDOR_CADETE_GPS);
+
+        assertEquals(-26.7955, existente.getLat());
+        assertEquals(DireccionCacheService.PROVEEDOR_CADETE_GPS, existente.getProveedor());
+        assertEquals(2, existente.getConfirmaciones());
+    }
+
+    @Test
+    void unBuscadorNoPisaUnPinPuestoAMano() {
+        CuadraCoords existente = coords("colombia", SMT, 4600, -26.7955, -65.2569, 1);
+        existente.setProveedor(DireccionCacheService.PROVEEDOR_MANUAL);
+        when(aliasRepository.findByVarianteNorm(anyString())).thenReturn(Optional.of(alias("colombia", "colombia")));
+        when(coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra("colombia", SMT, 4600)).thenReturn(Optional.of(existente));
+
+        service.guardar("Colombia", 4650, "Colombia", SMT, -26.80, -65.25, false, "locationiq");
+        service.guardar("Colombia", 4650, "Colombia", SMT, -26.79, -65.24, false, DireccionCacheService.PROVEEDOR_CADETE_GPS);
+
+        assertEquals(-26.7955, existente.getLat());
+        assertEquals(DireccionCacheService.PROVEEDOR_MANUAL, existente.getProveedor());
+        assertEquals(3, existente.getConfirmaciones());
+    }
+
     private DireccionAlias alias(String varianteNorm, String calleCanonica) {
         DireccionAlias a = new DireccionAlias();
         a.setId("a1");

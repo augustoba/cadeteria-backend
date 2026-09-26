@@ -12,6 +12,7 @@ import org.springframework.web.client.RestClient;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -74,18 +75,33 @@ public class GeocodingProxyService {
     private static final String TUCUMAN_VIEWBOX = "-66.2,-26.0,-64.4,-28.1";
     private static final Pattern NUMERO_FINAL = Pattern.compile("^(.+?)[\\s,]*(\\d{1,6})\\s*$");
 
+    /** Precisión máxima (metros) del GPS del cadete para aprender una dirección de Retirado/Entregado. */
+    public static final String CONFIG_GPS_PRECISION_MAX = "aprender_gps_precision_max_m";
+    /** Tope diario de reverse geocoding de respaldo (LocationIQ/Geoapify) cuando Nominatim no da la altura. 0 = apagado. */
+    public static final String CONFIG_REVERSE_RESPALDO_MAX_DIA = "reverse_respaldo_max_dia";
+    /** El GPS del cadete tiene que caer a menos de esto del pin del pedido (si no, marcó en otro lado). */
+    private static final double DISTANCIA_MAX_AL_PIN_M = 2000;
+    private static final String LOCATIONIQ_REVERSE_URL = "https://us1.locationiq.com/v1/reverse";
+    private static final String GEOAPIFY_REVERSE_URL = "https://api.geoapify.com/v1/geocode/reverse";
+
     private final RestClient restClient = RestClient.create();
     private final ApiKeyPoolService apiKeyPool;
     private final DireccionCacheService direccionCache;
+    private final ConfiguracionService configuracionService;
+    /** Contador del respaldo del día (se reinicia al cambiar de día o al reiniciar el backend). */
+    private LocalDate diaRespaldo = LocalDate.now();
+    private int usosRespaldoHoy = 0;
     private final String geoapifyKeyLegado;
     private final String locationIqKeyLegado;
 
     /** Último resultado real de Nominatim — lo lee el panel de salud (ver SaludController), no hace un ping aparte. */
     private volatile boolean nominatimOk = true;
 
-    public GeocodingProxyService(AppProperties props, ApiKeyPoolService apiKeyPool, DireccionCacheService direccionCache) {
+    public GeocodingProxyService(AppProperties props, ApiKeyPoolService apiKeyPool, DireccionCacheService direccionCache,
+                                 ConfiguracionService configuracionService) {
         this.apiKeyPool = apiKeyPool;
         this.direccionCache = direccionCache;
+        this.configuracionService = configuracionService;
         this.geoapifyKeyLegado = props.getMaps().getGeoapifyKey();
         this.locationIqKeyLegado = props.getMaps().getLocationIqKey();
     }
@@ -244,9 +260,34 @@ public class GeocodingProxyService {
      */
     @Async
     public void aprenderPin(String direccion, Double lat, Double lng, String fuente) {
-        if (direccion == null || lat == null || lng == null) return;
         if (!DireccionCacheService.PROVEEDOR_MANUAL.equals(fuente)
                 && !DireccionCacheService.PROVEEDOR_GOOGLE_LINK.equals(fuente)) return;
+        aprender(direccion, lat, lng, fuente);
+    }
+
+    /**
+     * El cadete marcó Retirado/Entregado parado en la puerta (2026-09-26): la dirección escrita en el
+     * pedido + el GPS del teléfono en ese momento es la mejor fuente para la cache — justo en las
+     * direcciones que usan los clientes y en las calles donde los buscadores gratuitos no tienen
+     * alturas. Solo si el GPS es preciso (≤ {@code aprender_gps_precision_max_m}, default 50 m) y cae
+     * cerca del pin del pedido (si no, marcó desde otro lado); la calle se confirma con el reverse
+     * igual que un pin manual.
+     */
+    @Async
+    public void aprenderDeCadete(String direccion, Double pinLat, Double pinLng, Double lat, Double lng, Float precisionM) {
+        if (lat == null || lng == null || precisionM == null) return;
+        int maxPrecision = configuracionService.getInt(CONFIG_GPS_PRECISION_MAX, 50);
+        if (maxPrecision <= 0 || precisionM > maxPrecision) return;
+        if (pinLat != null && pinLng != null
+                && GeocodingService.distanciaKm(pinLat, pinLng, lat, lng) * 1000 > DISTANCIA_MAX_AL_PIN_M) {
+            log.info("No se aprende \"{}\" del GPS del cadete: marcó a más de {} m del pin.", direccion, (int) DISTANCIA_MAX_AL_PIN_M);
+            return;
+        }
+        aprender(direccion, lat, lng, DireccionCacheService.PROVEEDOR_CADETE_GPS);
+    }
+
+    private void aprender(String direccion, Double lat, Double lng, String fuente) {
+        if (direccion == null || lat == null || lng == null) return;
         // "Colombia 4695, San Miguel de Tucumán" -> "Colombia" + 4695
         Matcher m = NUMERO_FINAL.matcher(direccion.split(",")[0].trim());
         if (!m.matches()) return;
@@ -276,7 +317,92 @@ public class GeocodingProxyService {
         return false;
     }
 
+    /**
+     * Calle y altura de un punto (2026-09-26: con respaldo). Primero Nominatim; si no encuentra la
+     * calle o no sabe la altura, prueba LocationIQ y después Geoapify (tienen otros datos de
+     * alturas), hasta {@code reverse_respaldo_max_dia} consultas por día para no comerse el cupo que
+     * usa el buscador de los clientes. Lo que sale con altura alimenta la cache.
+     */
     public GeoAddress reverse(double lat, double lng) {
+        GeoAddress r = reverseNominatim(lat, lng);
+        if ((r == null || r.approximate()) && permitirRespaldo()) {
+            GeoAddress respaldo = reverseLocationIq(lat, lng);
+            if (respaldo == null || respaldo.approximate()) {
+                GeoAddress geoapify = reverseGeoapify(lat, lng);
+                if (geoapify != null && (respaldo == null || !geoapify.approximate())) respaldo = geoapify;
+            }
+            if (respaldo != null && (r == null || !respaldo.approximate())) r = respaldo;
+        }
+        if (r != null) alimentarCacheSiEsPreciso(r);
+        return r;
+    }
+
+    private synchronized boolean permitirRespaldo() {
+        int max = configuracionService.getInt(CONFIG_REVERSE_RESPALDO_MAX_DIA, 500);
+        if (max <= 0) return false;
+        LocalDate hoy = LocalDate.now();
+        if (!hoy.equals(diaRespaldo)) {
+            diaRespaldo = hoy;
+            usosRespaldoHoy = 0;
+        }
+        if (usosRespaldoHoy >= max) return false;
+        usosRespaldoHoy++;
+        return true;
+    }
+
+    private GeoAddress reverseLocationIq(double lat, double lng) {
+        String key = apiKeyPool.siguienteClave(PROVEEDOR_LOCATIONIQ, CONFIG_LOCATIONIQ_KEYS, locationIqKeyLegado);
+        if (key == null || key.isBlank()) return null;
+        String url = LOCATIONIQ_REVERSE_URL + "?key=" + key + "&lat=" + lat + "&lon=" + lng
+                + "&format=json&addressdetails=1&accept-language=es";
+        try {
+            apiKeyPool.registrarUso(PROVEEDOR_LOCATIONIQ, CONFIG_LOCATIONIQ_KEYS, key);
+            Map<String, Object> p = restClient.get().uri(url).header("Accept", "application/json").retrieve()
+                    .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+            if (p == null || p.containsKey("error")) return null;
+            @SuppressWarnings("unchecked")
+            Map<String, Object> address = (Map<String, Object>) p.get("address");
+            if (address == null || blank(address.get("road"))) return null;
+            GeoAddress base = desdeNominatim(p, address, null, PROVEEDOR_LOCATIONIQ);
+            // Las coordenadas son las del punto consultado (el GPS), no las de la casa que encontró.
+            return new GeoAddress(base.label(), base.street(), base.number(), base.locality(), lat, lng, base.approximate(), base.proveedor());
+        } catch (HttpClientErrorException e) {
+            if (e.getStatusCode().value() == 429 || e.getStatusCode().value() == 403) {
+                apiKeyPool.marcarAgotada(PROVEEDOR_LOCATIONIQ, CONFIG_LOCATIONIQ_KEYS, key);
+            }
+            return null;
+        } catch (Exception e) {
+            log.debug("Fallo el reverse de LocationIQ de {},{}: {}", lat, lng, e.getMessage());
+            return null;
+        }
+    }
+
+    private GeoAddress reverseGeoapify(double lat, double lng) {
+        String key = apiKeyPool.siguienteClave(PROVEEDOR_GEOAPIFY, CONFIG_GEOAPIFY_KEYS, geoapifyKeyLegado);
+        if (key == null || key.isBlank()) return null;
+        String url = GEOAPIFY_REVERSE_URL + "?apiKey=" + key + "&lat=" + lat + "&lon=" + lng + "&format=json&lang=es";
+        try {
+            apiKeyPool.registrarUso(PROVEEDOR_GEOAPIFY, CONFIG_GEOAPIFY_KEYS, key);
+            Map<String, Object> data = restClient.get().uri(url).retrieve()
+                    .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+            if (data == null) return null;
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> results = (List<Map<String, Object>>) data.get("results");
+            if (results == null || results.isEmpty() || blank(results.get(0).get("street"))) return null;
+            GeoAddress base = desdeGeoapify(results.get(0), null);
+            return new GeoAddress(base.label(), base.street(), base.number(), base.locality(), lat, lng, base.approximate(), base.proveedor());
+        } catch (HttpClientErrorException e) {
+            if (e.getStatusCode().value() == 429 || e.getStatusCode().value() == 403) {
+                apiKeyPool.marcarAgotada(PROVEEDOR_GEOAPIFY, CONFIG_GEOAPIFY_KEYS, key);
+            }
+            return null;
+        } catch (Exception e) {
+            log.debug("Fallo el reverse de Geoapify de {},{}: {}", lat, lng, e.getMessage());
+            return null;
+        }
+    }
+
+    private GeoAddress reverseNominatim(double lat, double lng) {
         String url = NOMINATIM_REVERSE_URL + "?format=jsonv2&lat=" + lat + "&lon=" + lng
                 + "&addressdetails=1&accept-language=es&zoom=18";
         try {
@@ -291,9 +417,7 @@ public class GeocodingProxyService {
             Map<String, Object> address = (Map<String, Object>) p.get("address");
             if (address == null || blank(address.get("road"))) return null;
             GeoAddress base = desdeNominatim(p, address, null);
-            GeoAddress resultado = new GeoAddress(base.label(), base.street(), base.number(), base.locality(), lat, lng, base.approximate(), base.proveedor());
-            alimentarCacheSiEsPreciso(resultado);
-            return resultado;
+            return new GeoAddress(base.label(), base.street(), base.number(), base.locality(), lat, lng, base.approximate(), base.proveedor());
         } catch (Exception e) {
             nominatimOk = false;
             log.warn("Fallo el reverse geocoding de {},{}: {}", lat, lng, e.getMessage());

@@ -194,6 +194,28 @@ Direcciones que el buscador no encuentra — para ir llenando la base propia sin
 - Ojo: con `frecuencia_ubicacion_seg` alto (ej. 120) el aviso tarda más (hacen falta 2 pings
   adentro). Con el default (45 s) llega ~45–90 s después de llegar.
 
+## Hecho el 2026-09-26 (madrugada): la cache de direcciones aprende del cadete y del respaldo
+
+- **Retirado y Entregado alimentan la cache** (`cuadra_coords`, proveedor `cadete_gps`): la
+  dirección escrita en el pedido + el GPS del teléfono en la puerta. La APK ahora pide una lectura
+  de GPS **nueva y precisa** al marcar (antes mandaba la última guardada, que podía tener minutos y
+  cientos de metros de error) y manda su precisión. El backend aprende solo si el error es
+  ≤ `aprender_gps_precision_max_m` (50 m), si cae a menos de 2 km del pin del pedido y si el reverse
+  confirma que es la misma calle (si el cadete marcó en otra calle, no se aprende). Lo encolado sin
+  conexión no trae precisión y no enseña.
+- **Qué fuente pisa a cuál en una cuadra**: pin puesto a mano > GPS del cadete / link de Google
+  Maps > buscadores gratuitos > Google API. Antes ganaba siempre la primera que llegaba (un pin
+  corregido a mano no pisaba lo que había interpolado un buscador).
+- **Reverse con respaldo**: si Nominatim no encuentra la calle o no sabe la altura de un punto, se
+  prueba LocationIQ y después Geoapify (hasta `reverse_respaldo_max_dia` = 500 por día, comparten
+  cupo con el buscador). Sirve para el mapeo de calles de los cadetes, para confirmar la calle al
+  aprender y para la calle que se muestra arriba del pin en el panel.
+- En vivo contra `cadeteria_prueba_claude`: de 6 puntos de Tucumán, en 2 (Plaza Independencia, Las
+  Talitas) Nominatim no daba la altura y la dio Geoapify. Un Retirado en "San Martín 650" con GPS a
+  20 m y 12 m de precisión guardó la cuadra 600 y después "San Martín 620" salió de la cache sin
+  consultar a nadie; con 180 m de precisión no aprendió; con una dirección de otra calle tampoco.
+- Tests: backend 180, APK 20.
+
 ## ⚠️ Falta probar (no se probó todavía)
 
 Lo de arriba se probó con tests (153 del backend), compilando panel y APK, y en su mayoría con
@@ -218,6 +240,9 @@ pruebas contra el backend en la base `cadeteria_prueba_claude`. **No se probó:*
   la patente, el alta de cadete del panel, nuevo pedido y `/pedir` — solo se compiló el panel. En
   la APK: mensajes del servidor al aceptar/finalizar/login y las validaciones del perfil (solo se
   compiló y corrieron los tests).
+- **El GPS preciso al marcar Retirado/Entregado en un teléfono real**: cuánto tarda en fijar
+  (espera hasta 8 s) y qué precisión da; si en la calle la precisión suele pasar de 50 m, subir
+  `aprender_gps_precision_max_m` con cuidado.
 - **El aviso de llegada en la calle** (solo tests): que llegue con la pantalla apagada, que no
   avise al pasar por al lado y que no salga si ya se marcó Retirado. Se prueba mañana con el túnel.
 - **Cadetes ya cargados con datos que no cumplen el formato nuevo** (ej. una patente de auto o un

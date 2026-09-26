@@ -237,7 +237,9 @@ public final class PedidoDtos {
     public record RecepcionRequest(@Size(max = 500) String fotoUrl,
                                    @DecimalMin("-90") @DecimalMax("90") Double lat,
                                    @DecimalMin("-180") @DecimalMax("180") Double lng,
-                                   Boolean archivoPerdido) {}
+                                   Boolean archivoPerdido,
+                                   /** Error del GPS en metros (APK 2026-09-26) — con buena precisión se aprende la dirección. */
+                                   @PositiveOrZero Float precision) {}
 
     /** Botón "Rechazar": motivo opcional, texto libre (spec Métricas: detectar patrones de rechazo). */
     public record RechazarRequest(@Size(max = 300, message = "El motivo puede tener hasta 300 caracteres.") String motivo) {}
@@ -256,7 +258,9 @@ public final class PedidoDtos {
             @Pattern(regexp = Validaciones.VACIO_O + Validaciones.NOMBRE_PERSONA, message = Validaciones.MSJ_RECEPTOR) String receptorNombre,
             @Size(max = 500) String fotoUrl, @Size(max = 500) String firmaUrl,
             @DecimalMin("-90") @DecimalMax("90") Double lat, @DecimalMin("-180") @DecimalMax("180") Double lng,
-            Boolean archivoPerdido) {
+            Boolean archivoPerdido,
+            /** Error del GPS en metros (APK 2026-09-26) — con buena precisión se aprende la dirección. */
+            @PositiveOrZero Float precision) {
         public boolean seperdioElArchivo() {
             return Boolean.TRUE.equals(archivoPerdido);
         }

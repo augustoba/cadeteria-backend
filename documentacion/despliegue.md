@@ -98,6 +98,16 @@ pasarlos a mano, pero no es la idea.
 - [ ] **Tarifas**: mínimo, km cubiertos, precio por km, factor de línea recta, recargo por dinero
       declarado y **recargo por volver al origen** (default 50%).
 - [ ] **Direcciones — keys**: Geoapify y LocationIQ (cuentas gratuitas propias).
+- [ ] **Aprendizaje de direcciones (2026-09-26)**, claves de Configuración (sin pantalla todavía;
+      si no están, valen los defaults):
+      - `aprender_gps_precision_max_m` (default **50**): error máximo del GPS del cadete para que
+        Retirado/Entregado enseñen la dirección a la cache. 0 = no aprender del cadete.
+      - `reverse_respaldo_max_dia` (default **500**): consultas por día a LocationIQ/Geoapify
+        cuando Nominatim no sabe la altura de un punto. **Comparten el cupo gratis** con el buscador
+        de los clientes (LocationIQ ~5.000/día, Geoapify ~3.000/día): no subirlo tanto que el
+        buscador se quede sin cupo. 0 = solo Nominatim.
+      - `mapeo_calles_cadetes_intervalo_seg` (default 1200): para pruebas con pocos teléfonos se
+        puede bajar a 30–60; volverlo a subir con muchos cadetes.
 - [ ] **Google (opcional)**: key de Geocoding de **una sola cuenta** (rotar cuentas para
       multiplicar el cupo gratis va contra sus condiciones). En Google Cloud: facturación
       activada, **cuota diaria** en la API y **alerta de presupuesto**. Revisar antes las
@@ -190,6 +200,9 @@ Solo el **backend** necesita el túnel: el panel se mira en la PC (`localhost:42
    última posición y lo que aprenda el mapeo de calles, pero no el trayecto. Ideal: un rato con
    pedido y otro sin.
 10. En la calle: marcar Retirado y Entregado (con foto y firma) para probar también eso.
+12. **Aprendizaje de direcciones**: al marcar Retirado/Entregado parado en la puerta, la dirección
+    del pedido queda en la cache (`cuadra_coords`, proveedor `cadete_gps`). Para ver cuánto crece:
+    `select proveedor, count(*) from cuadra_coords group by proveedor;`
 11. **Aviso de llegada** (APK, 2026-09-26): quedarse ~1 minuto en el origen **sin** marcar
     Retirado → tiene que llegar "Llegaste al retiro… no te olvides de marcar Retirado"; idem en el
     destino. Probar también pasar por al lado sin frenar (no tiene que avisar) y con la pantalla

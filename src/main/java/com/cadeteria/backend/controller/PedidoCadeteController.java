@@ -1,5 +1,6 @@
 package com.cadeteria.backend.controller;
 
+import com.cadeteria.backend.service.GeocodingProxyService;
 import com.cadeteria.backend.common.ConflictException;
 import com.cadeteria.backend.common.BadRequestException;
 import com.cadeteria.backend.dto.PedidoDtos.ComentarioRequest;
@@ -36,6 +37,7 @@ public class PedidoCadeteController {
     private final CadeteService cadeteService;
     private final RutaService rutaService;
     private final ReporteClienteService reporteClienteService;
+    private final GeocodingProxyService geocodingProxyService;
 
     /** "Reportar al cliente" desde la pantalla del viaje (spec-antiabuso Fase 3). tipo: DEMORO | NO_DECLARO_VALORES | PEDIDO_FALSO | OTRO. */
     public record ReporteRequest(
@@ -45,8 +47,10 @@ public class PedidoCadeteController {
             @jakarta.validation.constraints.Size(max = 500, message = "La nota puede tener hasta 500 caracteres.") String nota) {}
 
     public PedidoCadeteController(PedidoService service, CadeteService cadeteService, RutaService rutaService,
-                                  ReporteClienteService reporteClienteService) {
+                                  ReporteClienteService reporteClienteService,
+                                  GeocodingProxyService geocodingProxyService) {
         this.reporteClienteService = reporteClienteService;
+        this.geocodingProxyService = geocodingProxyService;
         this.service = service;
         this.cadeteService = cadeteService;
         this.rutaService = rutaService;
@@ -121,13 +125,21 @@ public class PedidoCadeteController {
     @PostMapping("/{id}/recepcion")
     public PedidoResponse recepcion(@PathVariable String id, @Valid @RequestBody RecepcionRequest req,
                                      Authentication auth) {
-        return PedidoResponse.paraCadete(service.registrarRecepcion(id, auth.getName(), req.fotoUrl(), req.lat(), req.lng(),
-                Boolean.TRUE.equals(req.archivoPerdido())));
+        Pedido p = service.registrarRecepcion(id, auth.getName(), req.fotoUrl(), req.lat(), req.lng(),
+                Boolean.TRUE.equals(req.archivoPerdido()));
+        // La puerta real del retiro alimenta la cache de direcciones (2026-09-26).
+        geocodingProxyService.aprenderDeCadete(p.getOrigenDireccion(), p.getOrigenLat(), p.getOrigenLng(),
+                req.lat(), req.lng(), req.precision());
+        return PedidoResponse.paraCadete(p);
     }
 
     @PostMapping("/{id}/finalizar")
     public PedidoResponse finalizar(@PathVariable String id, @Valid @RequestBody FinalizarRequest req, Authentication auth) {
-        return PedidoResponse.paraCadete(service.finalizar(id, auth.getName(), req));
+        Pedido p = service.finalizar(id, auth.getName(), req);
+        // La puerta real de la entrega alimenta la cache de direcciones (2026-09-26).
+        geocodingProxyService.aprenderDeCadete(p.getDestinoDireccion(), p.getDestinoLat(), p.getDestinoLng(),
+                req.lat(), req.lng(), req.precision());
+        return PedidoResponse.paraCadete(p);
     }
 
     /** Botón "No se pudo entregar" (ej. el cliente no atendió) — el pedido no se anula, el admin lo puede reintentar. */
