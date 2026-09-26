@@ -173,6 +173,14 @@ public final class PedidoDtos {
     /** Sugerencia de nombre al cargar un pedido con un teléfono ya visto (spec 5.6). */
     public record ClienteEncontradoResponse(String nombre) {}
 
+    /**
+     * Dirección que un cliente ya usó (2026-09-25): para cargarla con un clic como origen o
+     * destino. lat/lng, piso, depto y observaciones son los de la última vez que se usó.
+     */
+    public record DireccionFrecuenteResponse(String direccion, Double lat, Double lng,
+                                             String piso, String depto, String observaciones,
+                                             int vecesOrigen, int vecesDestino, Instant ultimaVez) {}
+
     public record AsignarRequest(@NotBlank String cadeteId) {}
 
     /** Boton "Quitar": si no se manda, se devuelve la comisión (comportamiento de siempre). */

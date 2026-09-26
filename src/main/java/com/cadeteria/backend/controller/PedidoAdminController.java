@@ -124,6 +124,12 @@ public class PedidoAdminController {
         return PedidoResponse.from(service.setPrioritario(id, Boolean.TRUE.equals(body.get("prioritario"))));
     }
 
+    /** Direcciones habituales del cliente de ese teléfono (2026-09-25) — vacía si nunca pidió. */
+    @GetMapping("/cliente/direcciones")
+    public List<com.cadeteria.backend.dto.PedidoDtos.DireccionFrecuenteResponse> direccionesCliente(@RequestParam String telefono) {
+        return service.direccionesFrecuentes(telefono);
+    }
+
     /** Autocompletar nombre por teléfono al cargar un pedido (spec 5.6) — 204 si nunca se vio ese número. */
     @GetMapping("/cliente")
     public ResponseEntity<ClienteEncontradoResponse> cliente(@RequestParam String telefono) {

@@ -2,6 +2,7 @@ package com.cadeteria.backend.service;
 
 import com.cadeteria.backend.common.BadRequestException;
 import com.cadeteria.backend.common.ResourceNotFoundException;
+import com.cadeteria.backend.dto.PedidoDtos.DireccionFrecuenteResponse;
 import com.cadeteria.backend.dto.PedidoDtos.FinalizarRequest;
 import com.cadeteria.backend.dto.PedidoDtos.PedidoRequest;
 import com.cadeteria.backend.dto.PedidoDtos.PedidoResponse;
@@ -217,6 +218,57 @@ public class PedidoService {
      * sin que eso modifique nada de lo ya guardado (no hay dónde guardarlo: el teléfono
      * nunca fuerza un único nombre).
      */
+    /**
+     * Direcciones habituales de un cliente (2026-09-25): las de sus últimos pedidos, agrupadas por
+     * texto, las más usadas primero (hasta 5). La mayoría de los clientes pide siempre desde o hacia
+     * los mismos lugares: así se cargan con un clic, sin buscar ni gastar geocoding.
+     */
+    @Transactional(readOnly = true)
+    public List<DireccionFrecuenteResponse> direccionesFrecuentes(String telefono) {
+        String digitos = telefono == null ? "" : telefono.replaceAll("[^0-9]", "");
+        if (digitos.length() < 6) return List.of();
+        java.util.Map<String, DireccionAcumulada> porDireccion = new java.util.LinkedHashMap<>();
+        // del más nuevo al más viejo: la primera vez que aparece una dirección es la última que se usó
+        for (Pedido p : repo.ultimosPorTelefonoNormalizado(digitos)) {
+            sumarDireccion(porDireccion, p.getOrigenDireccion(), p.getOrigenLat(), p.getOrigenLng(), p.getOrigenPiso(),
+                    p.getOrigenDepto(), p.getOrigenObservaciones(), p.getCreadoEn(), true);
+            sumarDireccion(porDireccion, p.getDestinoDireccion(), p.getDestinoLat(), p.getDestinoLng(), p.getDestinoPiso(),
+                    p.getDestinoDepto(), p.getDestinoObservaciones(), p.getCreadoEn(), false);
+        }
+        return porDireccion.values().stream()
+                .sorted(java.util.Comparator.comparingInt((DireccionAcumulada a) -> -(a.vecesOrigen + a.vecesDestino))
+                        .thenComparing(a -> a.ultimaVez, java.util.Comparator.reverseOrder()))
+                .limit(5)
+                .map(a -> new DireccionFrecuenteResponse(a.direccion, a.lat, a.lng, a.piso, a.depto, a.observaciones,
+                        a.vecesOrigen, a.vecesDestino, a.ultimaVez))
+                .toList();
+    }
+
+    private static final class DireccionAcumulada {
+        String direccion, piso, depto, observaciones;
+        Double lat, lng;
+        Instant ultimaVez;
+        int vecesOrigen, vecesDestino;
+    }
+
+    private static void sumarDireccion(java.util.Map<String, DireccionAcumulada> mapa, String direccion, Double lat,
+                                       Double lng, String piso, String depto, String obs, Instant cuando, boolean esOrigen) {
+        if (direccion == null || direccion.isBlank() || lat == null || lng == null) return;
+        DireccionAcumulada a = mapa.computeIfAbsent(com.cadeteria.backend.util.DireccionUtils.normalizar(direccion), k -> {
+            DireccionAcumulada n = new DireccionAcumulada();
+            n.direccion = direccion.trim();
+            n.lat = lat;
+            n.lng = lng;
+            n.piso = piso;
+            n.depto = depto;
+            n.observaciones = obs;
+            n.ultimaVez = cuando;
+            return n;
+        });
+        if (esOrigen) a.vecesOrigen++;
+        else a.vecesDestino++;
+    }
+
     @Transactional(readOnly = true)
     public Optional<String> nombreClientePorTelefono(String telefono) {
         return repo.findFirstByClienteTelefonoOrderByCreadoEnDesc(telefono).map(Pedido::getClienteNombre);

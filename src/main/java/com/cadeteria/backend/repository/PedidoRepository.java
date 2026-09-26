@@ -34,6 +34,14 @@ public interface PedidoRepository extends JpaRepository<Pedido, String> {
     /** Autocompletar nombre por teléfono al cargar un pedido (spec 5.6) — el más reciente para ese número. */
     Optional<Pedido> findFirstByClienteTelefonoOrderByCreadoEnDesc(String clienteTelefono);
 
+    /**
+     * Últimos pedidos de un teléfono comparando solo los dígitos ("381 555-1234" = "3815551234"),
+     * para sugerir las direcciones habituales del cliente al cargar un pedido (2026-09-25).
+     */
+    @Query(value = "SELECT * FROM pedido WHERE REGEXP_REPLACE(cliente_telefono, '[^0-9]', '') = :digitos "
+            + "ORDER BY creado_en DESC LIMIT 60", nativeQuery = true)
+    List<Pedido> ultimosPorTelefonoNormalizado(@Param("digitos") String digitos);
+
     /** Historial completo de un cliente para su ficha (ronda 4, punto 44). */
     List<Pedido> findByClienteTelefonoOrderByCreadoEnDesc(String clienteTelefono);
 
