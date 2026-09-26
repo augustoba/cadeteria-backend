@@ -233,6 +233,9 @@ public class Pedido {
     @Column(nullable = false)
     private boolean smsFallido = false;
 
+    /** Cuándo el admin tocó "Avisar al cliente" (WhatsApp Web, 2026-09-26) — null si todavía no avisó. */
+    private Instant clienteAvisadoEn;
+
     /** Marca manual del admin para destacarlo en el dashboard (mejora 93) — no cambia ninguna lógica de asignación. */
     @Column(nullable = false)
     private boolean prioritario = false;
@@ -675,6 +678,14 @@ public class Pedido {
 
     public void setSmsFallido(boolean smsFallido) {
         this.smsFallido = smsFallido;
+    }
+
+    public Instant getClienteAvisadoEn() {
+        return clienteAvisadoEn;
+    }
+
+    public void setClienteAvisadoEn(Instant clienteAvisadoEn) {
+        this.clienteAvisadoEn = clienteAvisadoEn;
     }
 
     public boolean isPrioritario() {

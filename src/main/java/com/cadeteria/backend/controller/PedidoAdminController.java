@@ -228,6 +228,12 @@ public class PedidoAdminController {
         return PedidoResponse.from(service.finalizarComoAdmin(id, req));
     }
 
+    /** Botón "Avisar al cliente" (2026-09-26): marca el pedido como avisado y devuelve el WhatsApp ya armado. */
+    @PostMapping("/{id}/aviso-whatsapp")
+    public com.cadeteria.backend.dto.PedidoDtos.AvisoWhatsappResponse avisoWhatsapp(@PathVariable String id) {
+        return service.avisoClientePorWhatsapp(id);
+    }
+
     /** Boton "Reenviar SMS": reenvia a mano el link de seguimiento (ronda 3, punto 21). */
     @PostMapping("/{id}/reenviar-sms")
     public ResponseEntity<Void> reenviarSms(@PathVariable String id) {

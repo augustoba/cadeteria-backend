@@ -95,6 +95,11 @@ pasarlos a mano, pero no es la idea.
       login de la app acepta letras y solo contesta "usuario o contraseña incorrectos". **Pendiente**:
       teclado numérico y aviso "tu usuario es tu DNI, solo números".
 - [ ] Panel → Configuración → **Versión mínima de la app** = la versión del APK que se reparte.
+- [ ] **PC del admin — app de escritorio de WhatsApp** (2026-09-26): instalarla (Microsoft Store) con
+      el número de la cadetería que manda los avisos. La primera vez que se toca "Avisar al cliente",
+      Chrome pregunta "¿Abrir WhatsApp?" → tildar **"Permitir siempre"**.
+- [ ] **Nombre de la cadetería** (Configuración → `nombre_cadeteria`, ej. "Cadem"): es el `{marca}`
+      de los avisos; sin cargarlo sale "Cadetería".
 - [ ] **Usuarios del panel** (2026-09-26): `ADMIN_USER` / `ADMIN_PASSWORD` crea al **superadmin**
       (vos: ve lo técnico y las API keys del sistema). Desde el panel → Usuarios, crear un usuario
       con rol **Admin** (el dueño de la cadetería) y otro con rol **Operador**; cada uno recibe una

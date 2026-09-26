@@ -531,6 +531,18 @@ A programar:
    no hay respaldo). Cada chip necesita un celular para activarlo y prenderlo cada tanto (WhatsApp
    desvincula los dispositivos si el principal pasa ~2 semanas sin conectarse).
 
+### 3n. "Avisar al cliente" con la app de WhatsApp — hecho el 2026-09-26 (ramas `aviso-whatsapp-web`)
+Solución de ahora (decisión del dueño), mientras no se use el gateway ni SMS: en cada pedido en curso
+(tabla y kanban del dashboard) el botón **"📲 Avisar al cliente"** abre la **app de escritorio de
+WhatsApp** (`whatsapp://send`) en el chat del cliente con el aviso escrito; el admin solo aprieta
+Enter. **El clic cuenta como avisado** (`pedido.cliente_avisado_en`, "✓ Avisado 14:32"); se puede
+volver a tocar para reenviar. Texto en Configuración (`whatsapp_template_en_camino`, con `{marca}`,
+`{cadete}`, `{numero}`, `{link}`); teléfono normalizado a 549 + área + número (saca 0 y 15).
+**No se usa WhatsApp Web** a propósito: no deja abrir un chat sin recargar la pestaña y desconecta la
+otra pestaña donde el admin chatea con los clientes ("Usar aquí"). La app y WhatsApp Web son
+dispositivos vinculados distintos: conviven con la misma cuenta.
+Falta: editar la plantilla desde el panel (hoy solo por la base) y probarlo con la app instalada.
+
 ### 3m. Superadmin — hecho el 2026-09-26 (rama `superadmin`, backend + panel)
 - Rol **Superadmin** con el permiso nuevo **"Sistema"**; el Admin tiene todo menos eso. El usuario
   del admin inicial (`ADMIN_USER`) pasa a ser superadmin (en una base nueva y en la existente).

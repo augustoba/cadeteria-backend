@@ -1513,6 +1513,55 @@ public class PedidoService {
         return frontBaseUrlSeguimiento + "/seguimiento/" + pedido.getTokenSeguimiento();
     }
 
+    /**
+     * "Avisar al cliente" (2026-09-26, pedido del dueño): mientras no se use el gateway ni SMS, el admin
+     * manda el aviso "en camino" desde el WhatsApp Web de la cadetería con un clic. El clic cuenta como
+     * avisado (el sistema no puede saber si después apretó Enviar); se puede repetir para reenviar.
+     */
+    public com.cadeteria.backend.dto.PedidoDtos.AvisoWhatsappResponse avisoClientePorWhatsapp(String pedidoId) {
+        Pedido pedido = get(pedidoId);
+        if (pedido.getClienteTelefono() == null || pedido.getClienteTelefono().isBlank()) {
+            throw new BadRequestException("El pedido no tiene teléfono del cliente.");
+        }
+        String cadete = pedido.getCadeteAsignado() == null ? "" : pedido.getCadeteAsignado().getNombre();
+        String texto = configuracionService.getString("whatsapp_template_en_camino", WHATSAPP_EN_CAMINO_DEFAULT)
+                .replace("{link}", linkSeguimiento(pedido))
+                .replace("{numero}", String.valueOf(pedido.getNumero()))
+                .replace("{cadete}", cadete)
+                .replace("{marca}", configuracionService.getString("nombre_cadeteria", "Cadetería"))
+                .replace("  ", " ");
+        pedido.setClienteAvisadoEn(Instant.now());
+        repo.save(pedido);
+        publisher.publicarPedido(PedidoResponse.from(pedido));
+        return new com.cadeteria.backend.dto.PedidoDtos.AvisoWhatsappResponse(
+                telefonoParaWhatsapp(pedido.getClienteTelefono()), texto, pedido.getClienteAvisadoEn());
+    }
+
+    /** Por WhatsApp no hay límite de caracteres ni problema con las tildes (a diferencia del SMS). */
+    public static final String WHATSAPP_EN_CAMINO_DEFAULT =
+            "{marca} le informa que su cadete {cadete} ya está en camino. Siga su envío acá: {link}";
+
+    /**
+     * Teléfono en formato internacional para WhatsApp (celular argentino): "381 15 555-1234" ->
+     * "5493815551234". Saca el 0 del área y el 15 de celular, y agrega 54 9 si falta.
+     */
+    public static String telefonoParaWhatsapp(String telefono) {
+        String d = telefono.replaceAll("\\D", "");
+        if (d.startsWith("549")) d = d.substring(3);
+        else if (d.startsWith("54")) d = d.substring(2);
+        if (d.startsWith("0")) d = d.substring(1);
+        // 12 dígitos = área + 15 + número: el 15 va después de un área de 3 (Tucumán), 2 (AMBA) o 4 dígitos.
+        if (d.length() == 12) {
+            for (int area : new int[]{3, 2, 4}) {
+                if (d.startsWith("15", area)) {
+                    d = d.substring(0, area) + d.substring(area + 2);
+                    break;
+                }
+            }
+        }
+        return "549" + d;
+    }
+
     /** Botón "Reenviar SMS" del panel (ronda 3, punto 21): reenvía a mano el link de seguimiento por si el SMS original no llegó. */
     public void reenviarSmsSeguimiento(String pedidoId) {
         Pedido pedido = get(pedidoId);

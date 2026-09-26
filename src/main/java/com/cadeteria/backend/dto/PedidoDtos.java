@@ -117,7 +117,9 @@ public final class PedidoDtos {
             /** Último reclamo del cliente desde el seguimiento (2026-09-25) y cuándo — null si no reclamó. */
             String reclamoDetalle, Instant reclamoEn,
             /** DEMORA_RETIRO | DEMORA_ENTREGA | PROBLEMA_ENTREGA y ABIERTO | VISTO | CONTACTO | CERRADO (2026-09-26). */
-            String reclamoTipo, String reclamoEstado
+            String reclamoTipo, String reclamoEstado,
+            /** Cuándo el admin tocó "Avisar al cliente" por WhatsApp Web (2026-09-26) — null si no avisó. */
+            Instant clienteAvisadoEn
     ) {
         public static PedidoResponse from(Pedido p) {
             return from(p, true, false);
@@ -181,7 +183,7 @@ public final class PedidoDtos {
                     p.getAsignadoPorUsername(), p.getCanceladoPorUsername(), p.isPrioritario(),
                     p.getOrigenCarga(), p.getCreadoPorUsername(),
                     p.getReclamoDetalle(), p.getUltimoReclamoEn(),
-                    p.getReclamoTipo(), p.getReclamoEstado());
+                    p.getReclamoTipo(), p.getReclamoEstado(), p.getClienteAvisadoEn());
         }
     }
 
@@ -197,6 +199,9 @@ public final class PedidoDtos {
 
     /** Sugerencia de nombre al cargar un pedido con un teléfono ya visto (spec 5.6). */
     public record ClienteEncontradoResponse(String nombre) {}
+
+    /** "Avisar al cliente" (2026-09-26): el panel abre WhatsApp Web con este teléfono y texto ya armados. */
+    public record AvisoWhatsappResponse(String telefono, String texto, Instant avisadoEn) {}
 
     /**
      * Dirección que un cliente ya usó (2026-09-25): para cargarla con un clic como origen o
