@@ -85,13 +85,13 @@ pasarlos a mano, pero no es la idea.
 - [ ] **App del cadete — HTTPS**: el manifest permite tráfico sin cifrar
       (`usesCleartextTraffic="true"`, necesario para el emulador). Con el backend en `https://`,
       apagarlo en release.
-- [ ] **App del cadete — permiso de ubicación** (2026-09-26): la app lo pide al entrar a la
+- [x] **App del cadete — permiso de ubicación** (2026-09-26, hecho en la rama `apk-permiso-servicio`): la app lo pide al entrar a la
       pantalla principal pero **no revisa la respuesta** (no hay `checkSelfPermission` de
       ubicación): con el permiso denegado y la ubicación del teléfono prendida, no avisa nada y no
       manda posición. Solo avisa si la ubicación del teléfono está apagada
       (`UbicacionHabilitada.kt`). **Pendiente de programar**: pantalla que bloquea "Sin permiso de
       ubicación no podés recibir viajes" + botón "Abrir ajustes", y aviso si eligió "Solo esta vez".
-- [ ] **App del cadete — login con DNI** (2026-09-26): el alta ya exige usuario = DNI, pero el
+- [x] **App del cadete — login con DNI** (2026-09-26, hecho en la rama `apk-permiso-servicio`): el alta ya exige usuario = DNI, pero el
       login de la app acepta letras y solo contesta "usuario o contraseña incorrectos". **Pendiente**:
       teclado numérico y aviso "tu usuario es tu DNI, solo números".
 - [ ] Panel → Configuración → **Versión mínima de la app** = la versión del APK que se reparte.

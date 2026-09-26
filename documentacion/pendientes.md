@@ -320,7 +320,17 @@ pisando la de fábrica (`CADETE_APP_DEFAULT_BASE_URL`). En producción el servid
 venir solo del código: mostrar el botón solo en debug (`BuildConfig.DEBUG`) y que release
 ignore la URL guardada. Anotado también en `despliegue.md` (§2).
 
-### 3f. ⚠️ Deuda (próxima sesión): app del cadete sin control del permiso de ubicación
+### 3f. App del cadete: permiso de ubicación, servicio que no arrancaba solo y login con DNI
+**Hecho el 2026-09-26 (APK, rama `apk-permiso-servicio`)**: `PermisoUbicacionScreen` bloquea toda la
+app (login incluido) sin permiso de ubicación **precisa**, con "Dar permiso" → "Abrir ajustes" cuando
+Android ya no muestra el cartel (probado en el emulador: 1er no, 2do no, ajustes); `HomeScreen`
+arranca el servicio si el cadete no está Desconectado (probado en el emulador: arrancó sin tocar el
+estado; el envío real no, el emulador no tiene servicios de ubicación de Google → confirmar en un
+celular); `LocationTrackingService` reemplaza la escucha anterior (antes Libre → Ocupado duplicaba
+los envíos); login con usuario solo numérico. **Sigue abierto**: la precisión en la calle (abajo),
+a medir en la próxima salida ahora que el respaldo ya no corre en paralelo (3k.4).
+
+Lo que se había visto:
 Visto probando en un Moto G32 el 2026-09-26: la app avisa si la **ubicación del teléfono** está
 apagada (`UbicacionHabilitada.kt`), pero **no revisa el permiso de ubicación**. `HomeScreen` lo pide
 al entrar (`RequestMultiplePermissions`) con un callback vacío y no hay ningún `checkSelfPermission`
