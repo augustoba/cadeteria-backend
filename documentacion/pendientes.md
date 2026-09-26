@@ -1,14 +1,30 @@
 # Pendientes
 
-Última actualización: 2026-09-25.
+Última actualización: 2026-09-26.
 
 > El backlog largo (las 11 rondas de propuestas) vive en `MEJORAS-PROPUESTAS.md`, en la raíz
 > del proyecto. **Ese archivo está fuera de cualquier repo git**, así que no viaja con el
 > código. Este archivo es el pendiente corto y accionable, versionado acá a propósito.
 
 Todo el trabajo nuevo va en la rama **`develop`** de los 3 repos (`cadeteria`, `admin-front`,
-`cadete-app`). Lo del 2026-09-24 está en la rama **`pendientes-2026-09-24`** de los 3, sin
+`cadete-app`). Lo del 2026-09-24 al 26 está en la rama **`pendientes-2026-09-24`** de los 3, sin
 mergear ni pushear todavía.
+
+## Plan de salida (acordado con el cliente el 2026-09-25)
+
+1. **Salir así**: la cadetería carga los pedidos que le llegan por WhatsApp (cotiza solo por
+   distancia, no hace falta alguien que sepa de calles ni de precios). Direcciones difíciles: link
+   de Google Maps pegado, que se va guardando en la base propia.
+2. `/pedir` **no se les da a los clientes** todavía; **asignación automática apagada**.
+3. Probar el gateway de WhatsApp, desplegar backend y panel.
+4. Probar la APK en celulares propios y de empleados (no cadetes), con gente ajena al desarrollo.
+5. Pasar la APK a todos los cadetes (cambio de sistema en un día fijo, con el sistema viejo de
+   respaldo una semana).
+6. Probar la asignación automática en horarios de pocos pedidos (fines de semana).
+7. Recién después, liberar `/pedir` (ver 5a).
+
+Objetivo de fondo: que el dueño pueda salir a buscar clientes. Minimizar lo que necesita un
+operador en la oficina (los reclamos se resuelven entre cliente y cadete y se cierran solos).
 
 ---
 
@@ -35,7 +51,7 @@ Además, pedido el 2026-09-24:
   teléfono, el backend rechazaba el "Finalizar" sin foto y el viaje quedaba trabado en la cola
   para siempre. Ahora la app avisa `archivoPerdido` y queda un comentario automático.
 
-## Hecho el 2026-09-25 (misma rama `pendientes-2026-09-24`, sin pushear)
+## Hecho el 2026-09-25 y 26 (misma rama `pendientes-2026-09-24`, sin pushear)
 
 Direcciones que el buscador no encuentra — para ir llenando la base propia sin gastar Google:
 - **Pegar un link de Google Maps** en el mismo campo de dirección (admin y `/pedir`): link largo
@@ -70,6 +86,72 @@ Direcciones que el buscador no encuentra — para ir llenando la base propia sin
   panel muestra el link para pasarlo a mano.
 - La cache ya no toma en cuenta las filas aproximadas viejas (anteriores al 2026-09-24): hacían
   parecer ambigua una cuadra y la búsqueda no encontraba la ubicación buena.
+- **Direcciones habituales del cliente**: en "Nuevo pedido", al escribir el teléfono aparecen hasta
+  5 direcciones que ya usó (compara solo dígitos), con "Usar como origen / destino".
+- **Objetos de valor suman recargo** igual que el dinero (sobre la suma de ambos), en el alta del
+  panel, `/pedir` y la revisión de solicitudes.
+- **Página de seguimiento** (`/seguimiento/{token}`):
+  - Pasos: Pedido recibido, En camino, Retirado, Entregado, con texto según el momento.
+  - Tarjeta del cadete desde que se asigna: foto, nombre y apellido, DNI, teléfono (llamar y
+    WhatsApp), foto y patente del vehículo, alias/CBU con "Copiar".
+  - Fotos del viaje: retiro (desde que retira), entrega y firma (al entregar).
+  - Descargar comprobante desde "En camino". Logo y nombre de la cadetería arriba.
+  - Aviso de verificar al cadete (datos o QR) antes de entregar el pedido, dinero o valores.
+  - El link vale hasta las 23:59 del día en que terminó el pedido (salvo reclamo abierto).
+  - Solo por token: sin búsqueda por número ni teléfono.
+- **Comprobante (PDF)**: encabezado logo | CADEM CADETERÍA | comprobante; sin teléfono fijo ni
+  "Firma de conformidad"; muestra objetos de valor y el teléfono del cadete; logo rehecho (el viejo
+  tenía bordes blancos en las letras).
+- **Mensajes al cliente** con `{marca}` y `{numero}` (plantillas editables); el de "cadete aceptó"
+  pide verificar al cadete o escanear el QR.
+- **QR del pedido en la app**: botón "Mostrar QR al cliente" durante el viaje; abre el seguimiento.
+- **Reclamos del cliente** desde el seguimiento (botón según el momento, con confirmación):
+  - Demora en el retiro / demora en la entrega: avisan al cadete (app y push) y se cierran solos
+    cuando retira / entrega.
+  - Problema con la entrega (el cliente escribe qué pasó): abre un **incidente GRAVE** vinculado al
+    pedido; **mientras esté abierto el cadete no recibe pedidos** (automática, candidatos, manual y
+    lote). A los `reclamo_seguimiento_min` (10) se le escribe al cliente por WhatsApp (o SMS); si no
+    responde en `reclamo_cierre_min` (10) se cierra solo. "Ya se solucionó" lo cierra; "Sigue el
+    problema" abre el WhatsApp de atención (`whatsapp_atencion_cliente`, puede ser el celular del
+    dueño) y queda abierto hasta que un admin lo cierre.
+  - App del cadete: recuadro rojo del reclamo en el viaje (con Llamar/WhatsApp) y en el historial;
+    aviso en inicio mientras esté bloqueado; la push del reclamo abre el viaje.
+  - Panel: filas de color por tipo (ámbar retiro, naranja entrega, rojo problema) que parpadean
+    hasta "Visto"; "Cerrar"; cuadro "Reclamos abiertos" con los ya entregados; alerta con sonido.
+- **Panel, dashboard**: pedidos sin asignar hace más de `minutos_pedido_urgente_reintentar` (30)
+  parpadean en violeta; selector "Ordenar" (reclamos primero, demorados en retirar, sin asignar hace
+  más tiempo); leyenda de colores.
+- **Registro de cadete**: al enviar, cartel de que le llega un mail al darlo de alta o si hay que
+  corregir. **Ficha del cadete**: apellido, DNI, fotos y datos en solapas.
+- **Demo**: al arrancar con `DEMO_ENABLED=true` se siembra un pedido por cada situación (incluidos
+  los tres reclamos y uno sin asignar hace 45 min) y se imprimen en el log los links de seguimiento
+  de cada uno, para mostrarle al cliente.
+- **`documentacion/despliegue.md`**: checklist de producción (variables, mail, APK, cosas de prueba
+  a apagar, cuentas externas).
+- **Bugs encontrados y arreglados**: `whatsapp_mensaje.texto` era TINYTEXT (todo WhatsApp de más de
+  255 caracteres fallaba); `/api/publico/configuracion` respondía XML que el navegador cacheaba (la
+  página de seguimiento mostraba "Algo salió mal"); la columna de observaciones de las solicitudes
+  de cadete no se creaba (`columnDefinition` entre comillas); el job de reclamos deshacía el cierre
+  si fallaba un envío.
+
+## ⚠️ Falta probar (no se probó todavía)
+
+Lo de arriba se probó con tests (153 del backend), compilando panel y APK, y en su mayoría con
+pruebas contra el backend en la base `cadeteria_prueba_claude`. **No se probó:**
+- **La APK en el emulador ni en un teléfono** con los cambios de estos días: recuadro del reclamo,
+  QR, aviso de bloqueo en inicio, que la push del reclamo abra el viaje. Hay que recompilarla y
+  reinstalarla.
+- **El panel en el navegador**: filas que parpadean y sus colores, "Visto" y "Cerrar", cuadro
+  "Reclamos abiertos", selector "Ordenar", leyenda, violeta de sin asignar. (Solo se compiló.)
+- **Página de seguimiento en el navegador**: botones "Ya se solucionó" / "Sigue el problema", campo
+  de texto del reclamo, aviso de verificar al cadete y logo. (Sí se vieron los 4 pasos, la tarjeta
+  del cadete, las fotos y el comprobante.)
+- **Push a la app** (necesita Firebase configurado) y **WhatsApp real**: el seguimiento del reclamo
+  solo se probó con `WHATSAPP_MODO_SIMULADO=true`.
+- **Mails reales** (alta, corrección y rechazo de cadetes): no hay SMTP configurado en esta PC.
+- **Link corto de Google Maps** de la app del celular (`maps.app.goo.gl`): no se probó con uno real.
+- **Registro de cadete con DNI repetido** en la base real (se probó en la de prueba).
+- Que el QR se lea desde otro celular (necesita `FRONT_BASE_URL` pública; con `localhost` no abre).
 
 ## Abierto
 
@@ -157,3 +239,6 @@ corto), qué pasa con avisos falsos, y el tema legal (ver la conversación).
   deja modificado en git.
 - Con JDK 21 el `assembleDebug` falla en `jlink` (AGP 8.5): compilar con un JDK 17
   (`-Dorg.gradle.java.home=...jbr-17...`).
+- `whatsapp_respuesta.texto` también es TINYTEXT (`@Lob`): una respuesta de un cliente de más de 255
+  caracteres fallaría al guardarse. Mismo arreglo que `whatsapp_mensaje` (length 4000).
+- La vista **Kanban** del dashboard todavía no muestra los colores de reclamos ni de sin asignar.

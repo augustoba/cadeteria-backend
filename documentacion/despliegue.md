@@ -72,6 +72,8 @@ pasarlos a mano, pero no es la idea.
       producción: `assembleRelease` con un keystore propio (guardarlo bien: sin él no se pueden
       publicar actualizaciones que se instalen encima), subir `versionCode`/`versionName` en cada
       entrega. Compilar con JDK 17.
+- [ ] **App del cadete — recompilar e instalar** en todos los celulares cada vez que cambia (QR
+      del pedido, reclamos, aviso de bloqueo, etc.). Subir la "Versión mínima" en Configuración.
 - [ ] **App del cadete — HTTPS**: el manifest permite tráfico sin cifrar
       (`usesCleartextTraffic="true"`, necesario para el emulador). Con el backend en `https://`,
       apagarlo en release.
@@ -97,6 +99,10 @@ pasarlos a mano, pero no es la idea.
       de Google en ese momento (hoy 30).
 - [ ] **Marca**: nombre de la cadetería y teléfono de soporte. El nombre sale en los mensajes al
       cliente (`{marca}`) y arriba de la página de seguimiento; sin cargar dice "Cadetería".
+- [ ] **Reclamos de clientes**: minutos hasta escribirle al cliente (10), minutos para cerrar sin
+      respuesta (10) y **WhatsApp de atención al cliente** (el número al que escribe si sigue el
+      problema; puede ser el celular del dueño). Sin gateway de WhatsApp ni SMS, el mensaje de
+      seguimiento no sale y el reclamo igual se cierra solo.
 - [ ] **Plantillas de SMS / vencimiento del link de seguimiento** (default 2 horas después de
       terminado el pedido): revisar los textos y las horas.
 - [ ] Revisar **Salud del sistema** (al final de Configuración): todo en 🟢 o 🟡 a propósito.
@@ -107,7 +113,7 @@ pasarlos a mano, pero no es la idea.
 
 | Qué | Dónde | En producción |
 | --- | --- | --- |
-| Datos de demo | `DEMO_ENABLED` | `false` |
+| Datos de demo (incluye pedidos con reclamos e incidentes de ejemplo) | `DEMO_ENABLED` | `false` |
 | Códigos simulados de WhatsApp | `WHATSAPP_MODO_SIMULADO` | `false` |
 | Admin inicial por defecto | `ADMIN_USER` / `ADMIN_PASSWORD` | propios |
 | "No borrar (solo para pruebas)" de las direcciones de Google | Configuración → Integraciones (`google_cache_pausar_borrado`) | **destildado**; sacar la opción o dejarla solo para superadmin (pendientes 3c) |
