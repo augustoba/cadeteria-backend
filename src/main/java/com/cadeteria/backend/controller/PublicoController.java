@@ -65,6 +65,15 @@ public class PublicoController {
         service.suscribirPush(token, req.endpoint(), req.p256dh(), req.auth());
     }
 
+    public record ReclamoResponse(boolean avisado, String mensaje) {}
+
+    /** Botón de reclamo del seguimiento (2026-09-25): el tipo lo decide el estado del pedido. */
+    @PostMapping("/reclamo")
+    public ReclamoResponse reclamo(@PathVariable String token) {
+        var r = service.reclamoDelCliente(token);
+        return new ReclamoResponse(r.avisado(), r.mensaje());
+    }
+
     public record RepetirResponse(String nuevoToken) {}
 
     /** Mejora 87 — el cliente repite su pedido sin llamar; el front navega al seguimiento del pedido nuevo con el token que devuelve. */

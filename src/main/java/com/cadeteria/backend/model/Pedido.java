@@ -211,6 +211,9 @@ public class Pedido {
     private String motivoNoEntrega;
     private Instant noEntregadoEn;
 
+    /** Último reclamo del cliente desde el seguimiento (2026-09-25) — para no mandarle 20 avisos seguidos al cadete. */
+    private Instant ultimoReclamoEn;
+
     /** true si se agotaron los reintentos de SMS (aceptación o entrega) sin poder avisarle al cliente — para el ícono del dashboard. */
     @Column(nullable = false)
     private boolean smsFallido = false;
@@ -588,6 +591,14 @@ public class Pedido {
 
     public void setMotivoNoEntrega(String motivoNoEntrega) {
         this.motivoNoEntrega = motivoNoEntrega;
+    }
+
+    public Instant getUltimoReclamoEn() {
+        return ultimoReclamoEn;
+    }
+
+    public void setUltimoReclamoEn(Instant ultimoReclamoEn) {
+        this.ultimoReclamoEn = ultimoReclamoEn;
     }
 
     public Instant getNoEntregadoEn() {

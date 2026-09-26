@@ -76,6 +76,18 @@ public class WebSocketPublisher {
         ));
     }
 
+    /** El cliente reclamó desde la página de seguimiento (2026-09-25) — el admin se entera además del cadete. */
+    public void publicarAlertaReclamo(Cadete cadete, PedidoResponse pedido, String detalle) {
+        template.convertAndSend("/topic/admin/alertas", Map.of(
+                "tipo", "RECLAMO_CLIENTE",
+                "cadeteId", cadete.getId(),
+                "cadeteNombre", cadete.getNombre(),
+                "cadeteApellido", cadete.getApellido(),
+                "pedido", pedido,
+                "detalle", detalle
+        ));
+    }
+
     /** Pedido nuevo sin asignar recién cargado — para el aviso sonoro/visual del dashboard (ronda 4, punto 26). */
     public void publicarAlertaPedidoNuevo(PedidoResponse pedido) {
         template.convertAndSend("/topic/admin/alertas", Map.of(

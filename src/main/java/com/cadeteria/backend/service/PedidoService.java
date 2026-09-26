@@ -293,6 +293,60 @@ public class PedidoService {
         return pedido;
     }
 
+    /** Resultado de un reclamo: si se avisó ahora, y el texto para el cliente. */
+    public record ReclamoResultado(boolean avisado, String mensaje) {}
+
+    private static final java.time.Duration ESPERA_ENTRE_RECLAMOS = java.time.Duration.ofMinutes(10);
+
+    /**
+     * Botón de reclamo de la página de seguimiento (2026-09-25). El tipo lo decide el estado del
+     * pedido, no lo que mande la página: en camino sin retirar = "el cadete no llegó"; retirado =
+     * demora en la entrega; entregado = problema con la entrega. Avisa al cadete (app + push), deja
+     * un comentario en el pedido y una alerta en el panel. Uno cada 10 minutos por pedido.
+     */
+    @Transactional
+    public ReclamoResultado reclamoDelCliente(String token) {
+        Pedido pedido = getPorToken(token);
+        Cadete cadete = pedido.getCadeteAsignado();
+        String estado = pedido.getEstado().getId();
+        String detalle;
+        if ("EN_CURSO".equals(estado) && pedido.getRetiradoEn() == null) {
+            detalle = "Reclamo por el retiro del pedido N° " + pedido.getNumero() + ": el cliente dice que el cadete no llegó.";
+        } else if ("EN_CURSO".equals(estado)) {
+            detalle = "El cliente reporta demora en la entrega del pedido N° " + pedido.getNumero() + ": todavía no lo recibió.";
+        } else if ("FINALIZADO".equals(estado)) {
+            detalle = "El cliente reportó un inconveniente con la entrega del pedido N° " + pedido.getNumero() + ".";
+        } else {
+            throw new BadRequestException("En este momento no se puede enviar un reclamo para este pedido.");
+        }
+        if (cadete == null) {
+            throw new BadRequestException("Este pedido no tiene un cadete asignado.");
+        }
+        String paraCliente = "Se está informando al cadete sobre la novedad. Pronto se comunicará con usted.";
+        if (pedido.getUltimoReclamoEn() != null
+                && pedido.getUltimoReclamoEn().plus(ESPERA_ENTRE_RECLAMOS).isAfter(Instant.now())) {
+            return new ReclamoResultado(false, "Ya le avisamos al cadete hace unos minutos. Pronto se comunicará con usted.");
+        }
+        pedido.setUltimoReclamoEn(Instant.now());
+        repo.save(pedido);
+
+        String mensajeCadete = detalle + " Por favor comunicate con el cliente a la brevedad: "
+                + pedido.getClienteNombre() + " — " + pedido.getClienteTelefono() + ".";
+        publisher.publicarAviso(cadete.getId(), mensajeCadete);
+        fcmService.enviar(cadete.getFcmToken(), "Reclamo del cliente", mensajeCadete,
+                java.util.Map.of("tipo", "RECLAMO_CLIENTE", "pedidoId", pedido.getId()));
+
+        PedidoComentario comentario = new PedidoComentario();
+        comentario.setId(UUID.randomUUID().toString());
+        comentario.setPedido(pedido);
+        comentario.setAdminUsername("cliente (seguimiento)");
+        comentario.setTexto("📣 " + detalle);
+        pedidoComentarioRepo.save(comentario);
+
+        publisher.publicarAlertaReclamo(cadete, PedidoResponse.from(pedido), detalle);
+        return new ReclamoResultado(true, paraCliente);
+    }
+
     /** 00:00 del día siguiente (hora de Argentina) al instante dado. */
     static Instant finDelDia(Instant instante) {
         return instante.atZone(ZONA_ARGENTINA).toLocalDate().plusDays(1).atStartOfDay(ZONA_ARGENTINA).toInstant();

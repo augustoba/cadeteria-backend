@@ -25,15 +25,19 @@ class PedidoServiceSeguimientoTest {
     private PedidoRepository repo;
     private ConfiguracionService config;
     private PedidoService service;
+    private WebSocketPublisher publisher;
+    private FcmService fcm;
 
     @BeforeEach
     void setUp() {
         repo = mock(PedidoRepository.class);
         config = mock(ConfiguracionService.class);
+        publisher = mock(WebSocketPublisher.class);
+        fcm = mock(FcmService.class);
         service = new PedidoService(
                 repo, mock(CadeteRepository.class), mock(EstadoPedidoRepository.class), mock(ResultadoOfertaRepository.class),
                 mock(OfertaPedidoRepository.class), mock(EstadoCadeteRepository.class), config,
-                mock(WebSocketPublisher.class), mock(FcmService.class), mock(SmsGatewayService.class),
+                publisher, fcm, mock(SmsGatewayService.class),
                 mock(PedidoUbicacionRepository.class), mock(PedidoComentarioRepository.class),
                 mock(PedidoPrecioLogRepository.class), mock(WebPushService.class),
                 mock(PedidoParadaRepository.class), mock(MovimientoCreditoRepository.class),
@@ -77,6 +81,70 @@ class PedidoServiceSeguimientoTest {
     void unTokenQueNoExisteNoDiceNada() {
         when(repo.findByTokenSeguimiento("otro")).thenReturn(Optional.empty());
         assertThrows(ResourceNotFoundException.class, () -> service.getPorToken("otro"));
+    }
+
+    // --- Reclamo del cliente (2026-09-25) ---
+
+    @Test
+    void enCaminoSinRetirarReclamaQueElCadeteNoLlego() {
+        Pedido p = conCadete(pedido("EN_CURSO", null));
+        tokenDe(p);
+
+        var r = service.reclamoDelCliente("tok");
+
+        org.junit.jupiter.api.Assertions.assertTrue(r.avisado());
+        org.mockito.Mockito.verify(fcm).enviar(org.mockito.ArgumentMatchers.eq("fcm-1"), org.mockito.ArgumentMatchers.eq("Reclamo del cliente"),
+                org.mockito.ArgumentMatchers.contains("el cadete no llegó"), org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.verify(publisher).publicarAviso(org.mockito.ArgumentMatchers.eq("c1"),
+                org.mockito.ArgumentMatchers.contains("3815550000"));
+    }
+
+    @Test
+    void retiradoReclamaDemoraYEntregadoReclamaLaEntrega() {
+        Pedido retirado = conCadete(pedido("EN_CURSO", null));
+        retirado.setRetiradoEn(Instant.now());
+        tokenDe(retirado);
+        service.reclamoDelCliente("tok");
+        org.mockito.Mockito.verify(fcm).enviar(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.contains("demora en la entrega"), org.mockito.ArgumentMatchers.any());
+
+        Pedido entregado = conCadete(pedido("FINALIZADO", Instant.now()));
+        when(repo.findByTokenSeguimiento("tok2")).thenReturn(Optional.of(entregado));
+        service.reclamoDelCliente("tok2");
+        org.mockito.Mockito.verify(fcm).enviar(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.contains("inconveniente con la entrega"), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void unSegundoReclamoEnMenosDeDiezMinutosNoVuelveAAvisar() {
+        Pedido p = conCadete(pedido("EN_CURSO", null));
+        tokenDe(p);
+        service.reclamoDelCliente("tok");
+
+        var r = service.reclamoDelCliente("tok");
+
+        org.junit.jupiter.api.Assertions.assertFalse(r.avisado());
+        org.mockito.Mockito.verify(fcm, org.mockito.Mockito.times(1)).enviar(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void sinCadeteOCanceladoNoSePuedeReclamar() {
+        tokenDe(pedido("SIN_ASIGNAR", null));
+        assertThrows(BadRequestException.class, () -> service.reclamoDelCliente("tok"));
+    }
+
+    private Pedido conCadete(Pedido p) {
+        com.cadeteria.backend.model.Cadete c = new com.cadeteria.backend.model.Cadete();
+        c.setId("c1");
+        c.setNombre("Juan");
+        c.setApellido("Pérez");
+        c.setFcmToken("fcm-1");
+        p.setCadeteAsignado(c);
+        p.setNumero(1234L);
+        p.setClienteNombre("Marcos");
+        p.setClienteTelefono("3815550000");
+        return p;
     }
 
     private void tokenDe(Pedido p) {
