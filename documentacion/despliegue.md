@@ -106,6 +106,28 @@ pasarlos a mano, pero no es la idea.
 
 ## 3. Panel → Configuración (después del primer arranque)
 
+### Valores sugeridos (2026-09-26)
+
+Los de "Producción" son los que ya trae el código por defecto (`DataSeeder` o el default en el
+servicio): si la clave no está en la base, vale ese. "Pruebas" es para salir a la calle con 1-5
+teléfonos; **volver a producción antes de tener cadetes reales**.
+
+| Clave (Configuración) | Qué hace | Producción | Pruebas | Por qué ese número |
+| --- | --- | --- | --- | --- |
+| `frecuencia_ubicacion_seg` | Cada cuánto el teléfono manda su posición | **45** | 10-20 | Batería del cadete y volumen: con pedido en curso cada envío es una fila de `pedido_ubicacion` (~1.000/cadete/día a 45 s). No tiene costo externo. La app lo toma al arrancar el servicio. |
+| `mapeo_calles_cadetes_intervalo_seg` | Respaldo con Nominatim para cadetes cuyo teléfono no resolvió la calle | **1200** | 10-60 | Límite de Nominatim: 1 consulta/seg compartida con el buscador. Cuenta segura = cadetes activos / intervalo. Piso duro de 10 s. |
+| `aprender_gps_precision_max_m` | Error máximo del GPS para aprender la puerta al marcar Retirado/Entregado | **50** | 50 | Más alto aprende puertas corridas. |
+| `aprender_geocoder_precision_max_m` | Error máximo para guardar la calle que resolvió el teléfono andando | **30** | 30 | Con más error el Geocoder devuelve la cuadra de al lado. |
+| `reverse_respaldo_max_dia` | Consultas diarias a LocationIQ/Geoapify cuando Nominatim no sabe la altura | **500** | 500 | Sale del cupo gratis del buscador (5.000 y 3.000/día). |
+| `google_cache_dias` | Días que se guarda lo de Google (API y teléfono) | **30** | 30 | Condiciones de Google. 0 = no guardar nada. |
+| `google_cache_pausar_borrado` | "No borrar (solo para pruebas)" | **false** | true | En producción guardaría datos de Google para siempre. |
+| `google_link_vence` | Que también venza lo sacado de un link de Google Maps | **false** | false | Zona gris; ver §2 y la decisión pendiente sobre datos de Google. |
+| `retencion_imagenes_pedido_dias` | Días que se guardan foto de entrega, firma y comprobante | **60** | 60 | Espacio en Cloudinary. **Sin `CLOUDINARY_API_KEY`/`SECRET` solo se borra la referencia en la base, no el archivo** (§1). |
+| `retencion_chat_dias` / `retencion_whatsapp_dias` | Días que se guardan chats y WhatsApp | **0** (nunca) | 0 | Decisión del dueño (privacidad, no espacio). |
+| `verificacion_telefono_activa` | Código al teléfono en `/pedir` | **false** hasta probar WhatsApp/SMS | false | Ver pendientes 3. |
+
+### Checklist
+
 - [ ] **Cloudinary**: cloud name + upload preset unsigned. Sin esto el cadete no puede
       finalizar pedidos (la foto de entrega es obligatoria).
 - [ ] **Tarifas**: mínimo, km cubiertos, precio por km, factor de línea recta, recargo por dinero
