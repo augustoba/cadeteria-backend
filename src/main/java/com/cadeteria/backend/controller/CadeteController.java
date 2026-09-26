@@ -45,13 +45,19 @@ public class CadeteController {
     private final com.cadeteria.backend.service.CadeteSesionService sesionService;
     private final String frontBaseUrl;
     private final com.cadeteria.backend.service.ReclamoService reclamoService;
+    private final com.cadeteria.backend.service.GeocodingProxyService geocodingProxyService;
+    private final com.cadeteria.backend.service.MapeoCallesCadetesService mapeoCallesCadetesService;
 
     public CadeteController(CadeteService service, WebSocketPublisher publisher, ConfiguracionService configuracionService,
                              PagoSemanalService pagoSemanalService,
                              com.cadeteria.backend.service.CadeteSesionService sesionService,
                              com.cadeteria.backend.config.AppProperties props,
-                             com.cadeteria.backend.service.ReclamoService reclamoService) {
+                             com.cadeteria.backend.service.ReclamoService reclamoService,
+                             com.cadeteria.backend.service.GeocodingProxyService geocodingProxyService,
+                             com.cadeteria.backend.service.MapeoCallesCadetesService mapeoCallesCadetesService) {
         this.reclamoService = reclamoService;
+        this.geocodingProxyService = geocodingProxyService;
+        this.mapeoCallesCadetesService = mapeoCallesCadetesService;
         this.sesionService = sesionService;
         this.frontBaseUrl = props.getFrontBaseUrl();
         this.service = service;
@@ -174,6 +180,12 @@ public class CadeteController {
     public CadeteResponse actualizarUbicacion(Authentication auth, @Valid @RequestBody UbicacionRequest req) {
         Cadete c = service.actualizarUbicacion(auth.getName(), req.lat(), req.lng());
         publisher.publicarUbicacion(c);
+        // Calle resuelta por el Geocoder del teléfono (2026-09-26): alimenta la cache y evita que el
+        // mapeo de calles vuelva a consultar ese punto. Sin calle, el mapeo sigue como siempre.
+        if (req.calle() != null && req.altura() != null) {
+            mapeoCallesCadetesService.registrarCalleDelTelefono(c.getId());
+            geocodingProxyService.aprenderDelTelefono(req.calle(), req.altura(), req.localidad(), req.lat(), req.lng(), req.precision());
+        }
         return CadeteResponse.from(c);
     }
 

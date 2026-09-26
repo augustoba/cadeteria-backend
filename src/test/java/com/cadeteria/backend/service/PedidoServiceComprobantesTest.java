@@ -97,13 +97,13 @@ class PedidoServiceComprobantesTest {
     @Test
     void finalizarSinFotoFallaConElDefault() {
         assertThrows(BadRequestException.class, () -> service.finalizar("p1", "30111222",
-                new FinalizarRequest("Lucía", null, null, null, null, null, null)));
+                new FinalizarRequest("Lucía", null, null, null, null, null, null, null, null)));
     }
 
     @Test
     void finalizarSinReceptorFallaSiempreAunqueSeHayaPerdidoLaFoto() {
         assertThrows(BadRequestException.class, () -> service.finalizar("p1", "30111222",
-                new FinalizarRequest(null, null, null, null, null, true, null)));
+                new FinalizarRequest(null, null, null, null, null, true, null, null, null)));
         verify(comentarioRepo, never()).save(any(PedidoComentario.class));
     }
 }

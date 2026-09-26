@@ -129,7 +129,7 @@ public class PedidoCadeteController {
                 Boolean.TRUE.equals(req.archivoPerdido()));
         // La puerta real del retiro alimenta la cache de direcciones (2026-09-26).
         geocodingProxyService.aprenderDeCadete(p.getOrigenDireccion(), p.getOrigenLat(), p.getOrigenLng(),
-                req.lat(), req.lng(), req.precision());
+                req.lat(), req.lng(), req.precision(), req.calleDetectada(), req.localidadDetectada());
         return PedidoResponse.paraCadete(p);
     }
 
@@ -138,7 +138,7 @@ public class PedidoCadeteController {
         Pedido p = service.finalizar(id, auth.getName(), req);
         // La puerta real de la entrega alimenta la cache de direcciones (2026-09-26).
         geocodingProxyService.aprenderDeCadete(p.getDestinoDireccion(), p.getDestinoLat(), p.getDestinoLng(),
-                req.lat(), req.lng(), req.precision());
+                req.lat(), req.lng(), req.precision(), req.calleDetectada(), req.localidadDetectada());
         return PedidoResponse.paraCadete(p);
     }
 

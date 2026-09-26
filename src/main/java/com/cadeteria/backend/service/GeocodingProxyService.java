@@ -77,6 +77,8 @@ public class GeocodingProxyService {
 
     /** Precisión máxima (metros) del GPS del cadete para aprender una dirección de Retirado/Entregado. */
     public static final String CONFIG_GPS_PRECISION_MAX = "aprender_gps_precision_max_m";
+    /** Precisión máxima (metros) del GPS para aprender la calle que resolvió el teléfono mientras anda. */
+    public static final String CONFIG_GEOCODER_PRECISION_MAX = "aprender_geocoder_precision_max_m";
     /** Tope diario de reverse geocoding de respaldo (LocationIQ/Geoapify) cuando Nominatim no da la altura. 0 = apagado. */
     public static final String CONFIG_REVERSE_RESPALDO_MAX_DIA = "reverse_respaldo_max_dia";
     /** El GPS del cadete tiene que caer a menos de esto del pin del pedido (si no, marcó en otro lado). */
@@ -273,8 +275,37 @@ public class GeocodingProxyService {
      * cerca del pin del pedido (si no, marcó desde otro lado); la calle se confirma con el reverse
      * igual que un pin manual.
      */
+    /**
+     * El teléfono del cadete resolvió calle y altura de su posición con su Geocoder (Android, datos
+     * de Google) mientras anda (2026-09-26). Se guarda como {@code android_geocoder} — vence como lo
+     * de Google — solo con buena precisión (≤ {@code aprender_geocoder_precision_max_m}, default 30 m):
+     * con un punto impreciso el Geocoder devuelve la cuadra o la calle de al lado.
+     *
+     * @return true si la guardó (el mapeo de calles no tiene que volver a consultar ese punto).
+     */
+    public boolean aprenderDelTelefono(String calle, Integer altura, String localidad, double lat, double lng, Float precisionM) {
+        if (calle == null || calle.isBlank() || altura == null || altura <= 0 || precisionM == null) return false;
+        int maxPrecision = configuracionService.getInt(CONFIG_GEOCODER_PRECISION_MAX, 30);
+        if (maxPrecision <= 0 || precisionM > maxPrecision) return false;
+        String canonica = DireccionUtils.expandirAbreviaturas(calle.trim());
+        direccionCache.guardar(calle.trim(), altura, canonica, limpiarLocalidad(localidad == null ? "" : localidad),
+                lat, lng, false, DireccionCacheService.PROVEEDOR_ANDROID_GEOCODER);
+        return true;
+    }
+
     @Async
     public void aprenderDeCadete(String direccion, Double pinLat, Double pinLng, Double lat, Double lng, Float precisionM) {
+        aprenderDeCadete(direccion, pinLat, pinLng, lat, lng, precisionM, null, null);
+    }
+
+    /**
+     * Igual, con la calle que resolvió el teléfono en ese momento (2026-09-26): si el reverse no
+     * confirma la calle (OSM no la conoce o la tiene con otro nombre) pero el teléfono sí, se aprende
+     * igual con el nombre del teléfono.
+     */
+    @Async
+    public void aprenderDeCadete(String direccion, Double pinLat, Double pinLng, Double lat, Double lng, Float precisionM,
+                                 String calleTelefono, String localidadTelefono) {
         if (lat == null || lng == null || precisionM == null) return;
         int maxPrecision = configuracionService.getInt(CONFIG_GPS_PRECISION_MAX, 50);
         if (maxPrecision <= 0 || precisionM > maxPrecision) return;
@@ -283,10 +314,14 @@ public class GeocodingProxyService {
             log.info("No se aprende \"{}\" del GPS del cadete: marcó a más de {} m del pin.", direccion, (int) DISTANCIA_MAX_AL_PIN_M);
             return;
         }
-        aprender(direccion, lat, lng, DireccionCacheService.PROVEEDOR_CADETE_GPS);
+        aprender(direccion, lat, lng, DireccionCacheService.PROVEEDOR_CADETE_GPS, calleTelefono, localidadTelefono);
     }
 
     private void aprender(String direccion, Double lat, Double lng, String fuente) {
+        aprender(direccion, lat, lng, fuente, null, null);
+    }
+
+    private void aprender(String direccion, Double lat, Double lng, String fuente, String calleTelefono, String localidadTelefono) {
         if (direccion == null || lat == null || lng == null) return;
         // "Colombia 4695, San Miguel de Tucumán" -> "Colombia" + 4695
         Matcher m = NUMERO_FINAL.matcher(direccion.split(",")[0].trim());
@@ -294,11 +329,18 @@ public class GeocodingProxyService {
         String calleTipeada = m.group(1).trim();
         int numero = Integer.parseInt(m.group(2));
         GeoAddress r = reverse(lat, lng);
-        if (r == null || !mismaCalle(calleTipeada, r.street())) {
-            log.info("No se aprende el pin de \"{}\": el reverse dio \"{}\".", direccion, r == null ? null : r.street());
+        if (r != null && mismaCalle(calleTipeada, r.street())) {
+            direccionCache.guardar(calleTipeada, numero, r.street(), r.locality(), lat, lng, false, fuente);
             return;
         }
-        direccionCache.guardar(calleTipeada, numero, r.street(), r.locality(), lat, lng, false, fuente);
+        // El reverse (datos de OSM) no la confirma, pero el teléfono sí: se usa su nombre de calle.
+        if (calleTelefono != null && !calleTelefono.isBlank() && mismaCalle(calleTipeada, calleTelefono)) {
+            direccionCache.guardar(calleTipeada, numero, DireccionUtils.expandirAbreviaturas(calleTelefono.trim()),
+                    limpiarLocalidad(localidadTelefono == null ? "" : localidadTelefono), lat, lng, false, fuente);
+            return;
+        }
+        log.info("No se aprende el pin de \"{}\": el reverse dio \"{}\" y el teléfono \"{}\".", direccion,
+                r == null ? null : r.street(), calleTelefono);
     }
 
     private static final Set<String> PALABRAS_GENERICAS = Set.of(

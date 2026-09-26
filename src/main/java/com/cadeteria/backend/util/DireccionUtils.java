@@ -22,6 +22,31 @@ public final class DireccionUtils {
         return sinPuntuacion.trim().replaceAll("\\s+", " ");
     }
 
+    private static final java.util.Map<String, String> ABREVIATURAS = java.util.Map.ofEntries(
+            java.util.Map.entry("av", "Avenida"), java.util.Map.entry("avda", "Avenida"),
+            java.util.Map.entry("gral", "General"), java.util.Map.entry("pte", "Presidente"),
+            java.util.Map.entry("pres", "Presidente"), java.util.Map.entry("dr", "Doctor"),
+            java.util.Map.entry("pje", "Pasaje"), java.util.Map.entry("psje", "Pasaje"),
+            java.util.Map.entry("bv", "Bulevar"), java.util.Map.entry("blvd", "Bulevar"),
+            java.util.Map.entry("cnel", "Coronel"), java.util.Map.entry("tte", "Teniente"),
+            java.util.Map.entry("ing", "Ingeniero"), java.util.Map.entry("sgto", "Sargento"));
+
+    /**
+     * "Av. Gral. Paz" -> "Avenida General Paz" (2026-09-26). El Geocoder del teléfono (datos de
+     * Google) abrevia y OpenStreetMap escribe completo: sin esto la misma calle quedaba como dos
+     * calles distintas en la cache.
+     */
+    public static String expandirAbreviaturas(String calle) {
+        if (calle == null) return null;
+        StringBuilder out = new StringBuilder();
+        for (String palabra : calle.trim().split("\\s+")) {
+            String clave = palabra.replace(".", "").toLowerCase(java.util.Locale.ROOT);
+            if (out.length() > 0) out.append(' ');
+            out.append(ABREVIATURAS.getOrDefault(clave, palabra));
+        }
+        return out.toString();
+    }
+
     /** Bloque de cuadra (centena) de una altura: 1502 -> 1500 (ver spec §5.1). */
     public static int cuadra(int numero) {
         return (numero / 100) * 100;

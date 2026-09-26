@@ -216,6 +216,31 @@ Direcciones que el buscador no encuentra — para ir llenando la base propia sin
   consultar a nadie; con 180 m de precisión no aprendió; con una dirección de otra calle tampoco.
 - Tests: backend 180, APK 20.
 
+## Hecho el 2026-09-26 (mañana): calle del Geocoder del teléfono
+
+- La APK resuelve la calle y altura de su posición con el **Geocoder de Android** (datos de Google,
+  gratis, sin key) y la manda en el ping de ubicación. No en cada ping: cada ~120 m o 2 minutos, y
+  solo con precisión ≤ 30 m (con un punto impreciso devuelve la cuadra de al lado). Si no la
+  encuentra, la posición se manda igual. Android 13+ usa la versión asíncrona; antes, la bloqueante
+  en segundo plano.
+- El backend la guarda en la cache como `android_geocoder` (confianza de buscador gratuito: nunca
+  pisa un pin manual ni el GPS de Retirado/Entregado), con la precisión ≤
+  `aprender_geocoder_precision_max_m`. **Vence como lo de Google** (`google_cache_dias`) y la pausa
+  de dev la cubre: zona gris con las condiciones de Google (datos de Google guardados en una base
+  propia). Si se decide no usarlo más, se borra con `delete from cuadra_coords where proveedor='android_geocoder'`.
+- **Abreviaturas**: "Av. Gral. Paz" se guarda como "Avenida General Paz" (así escribe OSM), con
+  alias de la forma abreviada; sin esto la misma calle quedaba repetida con dos nombres. Nombres
+  que difieren en más que abreviaturas (ej. "Juan B. Justo" vs "Juan Bautista Justo") todavía
+  pueden duplicarse: mirar en la semana de pruebas.
+- El mapeo de calles no vuelve a consultar a Nominatim/LocationIQ/Geoapify el punto de un cadete
+  cuyo teléfono ya mandó la calle en ese intervalo (ahorra cupo).
+- **Retirado/Entregado** mandan también la calle del teléfono: si el reverse (OSM) no confirma la
+  calle del pedido pero el teléfono sí, se aprende igual.
+- APK vieja (sin estos campos) sigue funcionando igual. Tests: backend 185, APK 23. En vivo: ping
+  con calle y 12 m → guardado y después "Av Mate de Luna 2480" salió de la cache; con 90 m no se
+  guarda; datos inválidos → 400.
+- Para comparar en la semana de recorridos: `select proveedor, count(*) from cuadra_coords group by proveedor;`
+
 ## ⚠️ Falta probar (no se probó todavía)
 
 Lo de arriba se probó con tests (153 del backend), compilando panel y APK, y en su mayoría con

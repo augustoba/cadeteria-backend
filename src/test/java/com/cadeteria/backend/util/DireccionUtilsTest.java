@@ -29,4 +29,12 @@ class DireccionUtilsTest {
         assertEquals(1600, DireccionUtils.cuadra(1600));
         assertEquals(0, DireccionUtils.cuadra(42));
     }
+
+    @Test
+    void expandeLasAbreviaturasDeGoogleComoLasEscribeOsm() {
+        assertEquals("Avenida General Paz", DireccionUtils.expandirAbreviaturas("Av. Gral. Paz"));
+        assertEquals("Avenida Presidente Perón", DireccionUtils.expandirAbreviaturas("Avda Pte. Perón"));
+        assertEquals("San Martín", DireccionUtils.expandirAbreviaturas("San Martín"));
+        assertEquals("Pasaje Doctor Ávila", DireccionUtils.expandirAbreviaturas("Pje. Dr. Ávila"));
+    }
 }

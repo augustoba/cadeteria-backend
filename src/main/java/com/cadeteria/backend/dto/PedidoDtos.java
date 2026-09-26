@@ -239,7 +239,10 @@ public final class PedidoDtos {
                                    @DecimalMin("-180") @DecimalMax("180") Double lng,
                                    Boolean archivoPerdido,
                                    /** Error del GPS en metros (APK 2026-09-26) — con buena precisión se aprende la dirección. */
-                                   @PositiveOrZero Float precision) {}
+                                   @PositiveOrZero Float precision,
+                                   /** Calle/localidad que resolvió el teléfono en ese punto (Geocoder de Android), opcionales. */
+                                   @Size(max = 120) String calleDetectada,
+                                   @Size(max = 120) String localidadDetectada) {}
 
     /** Botón "Rechazar": motivo opcional, texto libre (spec Métricas: detectar patrones de rechazo). */
     public record RechazarRequest(@Size(max = 300, message = "El motivo puede tener hasta 300 caracteres.") String motivo) {}
@@ -260,7 +263,10 @@ public final class PedidoDtos {
             @DecimalMin("-90") @DecimalMax("90") Double lat, @DecimalMin("-180") @DecimalMax("180") Double lng,
             Boolean archivoPerdido,
             /** Error del GPS en metros (APK 2026-09-26) — con buena precisión se aprende la dirección. */
-            @PositiveOrZero Float precision) {
+            @PositiveOrZero Float precision,
+            /** Calle/localidad que resolvió el teléfono en ese punto (Geocoder de Android), opcionales. */
+            @Size(max = 120) String calleDetectada,
+            @Size(max = 120) String localidadDetectada) {
         public boolean seperdioElArchivo() {
             return Boolean.TRUE.equals(archivoPerdido);
         }

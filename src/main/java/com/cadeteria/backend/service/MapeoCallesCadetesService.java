@@ -54,6 +54,8 @@ public class MapeoCallesCadetesService {
     private final ConfiguracionService configuracionService;
 
     private volatile Instant ultimaCorrida = Instant.EPOCH;
+    /** Última vez que el teléfono de cada cadete mandó su calle ya resuelta (2026-09-26). */
+    private final java.util.Map<String, Instant> calleDelTelefono = new java.util.concurrent.ConcurrentHashMap<>();
 
     public MapeoCallesCadetesService(CadeteRepository cadeteRepository, GeocodingProxyService geocodingProxyService,
                                       ConfiguracionService configuracionService) {
@@ -70,7 +72,11 @@ public class MapeoCallesCadetesService {
         if (Duration.between(ultimaCorrida, Instant.now()).getSeconds() < intervaloEfectivoSeg) return;
         ultimaCorrida = Instant.now();
 
+        Instant limiteTelefono = Instant.now().minusSeconds(intervaloEfectivoSeg);
         for (Cadete c : cadetesActivosConUbicacionReciente()) {
+            // Si su teléfono ya resolvió la calle en este intervalo, no se gasta otra consulta.
+            Instant resuelta = calleDelTelefono.get(c.getId());
+            if (resuelta != null && resuelta.isAfter(limiteTelefono)) continue;
             try {
                 geocodingProxyService.reverse(c.getLat(), c.getLng());
             } catch (Exception e) {
@@ -78,6 +84,11 @@ public class MapeoCallesCadetesService {
             }
             pausar();
         }
+    }
+
+    /** El teléfono del cadete mandó la calle de su posición (Geocoder de Android). */
+    public void registrarCalleDelTelefono(String cadeteId) {
+        calleDelTelefono.put(cadeteId, Instant.now());
     }
 
     private List<Cadete> cadetesActivosConUbicacionReciente() {

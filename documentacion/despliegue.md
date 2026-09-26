@@ -106,6 +106,10 @@ pasarlos a mano, pero no es la idea.
         cuando Nominatim no sabe la altura de un punto. **Comparten el cupo gratis** con el buscador
         de los clientes (LocationIQ ~5.000/día, Geoapify ~3.000/día): no subirlo tanto que el
         buscador se quede sin cupo. 0 = solo Nominatim.
+      - `aprender_geocoder_precision_max_m` (default **30**): error máximo del GPS para guardar la
+        calle que resolvió el Geocoder del teléfono mientras el cadete anda. 0 = no guardar.
+      - Lo del Geocoder del teléfono (`android_geocoder`, datos de Google) **vence igual que lo de
+        Google** (`google_cache_dias`, 30) y lo cubre la misma opción "No borrar (solo para pruebas)".
       - `mapeo_calles_cadetes_intervalo_seg` (default 1200): para pruebas con pocos teléfonos se
         puede bajar a 30–60; volverlo a subir con muchos cadetes.
 - [ ] **Google (opcional)**: key de Geocoding de **una sola cuenta** (rotar cuentas para
@@ -134,7 +138,7 @@ pasarlos a mano, pero no es la idea.
 | Datos de demo (incluye pedidos con reclamos e incidentes de ejemplo) | `DEMO_ENABLED` | `false` |
 | Códigos simulados de WhatsApp | `WHATSAPP_MODO_SIMULADO` | `false` |
 | Admin inicial por defecto | `ADMIN_USER` / `ADMIN_PASSWORD` | propios |
-| "No borrar (solo para pruebas)" de las direcciones de Google | Configuración → Integraciones (`google_cache_pausar_borrado`) | **destildado**; sacar la opción o dejarla solo para superadmin (pendientes 3c) |
+| "No borrar (solo para pruebas)" de las direcciones de Google (incluye lo del Geocoder del teléfono, `android_geocoder`) | Configuración → Integraciones (`google_cache_pausar_borrado`) | **destildado**; sacar la opción o dejarla solo para superadmin (pendientes 3c) |
 | Código de verificación del teléfono en `/pedir` | Configuración (`verificacion_telefono_activa`) | apagado a propósito hasta probarlo con WhatsApp/SMS real (pendientes 3) |
 | Keys de Geoapify/LocationIQ commiteadas | `application.yml` | keys propias, dar de baja las viejas |
 | `application-local.yml` de esta PC | raíz del backend (gitignoreado) | no se sube; en el servidor, variables de entorno propias |

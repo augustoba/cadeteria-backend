@@ -53,6 +53,12 @@ public class DireccionCacheService {
      * medida con buena precisión. No vence.
      */
     public static final String PROVEEDOR_CADETE_GPS = "cadete_gps";
+    /**
+     * Calle y altura que resolvió el Geocoder del teléfono del cadete (Android, datos de Google) para
+     * su posición mientras anda (2026-09-26). Zona gris con las condiciones de Google: **vence igual
+     * que lo de la API de Google** ({@code google_cache_dias}) y la pausa de dev también lo cubre.
+     */
+    public static final String PROVEEDOR_ANDROID_GEOCODER = "android_geocoder";
     private static final String PROVEEDOR_GOOGLE = "google";
     public static final String CONFIG_DIAS_GOOGLE = "google_cache_dias";
     public static final String CONFIG_PAUSAR_BORRADO = "google_cache_pausar_borrado";
@@ -170,6 +176,8 @@ public class DireccionCacheService {
             case PROVEEDOR_MANUAL -> 4;
             case PROVEEDOR_CADETE_GPS, PROVEEDOR_GOOGLE_LINK -> 3;
             case GeocodingProxyService.PROVEEDOR_GOOGLE -> 0;
+            // Mismo nivel que un buscador gratuito: viene de un punto en movimiento.
+            case PROVEEDOR_ANDROID_GEOCODER -> 1;
             default -> 1; // nominatim, geoapify, locationiq
         };
     }
@@ -203,6 +211,7 @@ public class DireccionCacheService {
     private Set<String> proveedoresQueVencen() {
         Set<String> out = new HashSet<>();
         out.add(PROVEEDOR_GOOGLE);
+        out.add(PROVEEDOR_ANDROID_GEOCODER);
         if (configuracionService.getBoolean(CONFIG_GOOGLE_LINK_VENCE, false)) out.add(PROVEEDOR_GOOGLE_LINK);
         return out;
     }

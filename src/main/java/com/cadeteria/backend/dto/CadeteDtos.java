@@ -215,7 +215,15 @@ public final class CadeteDtos {
 
     public record UbicacionRequest(
             @DecimalMin(value = "-90", message = "Latitud inválida.") @DecimalMax(value = "90", message = "Latitud inválida.") double lat,
-            @DecimalMin(value = "-180", message = "Longitud inválida.") @DecimalMax(value = "180", message = "Longitud inválida.") double lng) {}
+            @DecimalMin(value = "-180", message = "Longitud inválida.") @DecimalMax(value = "180", message = "Longitud inválida.") double lng,
+            /*
+             * Opcionales (APK 2026-09-26): calle, altura y localidad que resolvió el Geocoder del
+             * teléfono para esta posición, y el error del GPS en metros. Las APK viejas no los mandan.
+             */
+            @Size(max = 120) @Pattern(regexp = "^$|^[\\p{L}0-9 .,'°º\\-]{1,120}$", message = "Calle inválida.") String calle,
+            @Min(1) @Max(99999) Integer altura,
+            @Size(max = 120) String localidad,
+            @PositiveOrZero Float precision) {}
 
     public record FcmTokenRequest(@NotBlank String fcmToken) {}
 

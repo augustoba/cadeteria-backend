@@ -141,7 +141,7 @@ class PedidoServiceDobleToqueTest {
     @Test
     void finalizarDosVecesNoMandaOtroSms() {
         service.aceptar("p1", "30111222");
-        FinalizarRequest req = new FinalizarRequest("Lucía Pérez", "https://img/entrega.jpg", null, null, null, null, null);
+        FinalizarRequest req = new FinalizarRequest("Lucía Pérez", "https://img/entrega.jpg", null, null, null, null, null, null, null);
         service.finalizar("p1", "30111222", req);
         service.finalizar("p1", "30111222", req);
 

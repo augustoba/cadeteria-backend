@@ -188,6 +188,30 @@ class DireccionCacheServiceTest {
     }
 
     @Test
+    void loDelGeocoderDelTelefonoVenceIgualQueGoogle() {
+        DireccionAlias alias = alias("colombia", "colombia");
+        CuadraCoords delTelefono = coords("colombia", SMT, 4600, -26.79, -65.25, 1);
+        delTelefono.setProveedor(DireccionCacheService.PROVEEDOR_ANDROID_GEOCODER);
+        delTelefono.setCreadaEn(Instant.now().minus(Duration.ofDays(31)));
+        when(aliasRepository.findByVarianteNorm("colombia")).thenReturn(Optional.of(alias));
+        when(coordsRepository.findByCalleCanonicaAndCuadra("colombia", 4600)).thenReturn(List.of(delTelefono));
+
+        assertNull(service.buscar("Colombia", 4695));
+
+        // y con la pausa de dev se sigue usando
+        when(configuracion.getBoolean(eq(DireccionCacheService.CONFIG_PAUSAR_BORRADO), anyBoolean())).thenReturn(true);
+        assertNotNull(service.buscar("Colombia", 4695));
+    }
+
+    @Test
+    void elBorradoDiarioIncluyeLoDelGeocoderDelTelefono() {
+        service.borrarVencidas();
+        verify(coordsRepository).deleteByProveedorInAndCreadaEnBefore(
+                org.mockito.ArgumentMatchers.argThat(s -> s.contains("google") && s.contains(DireccionCacheService.PROVEEDOR_ANDROID_GEOCODER)),
+                any());
+    }
+
+    @Test
     void conElBorradoPausadoUsaUnaUbicacionDeGoogleVencida() {
         when(configuracion.getBoolean(eq(DireccionCacheService.CONFIG_PAUSAR_BORRADO), anyBoolean())).thenReturn(true);
         DireccionAlias alias = alias("colombia", "colombia");
@@ -269,12 +293,13 @@ class DireccionCacheServiceTest {
     @Test
     void elBorradoDiarioIncluyeElLinkDeGoogleMapsSoloSiEstaConfigurado() {
         service.borrarVencidas();
-        verify(coordsRepository).deleteByProveedorInAndCreadaEnBefore(eq(java.util.Set.of("google")), any());
+        verify(coordsRepository).deleteByProveedorInAndCreadaEnBefore(
+                eq(java.util.Set.of("google", DireccionCacheService.PROVEEDOR_ANDROID_GEOCODER)), any());
 
         when(configuracion.getBoolean(eq(DireccionCacheService.CONFIG_GOOGLE_LINK_VENCE), anyBoolean())).thenReturn(true);
         service.borrarVencidas();
         verify(coordsRepository).deleteByProveedorInAndCreadaEnBefore(
-                eq(java.util.Set.of("google", DireccionCacheService.PROVEEDOR_GOOGLE_LINK)), any());
+                eq(java.util.Set.of("google", DireccionCacheService.PROVEEDOR_ANDROID_GEOCODER, DireccionCacheService.PROVEEDOR_GOOGLE_LINK)), any());
     }
 
     // --- Qué fuente pisa a cuál (2026-09-26) ---
