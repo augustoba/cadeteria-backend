@@ -95,6 +95,10 @@ pasarlos a mano, pero no es la idea.
       login de la app acepta letras y solo contesta "usuario o contraseña incorrectos". **Pendiente**:
       teclado numérico y aviso "tu usuario es tu DNI, solo números".
 - [ ] Panel → Configuración → **Versión mínima de la app** = la versión del APK que se reparte.
+- [ ] **Base: nombres de calle unificados** (2026-09-26): con el backend nuevo parado, respaldar
+      `cuadra_coords` y `direccion_alias` y correr `documentacion/sql/2026-09-26-alias-curados.sql`
+      (idempotente salvo el `ALTER TABLE ... ADD COLUMN muestras`, que falla si ya existe: sacarlo si
+      el backend ya arrancó una vez y la creó). Si se migra la base local entera, ya está aplicado.
 - [ ] `/pedir` (pedidos de clientes): **todavía no se libera** (decisión 2026-09-25). Antes de
       liberarla, revisar los textos del link de Google Maps para el celular (pendientes 3d).
 
