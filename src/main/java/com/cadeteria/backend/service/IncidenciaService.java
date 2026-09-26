@@ -90,6 +90,14 @@ public class IncidenciaService {
         i.setEstado("CERRADA");
         i.setCerradaEn(Instant.now());
         i.setCerradaPorUsername(adminUsername);
+        // Incidente de un reclamo del cliente (2026-09-26): el pedido deja de figurar con reclamo abierto.
+        if ("RECLAMO_CLIENTE".equals(i.getOrigen()) && i.getPedidoId() != null) {
+            if (i.getMotivoCierre() == null) i.setMotivoCierre("Cerrado desde el panel");
+            pedidoRepo.findById(i.getPedidoId()).ifPresent(p -> {
+                p.setReclamoEstado("CERRADO");
+                pedidoRepo.save(p);
+            });
+        }
         return repo.save(i);
     }
 

@@ -4,7 +4,6 @@ import com.cadeteria.backend.util.TelefonoUtils;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
-import jakarta.persistence.Lob;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -32,8 +31,12 @@ public class WhatsappMensaje {
     @Column(nullable = false)
     private String telefono;
 
-    @Lob
-    @Column(nullable = false)
+    /**
+     * Hasta 4000 caracteres (2026-09-26). Antes era @Lob, que Hibernate crea en MySQL como TINYTEXT
+     * (255): cualquier WhatsApp más largo fallaba al guardarse, y en cada arranque intentaba volver
+     * la columna a TINYTEXT.
+     */
+    @Column(nullable = false, length = 4000)
     private String texto;
 
     /** "PENDIENTE" | "ENVIADO" | "FALLIDO". */

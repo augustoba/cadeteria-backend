@@ -33,9 +33,12 @@ public class PedidoAdminController {
     private final PdfComprobanteService pdfService;
 
     private final GeocodingProxyService geocodingProxyService;
+    private final com.cadeteria.backend.service.ReclamoService reclamoService;
 
     public PedidoAdminController(PedidoService service, PdfComprobanteService pdfService,
-                                 GeocodingProxyService geocodingProxyService) {
+                                 GeocodingProxyService geocodingProxyService,
+                                 com.cadeteria.backend.service.ReclamoService reclamoService) {
+        this.reclamoService = reclamoService;
         this.geocodingProxyService = geocodingProxyService;
         this.service = service;
         this.pdfService = pdfService;
@@ -122,6 +125,24 @@ public class PedidoAdminController {
     @PutMapping("/{id}/prioritario")
     public PedidoResponse setPrioritario(@PathVariable String id, @RequestBody java.util.Map<String, Boolean> body) {
         return PedidoResponse.from(service.setPrioritario(id, Boolean.TRUE.equals(body.get("prioritario"))));
+    }
+
+    /** Pedidos ya entregados con un reclamo sin cerrar — cuadro "Reclamos abiertos" del dashboard (2026-09-26). */
+    @GetMapping("/reclamos-abiertos")
+    public List<PedidoResponse> reclamosAbiertos() {
+        return reclamoService.entregadosConReclamoAbierto().stream().map(PedidoResponse::fromResumen).toList();
+    }
+
+    /** "Visto": la fila deja de parpadear. */
+    @PostMapping("/{id}/reclamo/visto")
+    public PedidoResponse reclamoVisto(@PathVariable String id) {
+        return PedidoResponse.from(reclamoService.marcarVisto(id));
+    }
+
+    /** Cierra el reclamo (y su incidente): el cadete vuelve a recibir pedidos. */
+    @PostMapping("/{id}/reclamo/cerrar")
+    public PedidoResponse reclamoCerrar(@PathVariable String id, Authentication auth) {
+        return PedidoResponse.from(reclamoService.cerrarDesdePanel(id, auth.getName()));
     }
 
     /** Direcciones habituales del cliente de ese teléfono (2026-09-25) — vacía si nunca pidió. */

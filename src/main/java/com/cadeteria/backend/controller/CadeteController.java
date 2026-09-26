@@ -44,11 +44,14 @@ public class CadeteController {
     private final PagoSemanalService pagoSemanalService;
     private final com.cadeteria.backend.service.CadeteSesionService sesionService;
     private final String frontBaseUrl;
+    private final com.cadeteria.backend.service.ReclamoService reclamoService;
 
     public CadeteController(CadeteService service, WebSocketPublisher publisher, ConfiguracionService configuracionService,
                              PagoSemanalService pagoSemanalService,
                              com.cadeteria.backend.service.CadeteSesionService sesionService,
-                             com.cadeteria.backend.config.AppProperties props) {
+                             com.cadeteria.backend.config.AppProperties props,
+                             com.cadeteria.backend.service.ReclamoService reclamoService) {
+        this.reclamoService = reclamoService;
         this.sesionService = sesionService;
         this.frontBaseUrl = props.getFrontBaseUrl();
         this.service = service;
@@ -177,6 +180,20 @@ public class CadeteController {
     @PatchMapping("/api/cadetes/me/fcm-token")
     public CadeteResponse actualizarFcmToken(Authentication auth, @Valid @RequestBody FcmTokenRequest req) {
         return CadeteResponse.from(service.actualizarFcmToken(auth.getName(), req.fcmToken()));
+    }
+
+    public record IncidenteAbiertoResponse(Long pedidoNumero, String detalle) {}
+
+    /**
+     * Incidente por reclamo de un cliente que tiene bloqueado al cadete (2026-09-26) — la app
+     * muestra el aviso de por qué no le llegan pedidos. 204 si no tiene ninguno.
+     */
+    @GetMapping("/api/cadetes/me/incidente-abierto")
+    public ResponseEntity<IncidenteAbiertoResponse> incidenteAbierto(Authentication auth) {
+        var cadete = service.getByUsername(auth.getName());
+        return reclamoService.incidenteAbiertoDe(cadete.getId())
+                .map(i -> ResponseEntity.ok(new IncidenteAbiertoResponse(i.getPedidoNumero(), i.getDescripcion())))
+                .orElse(ResponseEntity.noContent().build());
     }
 
     @GetMapping("/api/cadetes/me")

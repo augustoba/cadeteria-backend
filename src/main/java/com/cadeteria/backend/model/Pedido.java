@@ -218,6 +218,17 @@ public class Pedido {
     @jakarta.persistence.Column(length = 500)
     private String reclamoDetalle;
 
+    /** DEMORA_RETIRO | DEMORA_ENTREGA | PROBLEMA_ENTREGA — null si nunca reclamó (2026-09-26). */
+    @jakarta.persistence.Column(length = 30)
+    private String reclamoTipo;
+
+    /**
+     * ABIERTO (la fila parpadea en el panel) | VISTO (color fijo) | CONTACTO (el cliente dijo que
+     * sigue el problema y pidió hablar) | CERRADO. null si nunca reclamó.
+     */
+    @jakarta.persistence.Column(length = 20)
+    private String reclamoEstado;
+
     /** true si se agotaron los reintentos de SMS (aceptación o entrega) sin poder avisarle al cliente — para el ícono del dashboard. */
     @Column(nullable = false)
     private boolean smsFallido = false;
@@ -595,6 +606,27 @@ public class Pedido {
 
     public void setMotivoNoEntrega(String motivoNoEntrega) {
         this.motivoNoEntrega = motivoNoEntrega;
+    }
+
+    public String getReclamoTipo() {
+        return reclamoTipo;
+    }
+
+    public void setReclamoTipo(String reclamoTipo) {
+        this.reclamoTipo = reclamoTipo;
+    }
+
+    public String getReclamoEstado() {
+        return reclamoEstado;
+    }
+
+    public void setReclamoEstado(String reclamoEstado) {
+        this.reclamoEstado = reclamoEstado;
+    }
+
+    /** Reclamo sin cerrar (abierto, visto o esperando contacto). */
+    public boolean isReclamoAbierto() {
+        return reclamoEstado != null && !"CERRADO".equals(reclamoEstado);
     }
 
     public String getReclamoDetalle() {

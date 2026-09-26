@@ -96,7 +96,9 @@ public final class PedidoDtos {
             /** WEB | PANEL | null (anterior a la mejora 2026-09-24) — y quién lo cargó si fue PANEL. */
             String origenCarga, String creadoPorUsername,
             /** Último reclamo del cliente desde el seguimiento (2026-09-25) y cuándo — null si no reclamó. */
-            String reclamoDetalle, Instant reclamoEn
+            String reclamoDetalle, Instant reclamoEn,
+            /** DEMORA_RETIRO | DEMORA_ENTREGA | PROBLEMA_ENTREGA y ABIERTO | VISTO | CONTACTO | CERRADO (2026-09-26). */
+            String reclamoTipo, String reclamoEstado
     ) {
         public static PedidoResponse from(Pedido p) {
             return from(p, true, false);
@@ -159,7 +161,8 @@ public final class PedidoDtos {
                             : List.of(),
                     p.getAsignadoPorUsername(), p.getCanceladoPorUsername(), p.isPrioritario(),
                     p.getOrigenCarga(), p.getCreadoPorUsername(),
-                    p.getReclamoDetalle(), p.getUltimoReclamoEn());
+                    p.getReclamoDetalle(), p.getUltimoReclamoEn(),
+                    p.getReclamoTipo(), p.getReclamoEstado());
         }
     }
 

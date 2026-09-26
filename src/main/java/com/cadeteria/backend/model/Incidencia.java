@@ -49,6 +49,21 @@ public class Incidencia {
     private Instant cerradaEn;
     private String cerradaPorUsername;
 
+    /**
+     * De dónde salió (2026-09-26): null = la cargó un admin; "RECLAMO_CLIENTE" = el cliente reportó
+     * un problema con la entrega desde el seguimiento. Estas bloquean al cadete para recibir
+     * pedidos mientras estén abiertas y se cierran solas (ver ReclamoService).
+     */
+    @Column(length = 30)
+    private String origen;
+
+    /** Cuándo se le mandó al cliente el mensaje de seguimiento — null si todavía no. */
+    private Instant seguimientoEnviadoEn;
+
+    /** Por qué se cerró: "Solucionado según el cliente", "Cerrado sin respuesta del cliente", etc. */
+    @Column(length = 200)
+    private String motivoCierre;
+
     public String getId() {
         return id;
     }
@@ -135,6 +150,30 @@ public class Incidencia {
 
     public void setPedidoNumero(Long pedidoNumero) {
         this.pedidoNumero = pedidoNumero;
+    }
+
+    public String getOrigen() {
+        return origen;
+    }
+
+    public void setOrigen(String origen) {
+        this.origen = origen;
+    }
+
+    public Instant getSeguimientoEnviadoEn() {
+        return seguimientoEnviadoEn;
+    }
+
+    public void setSeguimientoEnviadoEn(Instant seguimientoEnviadoEn) {
+        this.seguimientoEnviadoEn = seguimientoEnviadoEn;
+    }
+
+    public String getMotivoCierre() {
+        return motivoCierre;
+    }
+
+    public void setMotivoCierre(String motivoCierre) {
+        this.motivoCierre = motivoCierre;
     }
 
     public Instant getCerradaEn() {

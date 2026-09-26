@@ -21,4 +21,14 @@ public interface IncidenciaRepository extends JpaRepository<Incidencia, String> 
 
     /** Para el score de riesgo de la tabla comparativa de cadetes (mejora 2026-09-17). */
     long countByCadeteIdAndEstado(String cadeteId, String estado);
+
+    /** Reclamos de clientes abiertos (ReclamoService, job de seguimiento y cierre). */
+    List<Incidencia> findByEstadoAndOrigen(String estado, String origen);
+
+    /** Un cadete con un reclamo de cliente abierto no recibe pedidos (2026-09-26). */
+    boolean existsByCadeteIdAndOrigenAndEstado(String cadeteId, String origen, String estado);
+
+    List<Incidencia> findByCadeteIdAndOrigenAndEstado(String cadeteId, String origen, String estado);
+
+    List<Incidencia> findByPedidoIdAndOrigenAndEstado(String pedidoId, String origen, String estado);
 }

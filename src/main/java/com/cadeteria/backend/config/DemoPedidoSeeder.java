@@ -60,9 +60,12 @@ public class DemoPedidoSeeder implements CommandLineRunner {
 
     private static final List<String> PEDIDO_IDS = List.of(
             "demo-pedido-01", "demo-pedido-02", "demo-pedido-03", "demo-pedido-04",
-            "demo-pedido-05", "demo-pedido-06", "demo-pedido-07", "demo-pedido-08");
+            "demo-pedido-05", "demo-pedido-06", "demo-pedido-07", "demo-pedido-08",
+            // Variantes de reclamos y demoras (2026-09-26) — ver sembrarVariantesDeReclamos.
+            "demo-pedido-09", "demo-pedido-10", "demo-pedido-11", "demo-pedido-12");
     private static final List<String> OFERTA_IDS = List.of(
-            "demo-oferta-01", "demo-oferta-02", "demo-oferta-03", "demo-oferta-04", "demo-oferta-05");
+            "demo-oferta-01", "demo-oferta-02", "demo-oferta-03", "demo-oferta-04", "demo-oferta-05",
+            "demo-oferta-09", "demo-oferta-10", "demo-oferta-11");
     private static final String SESION_ID = "demo-sesion-cadete";
 
     private final PedidoRepository pedidoRepo;
@@ -80,6 +83,7 @@ public class DemoPedidoSeeder implements CommandLineRunner {
     private final PedidoParadaRepository paradaRepo;
     private final PedidoPrecioLogRepository precioLogRepo;
     private final PedidoPushSubscriptionRepository pushRepo;
+    private final com.cadeteria.backend.repository.IncidenciaRepository incidenciaRepo;
     private final AppProperties props;
 
     public DemoPedidoSeeder(PedidoRepository pedidoRepo, OfertaPedidoRepository ofertaRepo,
@@ -89,7 +93,9 @@ public class DemoPedidoSeeder implements CommandLineRunner {
                              ResultadoOfertaRepository resultadoOfertaRepo, EstadoCadeteRepository estadoCadeteRepo,
                              CadeteSesionRepository sesionRepo, PedidoCadeteExcluidoRepository excluidoRepo,
                              PedidoParadaRepository paradaRepo, PedidoPrecioLogRepository precioLogRepo,
-                             PedidoPushSubscriptionRepository pushRepo, AppProperties props) {
+                             PedidoPushSubscriptionRepository pushRepo,
+                             com.cadeteria.backend.repository.IncidenciaRepository incidenciaRepo, AppProperties props) {
+        this.incidenciaRepo = incidenciaRepo;
         this.pedidoRepo = pedidoRepo;
         this.ofertaRepo = ofertaRepo;
         this.comentarioRepo = comentarioRepo;
@@ -218,6 +224,8 @@ public class DemoPedidoSeeder implements CommandLineRunner {
         p8.setCanceladoEn(ahora.minus(100, ChronoUnit.MINUTES));
         pedidoRepo.save(p8);
 
+        sembrarVariantesDeReclamos(cadete, zona, moto, ahora);
+
         // El cadete queda "OCUPADO" porque tiene los pedidos 3/4/5 activos, igual que pasaria en la app real.
         cadete.setEstado(estadoCadete("OCUPADO"));
         cadeteRepo.save(cadete);
@@ -230,6 +238,104 @@ public class DemoPedidoSeeder implements CommandLineRunner {
 
         log.info("Demo: {} pedidos de ejemplo sembrados (todos los estados) para el cadete '{}'.",
                 PEDIDO_IDS.size(), cadete.getUsername());
+        loguearLinksDeSeguimiento();
+    }
+
+    /**
+     * Un pedido por cada situación que el panel pinta distinto (2026-09-26): reclamo por demora en
+     * el retiro, por demora en la entrega, por problema con la entrega (con su incidente, que
+     * bloquea al cadete y se cierra solo si nadie responde) y un pedido sin asignar hace 45 minutos.
+     * El del problema con la entrega va a OTRO cadete si hay, para no dejar bloqueado al principal.
+     */
+    private void sembrarVariantesDeReclamos(Cadete cadete, Zona zona, TipoVehiculo moto, Instant ahora) {
+        Pedido p9 = base("demo-pedido-09", 9_100_009L, cadete, zona, moto,
+                "Laura Díaz", "3815112233",
+                "Crisóstomo Álvarez 600, San Miguel de Tucumán", -26.8290, -65.2075,
+                "Av. Mate de Luna 2400, San Miguel de Tucumán", -26.8215, -65.2310,
+                new BigDecimal("1300.00"), BigDecimal.ZERO);
+        p9.setEstado(estadoPedido("EN_CURSO"));
+        p9.setCreadoEn(ahora.minus(40, ChronoUnit.MINUTES));
+        p9.setAsignadoEn(ahora.minus(32, ChronoUnit.MINUTES));
+        p9.setAceptadoEn(ahora.minus(30, ChronoUnit.MINUTES));
+        reclamo(p9, "DEMORA_RETIRO", "El cliente reclama demora en el retiro del pedido N° 9100009.", ahora.minus(4, ChronoUnit.MINUTES));
+        pedidoRepo.save(p9);
+        crearOferta("demo-oferta-09", p9, cadete, "ACEPTADO", ahora.minus(32, ChronoUnit.MINUTES), ahora.minus(30, ChronoUnit.MINUTES));
+
+        Pedido p10 = base("demo-pedido-10", 9_100_010L, cadete, zona, moto,
+                "Hernán Gómez", "3815334455",
+                "Santiago del Estero 1000, San Miguel de Tucumán", -26.8195, -65.2120,
+                "Av. Solano Vera 300, Yerba Buena", -26.8130, -65.2890,
+                new BigDecimal("1800.00"), BigDecimal.ZERO);
+        p10.setEstado(estadoPedido("EN_CURSO"));
+        p10.setCreadoEn(ahora.minus(70, ChronoUnit.MINUTES));
+        p10.setAsignadoEn(ahora.minus(62, ChronoUnit.MINUTES));
+        p10.setAceptadoEn(ahora.minus(60, ChronoUnit.MINUTES));
+        p10.setRetiradoEn(ahora.minus(45, ChronoUnit.MINUTES));
+        reclamo(p10, "DEMORA_ENTREGA", "El cliente reclama demora en la entrega del pedido N° 9100010.", ahora.minus(6, ChronoUnit.MINUTES));
+        pedidoRepo.save(p10);
+        crearOferta("demo-oferta-10", p10, cadete, "ACEPTADO", ahora.minus(62, ChronoUnit.MINUTES), ahora.minus(60, ChronoUnit.MINUTES));
+
+        Cadete otro = cadeteRepo.findAll().stream().filter(c -> !c.getId().equals(cadete.getId())).findFirst().orElse(cadete);
+        crearFinalizado("demo-pedido-11", "demo-oferta-11", 9_100_011L, otro, zona, moto,
+                "Graciela Núñez", "3815778899",
+                "Laprida 150, San Miguel de Tucumán", -26.8270, -65.2040,
+                "Av. Belgrano 2500, San Miguel de Tucumán", -26.8330, -65.2290,
+                new BigDecimal("1150.00"), BigDecimal.ZERO, "Graciela Núñez",
+                ahora.minus(55, ChronoUnit.MINUTES), ahora.minus(53, ChronoUnit.MINUTES),
+                ahora.minus(52, ChronoUnit.MINUTES), ahora.minus(40, ChronoUnit.MINUTES), ahora.minus(12, ChronoUnit.MINUTES));
+        Pedido p11 = pedidoRepo.findById("demo-pedido-11").orElseThrow();
+        String detalle = "El cliente reclama problemas en la entrega del pedido N° 9100011: \"La caja llegó golpeada y falta un producto\".";
+        reclamo(p11, "PROBLEMA_ENTREGA", detalle, ahora.minus(2, ChronoUnit.MINUTES));
+        pedidoRepo.save(p11);
+        com.cadeteria.backend.model.Incidencia inc = new com.cadeteria.backend.model.Incidencia();
+        inc.setId("demo-incidencia-11");
+        inc.setTitulo("Reclamo del cliente: problema con la entrega");
+        inc.setDescripcion(detalle);
+        inc.setPrioridad("GRAVE");
+        inc.setEstado("ABIERTA");
+        inc.setOrigen("RECLAMO_CLIENTE");
+        inc.setCadeteId(otro.getId());
+        inc.setCadeteNombre(otro.getNombre() + " " + otro.getApellido());
+        inc.setPedidoId(p11.getId());
+        inc.setPedidoNumero(p11.getNumero());
+        inc.setCreadaPorUsername("cliente (seguimiento)");
+        inc.setCreadaEn(ahora.minus(2, ChronoUnit.MINUTES));
+        incidenciaRepo.save(inc);
+
+        Pedido p12 = base("demo-pedido-12", 9_100_012L, null, zona, moto,
+                "Martín Aguirre", "3815990022",
+                "24 de Septiembre 500, San Miguel de Tucumán", -26.8305, -65.2030,
+                "Av. Independencia 1800, San Miguel de Tucumán", -26.8125, -65.2185,
+                new BigDecimal("900.00"), BigDecimal.ZERO);
+        p12.setEstado(estadoPedido("SIN_ASIGNAR"));
+        p12.setCreadoEn(ahora.minus(45, ChronoUnit.MINUTES));
+        pedidoRepo.save(p12);
+    }
+
+    private static void reclamo(Pedido p, String tipo, String detalle, Instant cuando) {
+        p.setReclamoTipo(tipo);
+        p.setReclamoEstado("ABIERTO");
+        p.setReclamoDetalle(detalle);
+        p.setUltimoReclamoEn(cuando);
+    }
+
+    /** Los links de seguimiento de cada situación, listos para abrir o mostrarle al cliente. */
+    private void loguearLinksDeSeguimiento() {
+        String base = props.getFrontBaseUrl() + "/seguimiento/demo-token-";
+        log.info("""
+
+                ===== Demo: links de seguimiento para mostrar =====
+                  Pedido recibido (sin cadete) ....... {}demo-pedido-06
+                  Sin asignar hace 45 min ............ {}demo-pedido-12
+                  En camino (todavía no retiró) ...... {}demo-pedido-04
+                  Retirado, yendo al destino ......... {}demo-pedido-05
+                  Entregado .......................... {}demo-pedido-01
+                  Reclamo: demora en el retiro ....... {}demo-pedido-09
+                  Reclamo: demora en la entrega ...... {}demo-pedido-10
+                  Reclamo: problema con la entrega ... {}demo-pedido-11
+                  Cancelado .......................... {}demo-pedido-07
+                ====================================================""",
+                base, base, base, base, base, base, base, base, base);
     }
 
     /**
@@ -250,6 +356,7 @@ public class DemoPedidoSeeder implements CommandLineRunner {
         PEDIDO_IDS.forEach(id -> pushRepo.findByPedidoId(id).forEach(pushRepo::delete));
         PEDIDO_IDS.forEach(id -> comentarioRepo.findByPedidoIdOrderByCreadoEnAsc(id).forEach(comentarioRepo::delete));
         PEDIDO_IDS.forEach(id -> ubicacionRepo.findByPedidoIdOrderByCapturadoEnAsc(id).forEach(ubicacionRepo::delete));
+        PEDIDO_IDS.forEach(id -> incidenciaRepo.findByPedidoIdOrderByCreadaEnDesc(id).forEach(incidenciaRepo::delete));
         PEDIDO_IDS.forEach(id -> pedidoRepo.findById(id).ifPresent(pedidoRepo::delete));
         sesionRepo.findById(SESION_ID).ifPresent(sesionRepo::delete);
     }

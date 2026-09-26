@@ -27,6 +27,8 @@ class PedidoServiceSeguimientoTest {
     private PedidoService service;
     private WebSocketPublisher publisher;
     private FcmService fcm;
+    private IncidenciaRepository incidenciaRepo;
+    private CadeteRepository cadeteRepo;
 
     @BeforeEach
     void setUp() {
@@ -34,14 +36,16 @@ class PedidoServiceSeguimientoTest {
         config = mock(ConfiguracionService.class);
         publisher = mock(WebSocketPublisher.class);
         fcm = mock(FcmService.class);
+        incidenciaRepo = mock(IncidenciaRepository.class);
+        cadeteRepo = mock(CadeteRepository.class);
         service = new PedidoService(
-                repo, mock(CadeteRepository.class), mock(EstadoPedidoRepository.class), mock(ResultadoOfertaRepository.class),
+                repo, cadeteRepo, mock(EstadoPedidoRepository.class), mock(ResultadoOfertaRepository.class),
                 mock(OfertaPedidoRepository.class), mock(EstadoCadeteRepository.class), config,
                 publisher, fcm, mock(SmsGatewayService.class),
                 mock(PedidoUbicacionRepository.class), mock(PedidoComentarioRepository.class),
                 mock(PedidoPrecioLogRepository.class), mock(WebPushService.class),
                 mock(PedidoParadaRepository.class), mock(MovimientoCreditoRepository.class),
-                mock(IncidenciaRepository.class), mock(PedidoCadeteExcluidoRepository.class), new AppProperties());
+                incidenciaRepo, mock(PedidoCadeteExcluidoRepository.class), new AppProperties());
     }
 
     @Test
@@ -128,6 +132,42 @@ class PedidoServiceSeguimientoTest {
         org.junit.jupiter.api.Assertions.assertFalse(r.avisado());
         org.mockito.Mockito.verify(fcm, org.mockito.Mockito.times(1)).enviar(org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void problemaConLaEntregaAbreUnIncidenteGraveQueBloqueaAlCadete() {
+        Pedido entregado = conCadete(pedido("FINALIZADO", Instant.now()));
+        tokenDe(entregado);
+
+        service.reclamoDelCliente("tok", "Llegó el paquete abierto");
+
+        var captor = org.mockito.ArgumentCaptor.forClass(com.cadeteria.backend.model.Incidencia.class);
+        org.mockito.Mockito.verify(incidenciaRepo).save(captor.capture());
+        var incidente = captor.getValue();
+        org.junit.jupiter.api.Assertions.assertEquals("GRAVE", incidente.getPrioridad());
+        org.junit.jupiter.api.Assertions.assertEquals(PedidoService.ORIGEN_RECLAMO, incidente.getOrigen());
+        org.junit.jupiter.api.Assertions.assertEquals("c1", incidente.getCadeteId());
+        org.junit.jupiter.api.Assertions.assertEquals("PROBLEMA_ENTREGA", entregado.getReclamoTipo());
+        org.junit.jupiter.api.Assertions.assertEquals("ABIERTO", entregado.getReclamoEstado());
+    }
+
+    @Test
+    void conUnReclamoAbiertoNoSeLePuedeAsignarAMano() {
+        Pedido sinAsignar = pedido("SIN_ASIGNAR", null);
+        when(repo.findById("p1")).thenReturn(Optional.of(sinAsignar));
+        com.cadeteria.backend.model.Cadete c = new com.cadeteria.backend.model.Cadete();
+        c.setId("c1");
+        c.setActivo(true);
+        com.cadeteria.backend.model.EstadoCadete libre = new com.cadeteria.backend.model.EstadoCadete();
+        libre.setId("LIBRE");
+        c.setEstado(libre);
+        c.setModalidadPago("PORCENTAJE");
+        c.setCreditoDisponible(new java.math.BigDecimal("100000"));
+        when(cadeteRepo.findById("c1")).thenReturn(Optional.of(c));
+        when(incidenciaRepo.existsByCadeteIdAndOrigenAndEstado("c1", PedidoService.ORIGEN_RECLAMO, "ABIERTA")).thenReturn(true);
+
+        var error = assertThrows(BadRequestException.class, () -> service.asignar("p1", "c1", "admin"));
+        org.junit.jupiter.api.Assertions.assertTrue(error.getMessage().contains("reclamo"), error.getMessage());
     }
 
     @Test

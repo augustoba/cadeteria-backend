@@ -287,7 +287,10 @@ public class PedidoService {
         Pedido pedido = repo.findByTokenSeguimiento(token)
                 .orElseThrow(() -> new ResourceNotFoundException("No encontramos este pedido."));
         Instant terminado = terminadoEn(pedido);
-        if (terminado != null && Instant.now().isAfter(finDelDia(terminado))) {
+        // Con un reclamo por problema en la entrega abierto, el link sigue andando hasta que se cierre
+        // (si no, un reclamo a las 23:50 dejaba al cliente sin los botones para responder).
+        boolean reclamoProblemaAbierto = "PROBLEMA_ENTREGA".equals(pedido.getReclamoTipo()) && pedido.isReclamoAbierto();
+        if (terminado != null && !reclamoProblemaAbierto && Instant.now().isAfter(finDelDia(terminado))) {
             throw new BadRequestException("Este link de seguimiento ya venció.");
         }
         return pedido;
@@ -319,11 +322,15 @@ public class PedidoService {
         Cadete cadete = pedido.getCadeteAsignado();
         String estado = pedido.getEstado().getId();
         String detalle;
+        String tipo;
         if ("EN_CURSO".equals(estado) && pedido.getRetiradoEn() == null) {
+            tipo = "DEMORA_RETIRO";
             detalle = "El cliente reclama demora en el retiro del pedido N° " + pedido.getNumero() + ".";
         } else if ("EN_CURSO".equals(estado)) {
+            tipo = "DEMORA_ENTREGA";
             detalle = "El cliente reclama demora en la entrega del pedido N° " + pedido.getNumero() + ".";
         } else if ("FINALIZADO".equals(estado)) {
+            tipo = "PROBLEMA_ENTREGA";
             String texto = textoCliente == null ? "" : textoCliente.trim().replaceAll("\\s+", " ");
             if (texto.length() < 5) {
                 throw new BadRequestException("Contanos qué pasó con la entrega.");
@@ -345,7 +352,14 @@ public class PedidoService {
         }
         pedido.setUltimoReclamoEn(Instant.now());
         pedido.setReclamoDetalle(detalle);
+        pedido.setReclamoTipo(tipo);
+        pedido.setReclamoEstado("ABIERTO");
         repo.save(pedido);
+        if ("PROBLEMA_ENTREGA".equals(tipo)) {
+            abrirIncidenteDeReclamo(pedido, cadete, detalle);
+        }
+        // El panel pinta la fila según el tipo de reclamo.
+        publisher.publicarPedido(PedidoResponse.from(pedido));
         // Para que la app recargue el viaje y muestre el recuadro del reclamo (si está abierta).
         publisher.publicarEventoViaje(cadete.getId(), "RECLAMO_CLIENTE", PedidoResponse.paraCadete(pedido));
 
@@ -364,6 +378,44 @@ public class PedidoService {
 
         publisher.publicarAlertaReclamo(cadete, PedidoResponse.from(pedido), detalle);
         return new ReclamoResultado(true, paraCliente);
+    }
+
+    /** Origen de los incidentes que abre un reclamo del cliente (bloquean al cadete, se cierran solos). */
+    public static final String ORIGEN_RECLAMO = "RECLAMO_CLIENTE";
+
+    /**
+     * Problema con la entrega (2026-09-26): incidente GRAVE vinculado al pedido y al cadete. Mientras
+     * esté abierto el cadete no recibe pedidos (la asignación automática ya excluye incidentes
+     * GRAVE abiertos; la manual lo chequea con {@link #tieneReclamoAbierto}). Lo cierra el cliente,
+     * el job de ReclamoService (sin respuesta) o un admin.
+     */
+    private void abrirIncidenteDeReclamo(Pedido pedido, Cadete cadete, String detalle) {
+        if (!incidenciaRepo.findByPedidoIdAndOrigenAndEstado(pedido.getId(), ORIGEN_RECLAMO, "ABIERTA").isEmpty()) return;
+        com.cadeteria.backend.model.Incidencia i = new com.cadeteria.backend.model.Incidencia();
+        i.setId(UUID.randomUUID().toString());
+        i.setTitulo("Reclamo del cliente: problema con la entrega");
+        i.setDescripcion(detalle);
+        i.setPrioridad("GRAVE");
+        i.setEstado("ABIERTA");
+        i.setOrigen(ORIGEN_RECLAMO);
+        i.setCadeteId(cadete.getId());
+        i.setCadeteNombre(cadete.getNombre() + " " + cadete.getApellido());
+        i.setPedidoId(pedido.getId());
+        i.setPedidoNumero(pedido.getNumero());
+        i.setCreadaPorUsername("cliente (seguimiento)");
+        incidenciaRepo.save(i);
+    }
+
+    /** true si el cadete tiene un incidente abierto por un reclamo del cliente: no se le asigna nada. */
+    public boolean tieneReclamoAbierto(String cadeteId) {
+        return incidenciaRepo.existsByCadeteIdAndOrigenAndEstado(cadeteId, ORIGEN_RECLAMO, "ABIERTA");
+    }
+
+    private void exigirSinReclamoAbierto(Cadete cadete) {
+        if (tieneReclamoAbierto(cadete.getId())) {
+            throw new BadRequestException("El cadete tiene un incidente abierto por un reclamo de un cliente: "
+                    + "no puede recibir pedidos hasta que se cierre (se cierra solo, o cerralo desde el panel).");
+        }
     }
 
     /** 00:00 del día siguiente (hora de Argentina) al instante dado. */
@@ -608,6 +660,7 @@ public class PedidoService {
                 .filter(c -> "LIBRE".equals(c.getEstado().getId()))
                 .filter(this::puedeRecibirViajes)
                 .filter(c -> dentroDeTopes(c, pedido))
+                .filter(c -> !tieneReclamoAbierto(c.getId()))
                 .toList();
     }
 
@@ -857,6 +910,7 @@ public class PedidoService {
         if (!cadete.isActivo() || !"LIBRE".equals(cadete.getEstado().getId())) {
             throw new BadRequestException("El cadete no esta libre.");
         }
+        exigirSinReclamoAbierto(cadete);
         if (!puedeRecibirViajes(cadete)) {
             throw new BadRequestException("El cadete todavia no pago la cuota semanal — no se le puede asignar.");
         }
@@ -888,6 +942,7 @@ public class PedidoService {
         if (!puedeRecibirViajes(cadete)) {
             throw new BadRequestException("El cadete todavia no pago la cuota semanal — no se le puede asignar.");
         }
+        exigirSinReclamoAbierto(cadete);
         List<Pedido> pedidos = pedidoIds.stream().map(this::get).toList();
         BigDecimal topeLoteKm = configuracionService.getBigDecimal("distancia_maxima_lote_km", BigDecimal.valueOf(3));
         Pedido primero = pedidos.get(0);
@@ -1140,6 +1195,10 @@ public class PedidoService {
             dejarComentarioArchivoPerdido(pedido, cadete, "retiro");
         }
         pedido.setRetiradoEn(Instant.now());
+        // "Demora en el retiro" queda resuelta cuando retira (2026-09-26).
+        if ("DEMORA_RETIRO".equals(pedido.getReclamoTipo()) && pedido.isReclamoAbierto()) {
+            pedido.setReclamoEstado("CERRADO");
+        }
         if (fotoUrl != null && !fotoUrl.isBlank()) {
             pedido.setFotoRecepcionUrl(fotoUrl.trim());
         }
@@ -1228,6 +1287,10 @@ public class PedidoService {
         pedido.setEntregaLng(req.lng());
         pedido.setEstado(estado("FINALIZADO"));
         pedido.setFinalizadoEn(Instant.now());
+        // Las demoras (retiro o entrega) quedan resueltas al entregar (2026-09-26).
+        if (pedido.getReclamoTipo() != null && pedido.getReclamoTipo().startsWith("DEMORA_") && pedido.isReclamoAbierto()) {
+            pedido.setReclamoEstado("CERRADO");
+        }
         repo.save(pedido);
 
         liberarCadete(cadete);

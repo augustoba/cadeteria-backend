@@ -7,6 +7,8 @@ import com.cadeteria.backend.model.Cadete;
 import com.cadeteria.backend.model.Pedido;
 import com.cadeteria.backend.service.PdfComprobanteService;
 import com.cadeteria.backend.service.PedidoService;
+import com.cadeteria.backend.service.ConfiguracionService;
+import com.cadeteria.backend.service.ReclamoService;
 import com.cadeteria.backend.service.RutaService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -29,8 +31,13 @@ public class PublicoController {
     private final PedidoService service;
     private final PdfComprobanteService pdfService;
     private final RutaService rutaService;
+    private final ReclamoService reclamoService;
+    private final ConfiguracionService configuracionService;
 
-    public PublicoController(PedidoService service, PdfComprobanteService pdfService, RutaService rutaService) {
+    public PublicoController(PedidoService service, PdfComprobanteService pdfService, RutaService rutaService,
+                             ReclamoService reclamoService, ConfiguracionService configuracionService) {
+        this.reclamoService = reclamoService;
+        this.configuracionService = configuracionService;
         this.service = service;
         this.pdfService = pdfService;
         this.rutaService = rutaService;
@@ -48,7 +55,8 @@ public class PublicoController {
                     cadete.getTipoVehiculo().getId()
             ).map(RutaService.Resumen::duracionMin).orElse(null);
         }
-        return SeguimientoResponse.from(pedido, etaMinutos);
+        return SeguimientoResponse.from(pedido, etaMinutos,
+                configuracionService.getString(ReclamoService.CONFIG_WHATSAPP_ATENCION, ""));
     }
 
     /** El cliente califica desde esta misma página, una sola vez, cuando el pedido ya está FINALIZADO. */
@@ -75,6 +83,20 @@ public class PublicoController {
     public ReclamoResponse reclamo(@PathVariable String token, @RequestBody(required = false) ReclamoRequest req) {
         var r = service.reclamoDelCliente(token, req == null ? null : req.texto());
         return new ReclamoResponse(r.avisado(), r.mensaje());
+    }
+
+    /** El cliente avisa que el problema con la entrega ya se solucionó: se cierra el incidente. */
+    @PostMapping("/reclamo/solucionado")
+    public void reclamoSolucionado(@PathVariable String token) {
+        reclamoService.clienteSolucionado(token);
+    }
+
+    public record SigueElProblemaResponse(String whatsappAtencion) {}
+
+    /** Sigue el problema: queda esperando contacto y devuelve el WhatsApp de atención. */
+    @PostMapping("/reclamo/sigue")
+    public SigueElProblemaResponse reclamoSigue(@PathVariable String token) {
+        return new SigueElProblemaResponse(reclamoService.clienteSigueElProblema(token));
     }
 
     public record RepetirResponse(String nuevoToken) {}
