@@ -24,7 +24,8 @@ import java.util.Optional;
  * hacía que todo viaje saliera con la tarifa de la zona demo ($700) — se sacó.
  * <p>
  * Encima se suma un recargo por el dinero que el cliente declara transportar (riesgo del
- * cadete): cada {@code recargo_dinero_transportado_umbral} pesos declarados suma
+ * cadete) — desde 2026-09-25 también por el valor de los objetos de valor declarados: el que
+ * llama le pasa la suma de los dos (ver CotizacionController): cada {@code recargo_dinero_transportado_umbral} pesos declarados suma
  * {@code recargo_dinero_transportado_monto}, redondeando el tramo incompleto hacia abajo (ej. con
  * umbral 10000 y monto 100, declarar $25000 suma $200). Umbral en 0 desactiva el recargo.
  * <p>

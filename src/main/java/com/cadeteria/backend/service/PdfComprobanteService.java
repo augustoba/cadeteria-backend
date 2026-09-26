@@ -36,7 +36,6 @@ public class PdfComprobanteService {
     private static final Color NARANJA = new Color(0xFC, 0x69, 0x00);
     private static final Color OSCURO = new Color(0x1E, 0x1E, 0x1E);
 
-    private static final String TELEFONO_CADETERIA = "0381 - 4210846";
 
     public byte[] generar(Pedido p) {
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
@@ -47,7 +46,6 @@ public class PdfComprobanteService {
 
             Font tituloFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 15, OSCURO);
             Font cuponFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, NARANJA);
-            Font telefonoFont = FontFactory.getFont(FontFactory.HELVETICA, 10, OSCURO);
             Font labelFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, OSCURO);
             Font valueFont = FontFactory.getFont(FontFactory.HELVETICA, 10, OSCURO);
             Font footerFont = FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 8, Color.GRAY);
@@ -60,10 +58,11 @@ public class PdfComprobanteService {
             contenedor.setBorderColor(NARANJA);
             contenedor.setBorderWidth(1.5f);
 
-            // Encabezado: logo a la izquierda, cupón/teléfono a la derecha
-            PdfPTable encabezado = new PdfPTable(2);
+            // Encabezado: logo | nombre de la cadetería | comprobante y cupón (2026-09-25: sin el
+            // teléfono fijo, que ya no se usa)
+            PdfPTable encabezado = new PdfPTable(3);
             encabezado.setWidthPercentage(100);
-            encabezado.setWidths(new float[]{1f, 2f});
+            encabezado.setWidths(new float[]{1f, 2.2f, 2f});
 
             PdfPCell celdaLogo = new PdfPCell();
             celdaLogo.setBorder(Rectangle.NO_BORDER);
@@ -77,6 +76,15 @@ public class PdfComprobanteService {
             }
             encabezado.addCell(celdaLogo);
 
+            PdfPCell celdaNombre = new PdfPCell();
+            celdaNombre.setBorder(Rectangle.NO_BORDER);
+            celdaNombre.setVerticalAlignment(Element.ALIGN_MIDDLE);
+            Paragraph nombrePar = new Paragraph();
+            nombrePar.add(new Phrase("CADEM ", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18, NARANJA)));
+            nombrePar.add(new Phrase("CADETERÍA", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18, OSCURO)));
+            celdaNombre.addElement(nombrePar);
+            encabezado.addCell(celdaNombre);
+
             PdfPCell celdaCupon = new PdfPCell();
             celdaCupon.setBorder(Rectangle.NO_BORDER);
             celdaCupon.setVerticalAlignment(Element.ALIGN_MIDDLE);
@@ -85,11 +93,8 @@ public class PdfComprobanteService {
             tituloPar.setAlignment(Element.ALIGN_RIGHT);
             Paragraph cuponPar = new Paragraph("Cupón Nº " + p.getNumero(), cuponFont);
             cuponPar.setAlignment(Element.ALIGN_RIGHT);
-            Paragraph telPar = new Paragraph(TELEFONO_CADETERIA, telefonoFont);
-            telPar.setAlignment(Element.ALIGN_RIGHT);
             celdaCupon.addElement(tituloPar);
             celdaCupon.addElement(cuponPar);
-            celdaCupon.addElement(telPar);
             encabezado.addCell(celdaCupon);
 
             contenedor.addElement(encabezado);
@@ -107,6 +112,10 @@ public class PdfComprobanteService {
             agregarFila(datos, "Origen:", p.getOrigenDireccion(), labelFont, valueFont);
             agregarFila(datos, "Destino:", p.getDestinoDireccion(), labelFont, valueFont);
             agregarFila(datos, "Efectivo:", formatoMoneda(p.getMontoDeclarado()), labelFont, valueFont);
+            if (p.isLlevaValores()) {
+                agregarFila(datos, "Objetos de valor:",
+                        p.getMontoValores() != null ? formatoMoneda(p.getMontoValores()) : "Sí (sin monto declarado)", labelFont, valueFont);
+            }
             agregarFila(datos, "Valor trámite:", formatoMoneda(p.getPrecio()), labelFont, valueFont);
             if (p.getCadeteAsignado() != null) {
                 String movil = p.getCadeteAsignado().getNombre() + " " + p.getCadeteAsignado().getApellido();
@@ -131,20 +140,7 @@ public class PdfComprobanteService {
             contenedor.addElement(datos);
             contenedor.addElement(lineaDivisoria());
 
-            Paragraph firmaLinea = new Paragraph(" ");
-            firmaLinea.setSpacingBefore(28);
-            contenedor.addElement(firmaLinea);
-
-            PdfPTable firma = new PdfPTable(1);
-            firma.setWidthPercentage(60);
-            firma.setHorizontalAlignment(Element.ALIGN_LEFT);
-            PdfPCell celdaFirma = new PdfPCell(new Phrase("Firma de conformidad", labelFont));
-            celdaFirma.setBorder(Rectangle.TOP);
-            celdaFirma.setBorderColor(OSCURO);
-            celdaFirma.setPaddingTop(4);
-            firma.addCell(celdaFirma);
-            contenedor.addElement(firma);
-
+            // Sin "Firma de conformidad" (2026-09-25): la firma de quien recibe la toma el cadete en la app.
             Paragraph piePar = new Paragraph("Gracias por confiar en CADEM cadetería.", footerFont);
             piePar.setSpacingBefore(16);
             contenedor.addElement(piePar);

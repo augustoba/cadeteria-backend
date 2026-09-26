@@ -34,8 +34,12 @@ public class CotizacionController {
             @RequestParam double origenLat, @RequestParam double origenLng,
             @RequestParam(required = false) Double destinoLat, @RequestParam(required = false) Double destinoLng,
             @RequestParam(required = false) BigDecimal montoDeclarado,
-            @RequestParam(defaultValue = "false") boolean retornaAlOrigen) {
-        return service.cotizar(origenLat, origenLng, destinoLat, destinoLng, montoDeclarado, retornaAlOrigen)
+            @RequestParam(defaultValue = "false") boolean retornaAlOrigen,
+            /** Valor de los objetos de valor declarados (2026-09-25): suma recargo igual que el dinero. */
+            @RequestParam(required = false) BigDecimal montoValores) {
+        BigDecimal declarado = montoDeclarado == null ? montoValores
+                : montoValores == null ? montoDeclarado : montoDeclarado.add(montoValores);
+        return service.cotizar(origenLat, origenLng, destinoLat, destinoLng, declarado, retornaAlOrigen)
                 .map(c -> new CotizacionResponse(c.precioSugerido(), c.metodo(), c.zonaId(), c.zonaNombre(), c.distanciaKm()))
                 .orElseGet(CotizacionResponse::vacia);
     }
