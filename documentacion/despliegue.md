@@ -1,6 +1,6 @@
 # Despliegue — checklist para producción
 
-Última actualización: 2026-09-25.
+Última actualización: 2026-09-26.
 
 Lista de todo lo que hay que configurar, cambiar o apagar al subir a producción, para que no
 se olvide nada. **Cada vez que se agrega una variable, una API o una opción "solo para
@@ -143,3 +143,71 @@ pasarlos a mano, pero no es la idea.
 | GraphHopper / OpenRouteService (opcional) | Distancia real por calle | Panel → Configuración |
 | Firebase (opcional) | Push a la app | variable `FCM_CREDENTIALS_PATH` |
 | Chip de WhatsApp / celular con SMS gateway | Códigos y avisos a clientes | gateway + variables |
+
+---
+
+## 6. Probar en la calle sin pagar servidor (2026-09-26)
+
+Para pruebas generales (que se carguen los datos, que se registren lat/lng y el recorrido, salir
+con la APK en el teléfono) todavía no hace falta un servidor pago.
+
+### Opciones analizadas
+
+| Opción | Costo | A favor | En contra |
+| --- | --- | --- | --- |
+| **A. Tu PC + túnel (Cloudflare Tunnel)** ← la recomendada para empezar | $0 | 30 min de armado; se usa el mismo backend y la misma base de siempre; HTTPS, así que Android no pone problemas; acepta WebSocket | la PC tiene que quedar prendida; en el modo rápido la dirección cambia cada vez que se reinicia el túnel (una fija requiere un dominio en Cloudflare, unos pocos US$/año) |
+| **B. Máquina virtual Oracle Cloud "Always Free"** (ARM, hasta 4 núcleos / 24 GB) | $0 | anda con la PC apagada; sobra para MySQL + backend + nginx con el panel; es lo más parecido a producción | pide tarjeta para verificar (no cobra) y a veces rechaza la cuenta o no hay lugar en la región; hay que instalar Java 21, MySQL, nginx y el certificado a mano (el repo no tiene Docker todavía) |
+| C. Google Cloud e2-micro gratis | $0 | idem B | 1 GB de RAM: muy justo para Spring + MySQL juntos |
+| D. Render / Koyeb + base gratis (Aiven, TiDB) + panel en Cloudflare Pages / Vercel | $0 | cero servidores que mantener | **no sirve para esta app**: el plan gratis duerme el backend a los ~15 min sin uso → se frenan los jobs (ofertas que vencen, reclamos, mapeo de calles) y se corta el tiempo real; tarda ~1 min en despertar; 512 MB es justo para Spring |
+| ngrok (alternativa a A) | $0 | dirección fija gratis | le muestra una página de aviso al panel en el navegador |
+
+Plan: **A mañana**; si anda bien y se quiere dejar fijo, **B**.
+
+### Paso a paso con el túnel (opción A)
+
+Solo el **backend** necesita el túnel: el panel se mira en la PC (`localhost:4200`) al volver.
+
+1. Instalar: `winget install Cloudflare.cloudflared`.
+2. Cambiar la contraseña del admin (`cambiar123`) antes de abrir el túnel: el backend queda
+   accesible desde internet mientras esté abierto.
+3. Backend prendido en 8080 con la base de siempre.
+4. En otra terminal, y **dejarla abierta**: `cloudflared tunnel --url http://localhost:8080` →
+   devuelve `https://<algo-al-azar>.trycloudflare.com`.
+5. Compilar e instalar la **APK nueva** (el `app-debug.apk` del repo es viejo; compilar con JDK 17,
+   ver pendientes §6). En el login → **"Cambiar servidor"** → la dirección del túnel (mismo
+   formato que cuando se pone la IP de la PC).
+6. PC: Configuración → Energía → **Suspender: nunca** (que se apague la pantalla está bien) y
+   pausar Windows Update para ese rato.
+7. Teléfono: ubicación **"Permitir todo el tiempo"**, sacar la app de la **optimización de
+   batería** (Xiaomi/Samsung matan el servicio en segundo plano), datos móviles.
+8. Panel → Configuración, solo mientras dure la prueba:
+   - `frecuencia_ubicacion_seg` más bajo si se quieren más puntos (ej. 15–20).
+   - `mapeo_calles_cadetes_intervalo_seg` en 30–60 para que la cache de direcciones aprenda de
+     la posición del cadete. **Volverlo a 1200 antes de tener muchos cadetes reales** (límite de
+     Nominatim, ver `MapeoCallesCadetesService`).
+9. **Antes de salir, un pedido asignado a vos y aceptado (EN CURSO)**: el recorrido
+   (`pedido_ubicacion`) se guarda solo con un pedido en curso. Sin pedido ("libre") se guarda la
+   última posición y lo que aprenda el mapeo de calles, pero no el trayecto. Ideal: un rato con
+   pedido y otro sin.
+10. En la calle: marcar Retirado y Entregado (con foto y firma) para probar también eso.
+
+### Al volver: qué mirar
+
+- `pedido_ubicacion` del pedido, ordenado por fecha: ¿hay huecos? (túnel caído o el teléfono
+  mató la app), ¿se registró con la pantalla apagada?, ¿cada cuánto llegó cada punto?
+- Mapa del panel y **km reales** en Métricas.
+- `retiro_lat/lng` y `entrega_lat/lng` del pedido, foto, firma y comprobante.
+- Si creció la cache de direcciones con lo que aprendió el mapeo.
+
+### Qué puede fallar
+
+- Si se cierra la terminal del túnel o se reinicia la PC, **la dirección cambia** y la APK queda
+  apuntando a la vieja: dejan de llegar puntos desde esa hora.
+- El teléfono mata la app en segundo plano: se ve como huecos largos entre puntos.
+- El link de seguimiento y el QR **no abren desde otro celular** (el panel no está en el túnel).
+  Si se quiere probar eso: un segundo túnel para el panel (`--url http://localhost:4200`) y
+  `FRONT_BASE_URL` con esa dirección.
+- Sin Firebase configurado no llegan push: los viajes nuevos se ven con la app abierta.
+- Precisión: la APK pide ubicación en modo "balanceado" (ahorra batería): error de decenas de
+  metros; mirar si el recorrido sale escalonado.
+- `TRUSTED_PROXIES` no hace falta: el túnel llega por localhost, que ya es de confianza.

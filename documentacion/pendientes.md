@@ -276,6 +276,53 @@ buscar-ampliado con Google, link de Google Maps, cotizar).
 gateway de SMS no le llega nada al cliente, aunque el de WhatsApp esté conectado. Evaluar que
 salgan por WhatsApp (y SMS de respaldo), igual que el código de verificación.
 
+### 5d. Ideas analizadas el 2026-09-26 (sin código todavía)
+
+**App o avisos para el dueño.** Si el dueño sale y deja el panel a alguien sin todos los permisos,
+hoy no se entera de nada. Orden propuesto:
+1. **WhatsApp al dueño** con el gateway que ya existe (~1 día): problema con la entrega, "sigue el
+   problema", solicitud de cadete nueva, pedido sin asignar hace más de X min, chip baneado.
+   Con **escalamiento**: primero el panel; si nadie toca "Visto" en N min, recién le llega al dueño.
+   Configurable por persona (qué avisos y horario de silencio) y respetando los permisos.
+   Las demoras de retiro/entrega solo si escalan (se cierran solas al retirar/entregar).
+2. Si hace falta actuar desde el celular: **versión "dueño" de la APK del cadete** (mismo login,
+   push y conexión): lista de avisos, reclamos (ver/llamar/cerrar), solicitudes de cadetes
+   (aprobar/rechazar con fotos), pedidos urgentes sin asignar, resumen del día. ~1 semana; necesita
+   Firebase.
+3. Que se caiga el servidor no lo puede avisar el propio servidor: monitor externo gratis que
+   mande WhatsApp al dueño.
+
+**Usar la ubicación del cadete sin pedidos.** Hoy el GPS de la APK ya corre mientras está
+disponible (con o sin pedido); se guarda la última posición y el mapeo de calles la usa cada
+`mapeo_calles_cadetes_intervalo_seg`, pero el recorrido (`pedido_ubicacion`) solo con un pedido
+EN_CURSO. Propuesta, en orden:
+1. Que **Retirado y Entregado alimenten la cache de direcciones** (`retiro_lat/lng`,
+   `entrega_lat/lng` son la puerta real confirmada): la mejor fuente y casi gratis. Verificar si
+   hoy ya lo hace.
+2. Guardar recorridos de cadetes libres **filtrados** (solo si se movió >50 m, buena precisión,
+   retención 30 días) para **tiempos de viaje reales por zona y horario** y dónde esperan los
+   cadetes — no para aprender direcciones: un punto en movimiento (modo balanceado, error de
+   decenas de metros, en la calle y no en la puerta) enseña alturas equivocadas.
+3. Volumen: un punto cada 45 s son ~1.000/cadete/día (70 cadetes ≈ 2 M filas/mes). Avisar al
+   cadete por escrito al darlo de alta; nunca trackear desconectado (como hoy).
+
+**Aviso "llegaste al origen / destino" en la APK.** Buena idea y barata (~1-2 días):
+- Notificación **local** del teléfono (no depende del servidor ni de Firebase): "Llegaste al
+  retiro en <dirección>. No te olvides de marcar Retirado" → al tocarla abre el viaje (no marca
+  sola: el retiro puede pedir foto y tiene que confirmarlo el cadete). Igual con el destino y
+  "Entregado".
+- Solo con el pedido EN_CURSO y sin retirar (origen) / sin entregar (destino); **una sola vez**
+  por punto; si ya lo marcó, se cancela.
+- Usar la **API de geofences de Google Play Services** en vez de los pings: con un ping cada
+  45 s a 30 km/h hay ~375 m entre puntos y un radio de 100 m se puede saltear. La API la maneja el
+  sistema, anda en segundo plano y gasta poca batería (necesita ubicación "todo el tiempo").
+- Radio ~150 m y disparar al **quedarse ~1 min** adentro (dwell), no al pasar por al lado; el pin
+  del origen puede estar corrido y en el centro el GPS rebota entre edificios.
+- De yapa, si la app le avisa al backend "llegó al origen a las HH:MM": tiempo de espera en cada
+  comercio para métricas, el seguimiento del cliente puede decir "el cadete llegó", y se detecta
+  quien marca Retirado lejos del origen. Y los retiros/entregas marcados en la puerta mejoran las
+  coordenadas que aprende la cache de direcciones.
+
 ### 5b. Idea a futuro: avisos de controles de tránsito entre cadetes (solo analizado)
 Pedido el 2026-09-25, estilo Waze: el cadete toca "Avisar control", queda registrado con su
 ubicación y hora, y a los cadetes que pasan a menos de ~500 m les llega "Control avisado a las
