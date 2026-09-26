@@ -514,10 +514,18 @@ códigos de verificación, confirmación de solicitudes de `/pedir` y seguimient
 (`whatsapp-gateway.md`: "conectar el envío real a los eventos del negocio" sigue pendiente).
 
 A programar:
-1. Asignado, **retirado** (nuevo) y entregado por **WhatsApp** (`WhatsappGatewayService`).
+1. **Un solo aviso por pedido** (decisión del dueño, 2026-09-26): "su cadete está en camino, siga su
+   envío acá: {link}" al aceptar el viaje, por **WhatsApp** (`WhatsappGatewayService`). No se avisa
+   retirado ni entregado: el link ya lo muestra. **Hecho del lado SMS** (rama `aviso-unico`): texto
+   corto sin tildes (1 SMS), "entregado" apagado por defecto (plantilla vacía = no se manda) y todo
+   SMS sale sin tildes ni "°" (con tildes cada aviso costaba 3-4 SMS).
 2. **SMS NO es respaldo automático**: es un canal que se prende o apaga, **opción solo del
    superadmin** (hoy variable `SMS_ENABLED`; pasarla a Configuración → Sistema). Por ahora apagado.
 3. Variar un poco el texto entre envíos y espaciar (riesgo de ban).
+3b. SMS con picos: la cadetería trabaja de 8 a 20 con horas pico (15-25 avisos en media hora) y
+   Android frena a ~30 SMS cada 30 min por app mostrando un cartel que hay que tocar → al instalar
+   el celular gateway (app "SMS Gateway for Android"), subir el límite por adb
+   (`settings put global sms_outgoing_check_max_count` / `sms_outgoing_check_interval_ms`).
 4. Chips: con ~70 viajes/día son ~210 mensajes/día → **alcanza 1 chip**. El riesgo es el ban, no el
    volumen: chip "calentado" 1-2 semanas antes de usarlo y un **segundo chip de reserva** (sin SMS
    no hay respaldo). Cada chip necesita un celular para activarlo y prenderlo cada tanto (WhatsApp

@@ -73,6 +73,9 @@ public class SmsGatewayService {
     }
 
     private boolean enviarConReintentos(String telefono, String mensaje) {
+        // Plantilla vacía = ese aviso está apagado (2026-09-26: por defecto solo sale "en camino").
+        if (mensaje == null || mensaje.isBlank()) return true;
+        mensaje = sinTildes(mensaje);
         if (!props.getSms().isEnabled() || props.getSms().getGatewayUrl().isBlank()) {
             log.info("SMS gateway deshabilitado (app.sms.enabled=false) — no se envia a {}: {}", telefono, mensaje);
             return true; // deshabilitado a propósito no cuenta como fallo
@@ -133,5 +136,16 @@ public class SmsGatewayService {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    /**
+     * Un SMS entra en 160 caracteres solo con el alfabeto básico (GSM-7): una tilde, una "ñ" o un "°"
+     * lo pasan a 70 por parte y se cobran 2-4 SMS por aviso (2026-09-26). Se sacan acá para que no
+     * dependa de cómo esté escrita la plantilla o el nombre de la cadetería ("Cadetería").
+     */
+    static String sinTildes(String texto) {
+        String base = java.text.Normalizer.normalize(texto, java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "");
+        return base.replace("°", "").replace("º", "").replace("—", "-").replace("–", "-")
+                .replace("“", "\"").replace("”", "\"").replace("‘", "'").replace("’", "'");
     }
 }

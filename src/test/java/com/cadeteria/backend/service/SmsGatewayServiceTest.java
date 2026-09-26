@@ -67,4 +67,11 @@ class SmsGatewayServiceTest {
 
         verify(publisher, times(1)).publicarAlertaSmsGatewayCaido();
     }
+
+    @Test
+    void sacaTildesYSimbolosQueEncarecenElSms() {
+        // 2026-09-26: con una tilde el SMS pasa a 70 caracteres por parte y se cobra varias veces.
+        org.junit.jupiter.api.Assertions.assertEquals("Cadeteria: pedido N 123 - senor, envio aca",
+                SmsGatewayService.sinTildes("Cadetería: pedido N° 123 — señor, envío acá"));
+    }
 }

@@ -30,6 +30,11 @@ public class PlantillasSmsMigracion implements ApplicationRunner {
             "sms_template_finalizado", new String[]{"Tu pedido fue entregado. Mira el detalle, descarga el comprobante y calificanos aca: {link}", PedidoService.SMS_FINALIZADO_DEFAULT},
             "sms_template_reenvio", new String[]{"Seguí tu pedido acá: {link}", PedidoService.SMS_REENVIO_DEFAULT});
 
+    /** 2026-09-26: un solo aviso ("en camino", corto y sin tildes) y el de "entregado" apagado. */
+    private static final Map<String, String[]> AVISO_UNICO = Map.of(
+            "sms_template_aceptado", new String[]{PedidoService.SMS_ACEPTADO_CON_VERIFICACION, PedidoService.SMS_ACEPTADO_DEFAULT},
+            "sms_template_finalizado", new String[]{PedidoService.SMS_FINALIZADO_ANTERIOR, PedidoService.SMS_FINALIZADO_DEFAULT});
+
     private final ConfiguracionService configuracionService;
 
     public PlantillasSmsMigracion(ConfiguracionService configuracionService) {
@@ -40,6 +45,7 @@ public class PlantillasSmsMigracion implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         java.util.List<Map.Entry<String, String[]>> todos = new java.util.ArrayList<>(VIEJO_A_NUEVO.entrySet());
         todos.addAll(VIEJO_A_NUEVO_EXTRA.entrySet());
+        todos.addAll(AVISO_UNICO.entrySet());
         todos.forEach(e -> {
             String clave = e.getKey();
             String[] textos = e.getValue();

@@ -1528,11 +1528,21 @@ public class PedidoService {
      * Con la verificación del cadete (2026-09-25): antes de entregar, que el cliente compare los datos
      * del link o escanee el QR que le muestra el cadete desde la app.
      */
-    public static final String SMS_ACEPTADO_DEFAULT =
+    /** Texto del aceptado entre el 2026-09-25 y el 26 — lo usa la migración de plantillas. */
+    public static final String SMS_ACEPTADO_CON_VERIFICACION =
             "{marca} le informa que un cadete aceptó su pedido N° {numero}. Antes de entregarle el pedido, dinero o valores, "
                     + "verifique que sea el cadete que figura en este link o escanee el QR que él le muestra: {link}";
-    public static final String SMS_FINALIZADO_DEFAULT =
+    /** Texto del finalizado hasta el 2026-09-26 — lo usa la migración de plantillas. */
+    public static final String SMS_FINALIZADO_ANTERIOR =
             "{marca}: su pedido N° {numero} fue entregado. Comprobante y calificación (hasta las 23:59 de hoy): {link}";
+    /**
+     * Un solo aviso por pedido (2026-09-26, pedido del dueño): "en camino" + link, que ya muestra todo
+     * lo demás. Corto y SIN tildes a propósito: con una tilde el SMS pasa a 70 caracteres por parte y el
+     * anterior (~230 con tildes) salía en 3-4 SMS cobrados; este entra en uno (~110 con el link).
+     */
+    public static final String SMS_ACEPTADO_DEFAULT = "{marca}: su cadete ya esta en camino. Siga su envio aca: {link}";
+    /** Vacío = no se manda (el cliente ya tiene el link del primer aviso). Se prende escribiendo un texto en Configuración. */
+    public static final String SMS_FINALIZADO_DEFAULT = "";
     public static final String SMS_REENVIO_DEFAULT = "{marca} — seguí tu pedido N° {numero} acá: {link}";
 
     /**
