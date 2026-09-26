@@ -325,7 +325,9 @@ public class PedidoService {
         String paraCliente = "Se está informando al cadete sobre la novedad. Pronto se comunicará con usted.";
         if (pedido.getUltimoReclamoEn() != null
                 && pedido.getUltimoReclamoEn().plus(ESPERA_ENTRE_RECLAMOS).isAfter(Instant.now())) {
-            return new ReclamoResultado(false, "Ya le avisamos al cadete hace unos minutos. Pronto se comunicará con usted.");
+            // Mismo texto que el primer aviso: "ya le avisamos hace unos minutos" confundía al cliente.
+            // Al cadete no se le vuelve a mandar nada (ya tiene el aviso de hace menos de 10 minutos).
+            return new ReclamoResultado(false, paraCliente);
         }
         pedido.setUltimoReclamoEn(Instant.now());
         repo.save(pedido);
