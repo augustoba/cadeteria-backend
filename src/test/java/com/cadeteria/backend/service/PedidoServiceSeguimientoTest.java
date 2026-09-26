@@ -94,7 +94,7 @@ class PedidoServiceSeguimientoTest {
 
         org.junit.jupiter.api.Assertions.assertTrue(r.avisado());
         org.mockito.Mockito.verify(fcm).enviar(org.mockito.ArgumentMatchers.eq("fcm-1"), org.mockito.ArgumentMatchers.eq("Reclamo del cliente"),
-                org.mockito.ArgumentMatchers.contains("el cadete no llegó"), org.mockito.ArgumentMatchers.any());
+                org.mockito.ArgumentMatchers.contains("demora en el retiro"), org.mockito.ArgumentMatchers.any());
         org.mockito.Mockito.verify(publisher).publicarAviso(org.mockito.ArgumentMatchers.eq("c1"),
                 org.mockito.ArgumentMatchers.contains("3815550000"));
     }

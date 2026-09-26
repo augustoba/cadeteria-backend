@@ -94,7 +94,9 @@ public final class PedidoDtos {
             /** Marca manual del admin para destacarlo en el dashboard (mejora 93). */
             boolean prioritario,
             /** WEB | PANEL | null (anterior a la mejora 2026-09-24) — y quién lo cargó si fue PANEL. */
-            String origenCarga, String creadoPorUsername
+            String origenCarga, String creadoPorUsername,
+            /** Último reclamo del cliente desde el seguimiento (2026-09-25) y cuándo — null si no reclamó. */
+            String reclamoDetalle, Instant reclamoEn
     ) {
         public static PedidoResponse from(Pedido p) {
             return from(p, true, false);
@@ -156,7 +158,8 @@ public final class PedidoDtos {
                                     .map(ParadaResponse::from).toList()
                             : List.of(),
                     p.getAsignadoPorUsername(), p.getCanceladoPorUsername(), p.isPrioritario(),
-                    p.getOrigenCarga(), p.getCreadoPorUsername());
+                    p.getOrigenCarga(), p.getCreadoPorUsername(),
+                    p.getReclamoDetalle(), p.getUltimoReclamoEn());
         }
     }
 

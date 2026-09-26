@@ -214,6 +214,10 @@ public class Pedido {
     /** Último reclamo del cliente desde el seguimiento (2026-09-25) — para no mandarle 20 avisos seguidos al cadete. */
     private Instant ultimoReclamoEn;
 
+    /** Texto del último reclamo del cliente — la app del cadete lo muestra en el viaje y en el historial. */
+    @jakarta.persistence.Column(length = 500)
+    private String reclamoDetalle;
+
     /** true si se agotaron los reintentos de SMS (aceptación o entrega) sin poder avisarle al cliente — para el ícono del dashboard. */
     @Column(nullable = false)
     private boolean smsFallido = false;
@@ -591,6 +595,14 @@ public class Pedido {
 
     public void setMotivoNoEntrega(String motivoNoEntrega) {
         this.motivoNoEntrega = motivoNoEntrega;
+    }
+
+    public String getReclamoDetalle() {
+        return reclamoDetalle;
+    }
+
+    public void setReclamoDetalle(String reclamoDetalle) {
+        this.reclamoDetalle = reclamoDetalle;
     }
 
     public Instant getUltimoReclamoEn() {

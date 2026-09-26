@@ -300,7 +300,7 @@ public class PedidoService {
 
     /**
      * Botón de reclamo de la página de seguimiento (2026-09-25). El tipo lo decide el estado del
-     * pedido, no lo que mande la página: en camino sin retirar = "el cadete no llegó"; retirado =
+     * pedido, no lo que mande la página: en camino sin retirar = demora en el retiro; retirado =
      * demora en la entrega; entregado = problema con la entrega. Avisa al cadete (app + push), deja
      * un comentario en el pedido y una alerta en el panel. Uno cada 10 minutos por pedido.
      */
@@ -320,16 +320,16 @@ public class PedidoService {
         String estado = pedido.getEstado().getId();
         String detalle;
         if ("EN_CURSO".equals(estado) && pedido.getRetiradoEn() == null) {
-            detalle = "Reclamo por el retiro del pedido N° " + pedido.getNumero() + ": el cliente dice que el cadete no llegó.";
+            detalle = "El cliente reclama demora en el retiro del pedido N° " + pedido.getNumero() + ".";
         } else if ("EN_CURSO".equals(estado)) {
-            detalle = "El cliente reporta demora en la entrega del pedido N° " + pedido.getNumero() + ": todavía no lo recibió.";
+            detalle = "El cliente reclama demora en la entrega del pedido N° " + pedido.getNumero() + ".";
         } else if ("FINALIZADO".equals(estado)) {
             String texto = textoCliente == null ? "" : textoCliente.trim().replaceAll("\\s+", " ");
             if (texto.length() < 5) {
                 throw new BadRequestException("Contanos qué pasó con la entrega.");
             }
             if (texto.length() > 300) texto = texto.substring(0, 300);
-            detalle = "El cliente reportó un problema con la entrega del pedido N° " + pedido.getNumero() + ": \"" + texto + "\".";
+            detalle = "El cliente reclama problemas en la entrega del pedido N° " + pedido.getNumero() + ": \"" + texto + "\".";
         } else {
             throw new BadRequestException("En este momento no se puede enviar un reclamo para este pedido.");
         }
@@ -344,9 +344,12 @@ public class PedidoService {
             return new ReclamoResultado(false, paraCliente);
         }
         pedido.setUltimoReclamoEn(Instant.now());
+        pedido.setReclamoDetalle(detalle);
         repo.save(pedido);
+        // Para que la app recargue el viaje y muestre el recuadro del reclamo (si está abierta).
+        publisher.publicarEventoViaje(cadete.getId(), "RECLAMO_CLIENTE", PedidoResponse.paraCadete(pedido));
 
-        String mensajeCadete = detalle + " Por favor comunicate con el cliente a la brevedad: "
+        String mensajeCadete = detalle + " Comunicarse con el cliente a la brevedad: "
                 + pedido.getClienteNombre() + " — " + pedido.getClienteTelefono() + ".";
         publisher.publicarAviso(cadete.getId(), mensajeCadete);
         fcmService.enviar(cadete.getFcmToken(), "Reclamo del cliente", mensajeCadete,
