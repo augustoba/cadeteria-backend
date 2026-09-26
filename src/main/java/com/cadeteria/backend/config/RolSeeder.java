@@ -34,6 +34,9 @@ public class RolSeeder implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(RolSeeder.class);
 
+    public static final String PERMISO_SISTEMA = "sistema";
+    public static final String ROL_SUPERADMIN = "superadmin";
+
     /** id, nombre, categoría — agregar acá un permiso nuevo es lo único que hace falta para que se pueda asignar a un rol. */
     private static final List<String[]> CATALOGO = List.of(
             new String[]{"configuracion", "Configuración del sistema", "Datos sensibles"},
@@ -42,7 +45,12 @@ public class RolSeeder implements CommandLineRunner {
             new String[]{"seguridad", "Panel de seguridad (accesos, cerrar sesiones)", "Datos sensibles"},
             new String[]{"usuarios", "Administrar usuarios del panel", "Datos sensibles"},
             new String[]{"whatsapp", "Panel de WhatsApp (chips, mensajes)", "Datos sensibles"},
-            new String[]{"roles", "Administrar roles y permisos", "Datos sensibles"});
+            new String[]{"roles", "Administrar roles y permisos", "Datos sensibles"},
+            // 2026-09-26: lo técnico que puede tirar el servicio (servidores, Cloudinary, borrado de lo
+            // de Google, frecuencias) y borrar API keys. Solo el rol superadmin; un admin no puede
+            // dárselo a nadie (RolService / AdminUsuarioService).
+            new String[]{PERMISO_SISTEMA, "Sistema (configuración técnica y API keys)", "Solo superadmin"});
+
 
     private final PermisoRepository permisoRepo;
     private final RolRepository rolRepo;
@@ -68,9 +76,28 @@ public class RolSeeder implements CommandLineRunner {
             admin.setId("admin");
             admin.setNombre("Admin");
             admin.setEsSistema(true);
-            admin.setPermisos(new LinkedHashSet<>(permisoRepo.findAll()));
+            // Todos menos "sistema": eso es solo del superadmin (el dueño de la plataforma).
+            admin.setPermisos(new LinkedHashSet<>(permisoRepo.findAll().stream()
+                    .filter(p -> !PERMISO_SISTEMA.equals(p.getId())).toList()));
             rolRepo.save(admin);
-            log.info("Seed: rol 'admin' creado con todos los permisos.");
+            log.info("Seed: rol 'admin' creado con todos los permisos menos '{}'.", PERMISO_SISTEMA);
+        }
+
+        if (!rolRepo.existsById(ROL_SUPERADMIN)) {
+            Rol superadmin = new Rol();
+            superadmin.setId(ROL_SUPERADMIN);
+            superadmin.setNombre("Superadmin");
+            superadmin.setEsSistema(true);
+            superadmin.setPermisos(new LinkedHashSet<>(permisoRepo.findAll()));
+            rolRepo.save(superadmin);
+            log.info("Seed: rol '{}' creado con todos los permisos.", ROL_SUPERADMIN);
+        } else {
+            // Un permiso nuevo del catálogo lo recibe siempre el superadmin (los demás roles, a mano).
+            Rol superadmin = rolRepo.findById(ROL_SUPERADMIN).orElseThrow();
+            if (superadmin.getPermisos().size() < permisoRepo.count()) {
+                superadmin.setPermisos(new LinkedHashSet<>(permisoRepo.findAll()));
+                rolRepo.save(superadmin);
+            }
         }
 
         if (!rolRepo.existsById("operador")) {

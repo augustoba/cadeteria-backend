@@ -1,6 +1,7 @@
 package com.cadeteria.backend.service;
 
 import com.cadeteria.backend.common.ConflictException;
+import com.cadeteria.backend.common.ForbiddenException;
 import com.cadeteria.backend.common.BadRequestException;
 import com.cadeteria.backend.common.ResourceNotFoundException;
 import com.cadeteria.backend.dto.RolDtos.PermisoResponse;
@@ -70,14 +71,21 @@ public class RolService {
 
     @Transactional(readOnly = true)
     public List<PermisoResponse> catalogoPermisos() {
+        boolean superadmin = com.cadeteria.backend.config.PermisosActuales.esSuperadmin();
         return permisoRepo.findAllByOrderByCategoriaAscNombreAsc().stream()
+                // El permiso "sistema" no se le muestra a un admin (no lo puede asignar igual).
+                .filter(p -> superadmin || !com.cadeteria.backend.config.RolSeeder.PERMISO_SISTEMA.equals(p.getId()))
                 .map(p -> new PermisoResponse(p.getId(), p.getNombre(), p.getCategoria()))
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public List<RolResponse> listar() {
-        return rolRepo.findAllByOrderByNombreAsc().stream().map(this::toResponse).toList();
+        boolean superadmin = com.cadeteria.backend.config.PermisosActuales.esSuperadmin();
+        return rolRepo.findAllByOrderByNombreAsc().stream()
+                // Los roles con "sistema" (Superadmin) no se le muestran a un admin.
+                .filter(r -> superadmin || !r.tienePermiso(com.cadeteria.backend.config.RolSeeder.PERMISO_SISTEMA))
+                .map(this::toResponse).toList();
     }
 
     public RolResponse crear(RolRequest req) {
@@ -96,6 +104,10 @@ public class RolService {
 
     public RolResponse actualizar(String id, RolRequest req) {
         Rol rol = get(id);
+        if (com.cadeteria.backend.config.RolSeeder.ROL_SUPERADMIN.equals(id)
+                && !com.cadeteria.backend.config.PermisosActuales.esSuperadmin()) {
+            throw new ForbiddenException("El rol Superadmin solo lo puede editar el superadmin.");
+        }
         // El id (y por lo tanto a quién apunta Admin.rol) nunca cambia, solo nombre/permisos — evita romper asignaciones existentes.
         rol.setNombre(req.nombre().trim());
         Set<Permiso> nuevos = resolverPermisos(req.permisos());
@@ -110,7 +122,7 @@ public class RolService {
     public void eliminar(String id) {
         Rol rol = get(id);
         if (rol.isEsSistema()) {
-            throw new ConflictException("Los roles del sistema (\"admin\", \"operador\") no se pueden borrar.");
+            throw new ConflictException("Los roles del sistema (\"superadmin\", \"admin\", \"operador\") no se pueden borrar.");
         }
         boolean enUso = adminRepo.findAll().stream().anyMatch(a -> id.equals(a.getRol()));
         if (enUso) {
@@ -131,6 +143,11 @@ public class RolService {
 
     private Set<Permiso> resolverPermisos(List<String> ids) {
         if (ids == null || ids.isEmpty()) return new LinkedHashSet<>();
+        // Un admin no se puede dar (ni dar a otro rol) el permiso "sistema" (2026-09-26, superadmin).
+        if (ids.contains(com.cadeteria.backend.config.RolSeeder.PERMISO_SISTEMA)
+                && !com.cadeteria.backend.config.PermisosActuales.esSuperadmin()) {
+            throw new ForbiddenException("El permiso \"Sistema\" solo lo puede asignar el superadmin.");
+        }
         List<Permiso> permisos = permisoRepo.findAllById(ids);
         if (permisos.size() != new LinkedHashSet<>(ids).size()) {
             throw new BadRequestException("Alguno de los permisos indicados no existe.");

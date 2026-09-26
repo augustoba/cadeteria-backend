@@ -74,6 +74,7 @@ public class DataSeeder implements CommandLineRunner {
         seedAutorMensaje();
         seedAdminInicial();
         backfillRolAdmins();
+        asegurarSuperadmin();
         seedConfiguracion();
     }
 
@@ -84,9 +85,23 @@ public class DataSeeder implements CommandLineRunner {
         admin.setUsername(props.getAdmin().getUsername());
         admin.setPasswordHash(passwordEncoder.encode(props.getAdmin().getPassword()));
         admin.setEnabled(true);
-        admin.setRol("admin");
+        admin.setRol(RolSeeder.ROL_SUPERADMIN);
         adminRepo.save(admin);
-        log.info("Seed: admin inicial '{}' creado.", admin.getUsername());
+        log.info("Seed: admin inicial '{}' creado como superadmin.", admin.getUsername());
+    }
+
+    /**
+     * Superadmin (2026-09-26): en una base que ya existía nadie lo es todavía, así que pasa a serlo el
+     * usuario del admin inicial ({@code ADMIN_USER}). Si ya hay algún superadmin, no toca nada.
+     */
+    private void asegurarSuperadmin() {
+        boolean hayAlguno = adminRepo.findAll().stream().anyMatch(a -> RolSeeder.ROL_SUPERADMIN.equals(a.getRol()));
+        if (hayAlguno) return;
+        adminRepo.findByUsername(props.getAdmin().getUsername()).ifPresent(a -> {
+            a.setRol(RolSeeder.ROL_SUPERADMIN);
+            adminRepo.save(a);
+            log.info("Seed: '{}' pasa a ser superadmin (no había ninguno).", a.getUsername());
+        });
     }
 
     /**

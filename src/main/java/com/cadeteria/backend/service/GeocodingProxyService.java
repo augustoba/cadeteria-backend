@@ -436,9 +436,7 @@ public class GeocodingProxyService {
             // Las coordenadas son las del punto consultado (el GPS), no las de la casa que encontró.
             return new GeoAddress(base.label(), base.street(), base.number(), base.locality(), lat, lng, base.approximate(), base.proveedor());
         } catch (HttpClientErrorException e) {
-            if (e.getStatusCode().value() == 429 || e.getStatusCode().value() == 403) {
-                apiKeyPool.marcarAgotada(PROVEEDOR_LOCATIONIQ, CONFIG_LOCATIONIQ_KEYS, key);
-            }
+            apiKeyPool.reportarError(PROVEEDOR_LOCATIONIQ, CONFIG_LOCATIONIQ_KEYS, key, e.getStatusCode().value());
             return null;
         } catch (Exception e) {
             log.debug("Fallo el reverse de LocationIQ de {},{}: {}", lat, lng, e.getMessage());
@@ -461,9 +459,7 @@ public class GeocodingProxyService {
             GeoAddress base = desdeGeoapify(results.get(0), null);
             return new GeoAddress(base.label(), base.street(), base.number(), base.locality(), lat, lng, base.approximate(), base.proveedor());
         } catch (HttpClientErrorException e) {
-            if (e.getStatusCode().value() == 429 || e.getStatusCode().value() == 403) {
-                apiKeyPool.marcarAgotada(PROVEEDOR_GEOAPIFY, CONFIG_GEOAPIFY_KEYS, key);
-            }
+            apiKeyPool.reportarError(PROVEEDOR_GEOAPIFY, CONFIG_GEOAPIFY_KEYS, key, e.getStatusCode().value());
             return null;
         } catch (Exception e) {
             log.debug("Fallo el reverse de Geoapify de {},{}: {}", lat, lng, e.getMessage());
@@ -560,10 +556,7 @@ public class GeocodingProxyService {
                 }
                 return out;
             } catch (HttpClientErrorException e) {
-                if (e.getStatusCode().value() == 429 || e.getStatusCode().value() == 403) {
-                    apiKeyPool.marcarAgotada(PROVEEDOR_GEOAPIFY, CONFIG_GEOAPIFY_KEYS, key);
-                    continue;
-                }
+                if (apiKeyPool.reportarError(PROVEEDOR_GEOAPIFY, CONFIG_GEOAPIFY_KEYS, key, e.getStatusCode().value())) continue;
                 log.warn("Fallo la búsqueda en Geoapify de \"{}\": {}", texto, e.getMessage());
                 return List.of();
             } catch (Exception e) {
@@ -598,10 +591,7 @@ public class GeocodingProxyService {
                 }
                 return out;
             } catch (HttpClientErrorException e) {
-                if (e.getStatusCode().value() == 429 || e.getStatusCode().value() == 403) {
-                    apiKeyPool.marcarAgotada(PROVEEDOR_LOCATIONIQ, CONFIG_LOCATIONIQ_KEYS, key);
-                    continue;
-                }
+                if (apiKeyPool.reportarError(PROVEEDOR_LOCATIONIQ, CONFIG_LOCATIONIQ_KEYS, key, e.getStatusCode().value())) continue;
                 log.warn("Fallo la búsqueda en LocationIQ de \"{}\": {}", texto, e.getMessage());
                 return List.of();
             } catch (Exception e) {

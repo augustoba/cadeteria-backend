@@ -100,10 +100,7 @@ public class RutaService {
                 actualizarRestanteOrs(key, resp.getHeaders());
                 return resp.getBody();
             } catch (HttpClientErrorException e) {
-                if (esErrorDeCupo(e)) {
-                    apiKeyPool.marcarAgotada(PROVEEDOR_ORS, CONFIG_ORS_KEYS, key);
-                    continue;
-                }
+                if (apiKeyPool.reportarError(PROVEEDOR_ORS, CONFIG_ORS_KEYS, key, e.getStatusCode().value())) continue;
                 throw e;
             }
         }
@@ -162,10 +159,7 @@ public class RutaService {
                 double duracionMs = ((Number) path.get("time")).doubleValue();
                 return Optional.of(new Resumen(distanciaM, (int) Math.ceil(duracionMs / 60000)));
             } catch (HttpClientErrorException e) {
-                if (esErrorDeCupo(e)) {
-                    apiKeyPool.marcarAgotada(PROVEEDOR_GRAPHHOPPER, CONFIG_GRAPHHOPPER_KEYS, key);
-                    continue;
-                }
+                if (apiKeyPool.reportarError(PROVEEDOR_GRAPHHOPPER, CONFIG_GRAPHHOPPER_KEYS, key, e.getStatusCode().value())) continue;
                 log.debug("GraphHopper no disponible para calcular distancia: {}", e.getMessage());
                 return Optional.empty();
             } catch (Exception e) {
@@ -192,12 +186,6 @@ public class RutaService {
             log.debug("OpenRouteService no disponible para calcular distancia: {}", e.getMessage());
             return Optional.empty();
         }
-    }
-
-    /** 429 = cupo agotado; algunos free tier devuelven 403 cuando se vence el plan gratuito — tratamos igual, se prueba la siguiente key. */
-    private boolean esErrorDeCupo(HttpClientErrorException e) {
-        int status = e.getStatusCode().value();
-        return status == 429 || status == 403;
     }
 
     /** OpenRouteService informa el cupo diario restante en este header — si no viene, no rompe nada, solo no se muestra "quedan: N". */

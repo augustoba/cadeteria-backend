@@ -507,6 +507,39 @@ A programar:
 4. Opcional, arreglo de raíz y gratis: **editar OpenStreetMap** (nombrar esas calles y cargar
    alturas del barrio). Nominatim toma los cambios en minutos y sirve para todos.
 
+### 3l. ⚠️ Avisos de pedido por WhatsApp (no por SMS) — pedido del dueño, 2026-09-26
+Hoy los avisos al cliente salen por **SMS** (`PedidoService`: "aceptado", "finalizado" y
+"reenvío" usan `SmsGatewayService`) y **"retirado" no manda nada**. WhatsApp solo se usa para
+códigos de verificación, confirmación de solicitudes de `/pedir` y seguimiento de reclamos
+(`whatsapp-gateway.md`: "conectar el envío real a los eventos del negocio" sigue pendiente).
+
+A programar:
+1. Asignado, **retirado** (nuevo) y entregado por **WhatsApp** (`WhatsappGatewayService`).
+2. **SMS NO es respaldo automático**: es un canal que se prende o apaga, **opción solo del
+   superadmin** (hoy variable `SMS_ENABLED`; pasarla a Configuración → Sistema). Por ahora apagado.
+3. Variar un poco el texto entre envíos y espaciar (riesgo de ban).
+4. Chips: con ~70 viajes/día son ~210 mensajes/día → **alcanza 1 chip**. El riesgo es el ban, no el
+   volumen: chip "calentado" 1-2 semanas antes de usarlo y un **segundo chip de reserva** (sin SMS
+   no hay respaldo). Cada chip necesita un celular para activarlo y prenderlo cada tanto (WhatsApp
+   desvincula los dispositivos si el principal pasa ~2 semanas sin conectarse).
+
+### 3m. Superadmin — hecho el 2026-09-26 (rama `superadmin`, backend + panel)
+- Rol **Superadmin** con el permiso nuevo **"Sistema"**; el Admin tiene todo menos eso. El usuario
+  del admin inicial (`ADMIN_USER`) pasa a ser superadmin (en una base nueva y en la existente).
+- Solo el superadmin ve y cambia (`ConfiguracionSistema`): Cloudinary, URLs de servidores, "No
+  borrar" / días de Google / link vence, frecuencia de ubicación y mapeo de calles, aprendizaje de
+  direcciones, versión mínima de la app, retención de fotos, límites anti-abuso, claves web push,
+  número de pedido y las **API keys del sistema**. El backend responde 403 aunque se arme el pedido
+  a mano; al admin ni le llegan esos valores.
+- **API keys**: dos listas por proveedor. Las del sistema (superadmin) se usan primero; las de la
+  cadetería (`*_cliente`) las agrega el admin pero **no las puede quitar** (403); el superadmin
+  borra las dos. Una key **inválida (401)** ahora se saltea y se ve en rojo en el semáforo (antes se
+  seguía usando y fallaba en cada consulta). LocationIQ se sumó al semáforo.
+- Un admin no puede darle el permiso "Sistema" a un rol, asignar el rol Superadmin, ni editar,
+  bloquear o resetear a un superadmin; tampoco los ve en Roles / Usuarios.
+- Falta: el SMS on/off como opción de sistema (3l) y, a futuro con varias cadeterías, que el
+  superadmin sea de la plataforma y no de cada base.
+
 ### 3d. `/pedir`: textos del link de Google Maps para clientes
 El buscador de `/pedir` es el mismo componente que el del panel, así que ya acepta el link. Antes
 de liberar `/pedir`, revisar los textos pensando en un cliente desde el celular (ej. "tocá

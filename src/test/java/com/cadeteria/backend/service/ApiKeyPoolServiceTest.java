@@ -129,4 +129,39 @@ class ApiKeyPoolServiceTest {
 
         verify(publisher, times(1)).publicarAlertaApiKeyPoolBajo(eq("graphhopper"), anyInt());
     }
+
+    @Test
+    void usaPrimeroLasKeysDelSistemaYDespuesLasDeLaCadeteria() {
+        when(configuracionService.getString("geoapify_keys", "")).thenReturn("SIS1");
+        when(configuracionService.getString("geoapify_keys_cliente", "")).thenReturn("CLI1");
+
+        org.junit.jupiter.api.Assertions.assertEquals("SIS1", pool.siguienteClave("geoapify", "geoapify_keys"));
+        pool.marcarAgotada("geoapify", "geoapify_keys", "SIS1");
+        org.junit.jupiter.api.Assertions.assertEquals("CLI1", pool.siguienteClave("geoapify", "geoapify_keys"));
+    }
+
+    @Test
+    void unaKeyInvalidaSeSalteaYNoFrenaAlResto() {
+        // 2026-09-26: un 401 (key mal copiada) antes no se descartaba y fallaba en cada consulta.
+        when(configuracionService.getString("geoapify_keys", "")).thenReturn("SIS1");
+        when(configuracionService.getString("geoapify_keys_cliente", "")).thenReturn("MALA,CLI2");
+        pool.marcarAgotada("geoapify", "geoapify_keys", "SIS1");
+
+        org.junit.jupiter.api.Assertions.assertTrue(pool.reportarError("geoapify", "geoapify_keys", "MALA", 401));
+
+        org.junit.jupiter.api.Assertions.assertEquals("CLI2", pool.siguienteClave("geoapify", "geoapify_keys"));
+        var estados = pool.estadoDe("geoapify", "geoapify_keys");
+        org.junit.jupiter.api.Assertions.assertEquals(ApiKeyPoolService.Estado.INVALIDA,
+                estados.stream().filter(e -> !e.delSistema() && e.claveEnmascarada().startsWith("•")).findFirst()
+                        .map(ApiKeyPoolService.EstadoClave::estado).orElseThrow());
+        org.junit.jupiter.api.Assertions.assertTrue(estados.get(0).delSistema());
+        org.junit.jupiter.api.Assertions.assertFalse(estados.get(2).delSistema());
+    }
+
+    @Test
+    void otroErrorHttpNoMarcaLaKey() {
+        when(configuracionService.getString("geoapify_keys", "")).thenReturn("SIS1");
+        org.junit.jupiter.api.Assertions.assertFalse(pool.reportarError("geoapify", "geoapify_keys", "SIS1", 400));
+        org.junit.jupiter.api.Assertions.assertEquals("SIS1", pool.siguienteClave("geoapify", "geoapify_keys"));
+    }
 }

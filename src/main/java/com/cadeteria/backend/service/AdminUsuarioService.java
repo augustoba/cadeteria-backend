@@ -1,6 +1,9 @@
 package com.cadeteria.backend.service;
 
 import com.cadeteria.backend.common.ConflictException;
+import com.cadeteria.backend.common.ForbiddenException;
+import com.cadeteria.backend.config.PermisosActuales;
+import com.cadeteria.backend.config.RolSeeder;
 import com.cadeteria.backend.common.BadRequestException;
 import com.cadeteria.backend.common.ResourceNotFoundException;
 import com.cadeteria.backend.dto.AdminUsuarioDtos.AdminUsuarioResponse;
@@ -47,7 +50,10 @@ public class AdminUsuarioService {
 
     @Transactional(readOnly = true)
     public List<AdminUsuarioResponse> listar() {
+        boolean superadmin = PermisosActuales.esSuperadmin();
         return repo.findAll().stream()
+                // Un admin no ve a los superadmin (no los puede tocar igual): el dueño de la plataforma.
+                .filter(a -> superadmin || !rolService.tienePermiso(a, RolSeeder.PERMISO_SISTEMA))
                 .sorted((a, b) -> a.getUsername().compareToIgnoreCase(b.getUsername()))
                 .map(this::toResponse)
                 .toList();
@@ -61,6 +67,7 @@ public class AdminUsuarioService {
         if (!rolRepo.existsById(req.rol())) {
             throw new BadRequestException("Ese rol no existe.");
         }
+        validarPuedeAsignar(req.rol());
         String passwordTemporal = generarPasswordTemporal();
         Admin admin = new Admin();
         admin.setId(UUID.randomUUID().toString());
@@ -79,6 +86,8 @@ public class AdminUsuarioService {
         if (!rolRepo.existsById(rol)) {
             throw new BadRequestException("Ese rol no existe.");
         }
+        validarPuedeTocar(admin);
+        validarPuedeAsignar(rol);
         if (rolService.esUltimoConPermiso(admin, "roles") && !rolService.permisosEfectivos(rol).contains("roles")) {
             throw new ConflictException("No podés sacarle el permiso \"roles\" al último admin que lo tiene.");
         }
@@ -89,6 +98,7 @@ public class AdminUsuarioService {
 
     public AdminUsuarioResponse habilitar(String id, boolean enabled) {
         Admin admin = get(id);
+        validarPuedeTocar(admin);
         if (!enabled && rolService.esUltimoConPermiso(admin, "roles")) {
             throw new ConflictException("No podés deshabilitar al último admin con permiso para administrar roles.");
         }
@@ -102,6 +112,7 @@ public class AdminUsuarioService {
 
     public com.cadeteria.backend.dto.AdminUsuarioDtos.ResetearPasswordResponse resetearPassword(String id) {
         Admin admin = get(id);
+        validarPuedeTocar(admin);
         String passwordTemporal = generarPasswordTemporal();
         admin.setPasswordHash(passwordEncoder.encode(passwordTemporal));
         admin.setSessionToken(UUID.randomUUID().toString());
@@ -109,6 +120,23 @@ public class AdminUsuarioService {
         admin.setPasswordTemporalExpira(Instant.now().plusSeconds(EXPIRA_PASSWORD_TEMPORAL_MIN * 60L));
         repo.save(admin);
         return new com.cadeteria.backend.dto.AdminUsuarioDtos.ResetearPasswordResponse(passwordTemporal);
+    }
+
+    /**
+     * Superadmin (2026-09-26): un rol con el permiso "sistema" solo lo asigna otro superadmin, y a un
+     * superadmin solo lo toca otro superadmin (rol, bloqueo, contraseña). Si no, un admin podría darse
+     * el acceso técnico o dejar afuera al dueño de la plataforma.
+     */
+    private void validarPuedeAsignar(String rol) {
+        if (rolService.permisosEfectivos(rol).contains(RolSeeder.PERMISO_SISTEMA) && !PermisosActuales.esSuperadmin()) {
+            throw new ForbiddenException("Ese rol solo lo puede asignar el superadmin.");
+        }
+    }
+
+    private void validarPuedeTocar(Admin admin) {
+        if (rolService.tienePermiso(admin, RolSeeder.PERMISO_SISTEMA) && !PermisosActuales.esSuperadmin()) {
+            throw new ForbiddenException("A un superadmin solo lo puede modificar otro superadmin.");
+        }
     }
 
     private Admin get(String id) {

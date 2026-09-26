@@ -46,14 +46,28 @@ public class ApiKeyPoolService {
             "google", 300
     );
 
-    public enum Estado { OK, AGOTADA }
+    /**
+     * Sufijo de la segunda lista de keys de cada proveedor (2026-09-26): la primera ("geoapify_keys")
+     * la carga el superadmin; esta ("geoapify_keys_cliente") el admin del cliente, que puede sumar
+     * cupo pero no borrar. Se usan primero las del sistema.
+     */
+    public static final String SUFIJO_CLIENTE = "_cliente";
+
+    public static String claveCliente(String configKey) {
+        return configKey + SUFIJO_CLIENTE;
+    }
+
+    /** INVALIDA: el proveedor contestó 401 (key mal copiada o dada de baja) — se reintenta a las 24 hs igual que una agotada. */
+    public enum Estado { OK, AGOTADA, INVALIDA }
 
     /** Snapshot de una key para mostrar en el panel de Configuración — nunca expone la key completa. */
     public record EstadoClave(String proveedor, String claveEnmascarada, Estado estado, Integer restante,
-                               boolean restanteEstimado, Instant actualizadoEn) {}
+                               boolean restanteEstimado, Instant actualizadoEn, boolean delSistema) {}
 
     private static final class ClaveEstado {
         final String valor;
+        /** true = la cargó el superadmin; false = la agregó el admin del cliente. */
+        volatile boolean delSistema = true;
         volatile Estado estado = Estado.OK;
         volatile Integer restanteInformado;
         volatile int usadasHoy;
@@ -134,6 +148,7 @@ public class ApiKeyPoolService {
         for (ClaveEstado c : clavesDe(proveedor, configKey, valorLegado)) {
             c.rotarDiaSiCorresponde();
             if (c.estado == Estado.OK) return c.valor;
+            // Agotada o inválida: se vuelve a probar pasadas 24 hs.
             if (c.agotadaEn != null && Duration.between(c.agotadaEn, Instant.now()).compareTo(DURACION_BLOQUEO) > 0) {
                 c.estado = Estado.OK;
                 c.agotadaEn = null;
@@ -154,6 +169,38 @@ public class ApiKeyPoolService {
             c.actualizadoEn = Instant.now();
             if (eraOk) avisarSiPoolAgotado(proveedor);
         });
+    }
+
+    /**
+     * La key no sirve (401: mal copiada o dada de baja). Antes no se contemplaba y una key inválida
+     * se seguía usando y fallaba en cada consulta; como el admin del cliente puede agregar keys
+     * (2026-09-26), una mal cargada no puede frenar el servicio: se saltea y el panel la muestra en rojo.
+     */
+    public void marcarInvalida(String proveedor, String configKey, String valor) {
+        buscar(proveedor, configKey, valor).ifPresent(c -> {
+            boolean eraOk = c.estado == Estado.OK;
+            c.estado = Estado.INVALIDA;
+            c.agotadaEn = Instant.now();
+            c.agotadaPorPrediccion = false;
+            c.actualizadoEn = Instant.now();
+            if (eraOk) avisarSiPoolAgotado(proveedor);
+        });
+    }
+
+    /**
+     * Punto único para un error HTTP del proveedor con esta key: 401 = inválida, 429/403 = sin cupo.
+     * @return true si se marcó (hay que probar con la siguiente key); false si es otro error.
+     */
+    public boolean reportarError(String proveedor, String configKey, String valor, int statusHttp) {
+        if (statusHttp == 401) {
+            marcarInvalida(proveedor, configKey, valor);
+            return true;
+        }
+        if (statusHttp == 429 || statusHttp == 403) {
+            marcarAgotada(proveedor, configKey, valor);
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -197,7 +244,7 @@ public class ApiKeyPoolService {
     /** Todas las cuentas cargadas de este proveedor se quedaron sin cupo a la vez — recién ahí vale la alerta. */
     private void avisarSiPoolAgotado(String proveedor) {
         List<ClaveEstado> claves = cache.getOrDefault(proveedor, List.of());
-        if (!claves.isEmpty() && claves.stream().allMatch(c -> c.estado == Estado.AGOTADA)) {
+        if (!claves.isEmpty() && claves.stream().allMatch(c -> c.estado != Estado.OK)) {
             publisher.publicarAlertaApiKeyPoolAgotado(proveedor);
         }
     }
@@ -219,10 +266,10 @@ public class ApiKeyPoolService {
                 .map(c -> {
                     c.rotarDiaSiCorresponde();
                     if (c.restanteInformado != null) {
-                        return new EstadoClave(proveedor, enmascarar(c.valor), c.estado, c.restanteInformado, false, c.actualizadoEn);
+                        return new EstadoClave(proveedor, enmascarar(c.valor), c.estado, c.restanteInformado, false, c.actualizadoEn, c.delSistema);
                     }
                     Integer estimado = limiteDiario == null ? null : Math.max(0, limiteDiario - c.usadasHoy);
-                    return new EstadoClave(proveedor, enmascarar(c.valor), c.estado, estimado, true, c.actualizadoEn);
+                    return new EstadoClave(proveedor, enmascarar(c.valor), c.estado, estimado, true, c.actualizadoEn, c.delSistema);
                 })
                 .toList();
     }
@@ -233,23 +280,35 @@ public class ApiKeyPoolService {
 
     /** Relee Configuración solo si el texto crudo cambió desde la última vez, preservando el estado de las keys que ya conocíamos. */
     private List<ClaveEstado> clavesDe(String proveedor, String configKey, String valorLegado) {
-        String cruda = configuracionService.getString(configKey, valorLegado);
+        String delSistema = configuracionService.getString(configKey, valorLegado);
+        String delCliente = configuracionService.getString(claveCliente(configKey), "");
+        String cruda = delSistema + "\u0001" + delCliente;
         if (cruda.equals(ultimaConfigCruda.getOrDefault(proveedor, "\u0000"))) {
             return cache.getOrDefault(proveedor, List.of());
         }
-        List<String> nuevasClaves = Arrays.stream(cruda.split("[,\\n]"))
-                .map(String::trim)
-                .filter(s -> !s.isBlank())
+        List<String> sistema = separarClaves(delSistema);
+        // Primero las del sistema; las del cliente suman cupo cuando esas se agotan.
+        List<String> nuevasClaves = java.util.stream.Stream.concat(sistema.stream(), separarClaves(delCliente).stream())
                 .distinct()
                 .toList();
         Map<String, ClaveEstado> anterioresPorValor = cache.getOrDefault(proveedor, List.of()).stream()
                 .collect(Collectors.toMap(c -> c.valor, c -> c));
         List<ClaveEstado> actualizadas = nuevasClaves.stream()
-                .map(v -> anterioresPorValor.getOrDefault(v, new ClaveEstado(v)))
+                .map(v -> {
+                    ClaveEstado c = anterioresPorValor.getOrDefault(v, new ClaveEstado(v));
+                    c.delSistema = sistema.contains(v);
+                    return c;
+                })
                 .collect(Collectors.toList());
         cache.put(proveedor, actualizadas);
         ultimaConfigCruda.put(proveedor, cruda);
         return actualizadas;
+    }
+
+    /** "a, b\nc" -> [a, b, c]: separadas por coma o salto de línea, sin vacías ni repetidas. */
+    public static List<String> separarClaves(String texto) {
+        if (texto == null) return List.of();
+        return Arrays.stream(texto.split("[,\\n]")).map(String::trim).filter(s -> !s.isBlank()).distinct().toList();
     }
 
     private String enmascarar(String clave) {

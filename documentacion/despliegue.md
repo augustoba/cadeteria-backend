@@ -95,6 +95,10 @@ pasarlos a mano, pero no es la idea.
       login de la app acepta letras y solo contesta "usuario o contraseña incorrectos". **Pendiente**:
       teclado numérico y aviso "tu usuario es tu DNI, solo números".
 - [ ] Panel → Configuración → **Versión mínima de la app** = la versión del APK que se reparte.
+- [ ] **Usuarios del panel** (2026-09-26): `ADMIN_USER` / `ADMIN_PASSWORD` crea al **superadmin**
+      (vos: ve lo técnico y las API keys del sistema). Desde el panel → Usuarios, crear un usuario
+      con rol **Admin** (el dueño de la cadetería) y otro con rol **Operador**; cada uno recibe una
+      contraseña temporal que lo obliga a cambiarla.
 - [ ] **Base: nombres de calle unificados** (2026-09-26): con el backend nuevo parado, respaldar
       `cuadra_coords` y `direccion_alias` y correr `documentacion/sql/2026-09-26-alias-curados.sql`
       (idempotente salvo el `ALTER TABLE ... ADD COLUMN muestras`, que falla si ya existe: sacarlo si
