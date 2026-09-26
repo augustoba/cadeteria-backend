@@ -274,25 +274,28 @@ public class PedidoService {
         return repo.findFirstByClienteTelefonoOrderByCreadoEnDesc(telefono).map(Pedido::getClienteNombre);
     }
 
-    /** Horas que el link de seguimiento sigue abriendo después de terminado el pedido (Configuración). */
-    public static final String CONFIG_SEGUIMIENTO_VENCE_HORAS = "seguimiento_vence_horas";
+    private static final java.time.ZoneId ZONA_ARGENTINA = java.time.ZoneId.of("America/Argentina/Buenos_Aires");
 
     /**
      * Único punto de entrada del link de seguimiento: todo lo público del pedido (ver, calificar,
      * comprobante, repetir, push) pasa por acá, solo con el token del link — no hay búsqueda por
-     * número, teléfono ni nada más. Pasadas {@code seguimiento_vence_horas} (default 2) desde que el
-     * pedido terminó (entregado, cancelado o no entregado), el link deja de abrir. En 0, no vence.
+     * número, teléfono ni nada más. El link vale hasta el final (23:59, hora de Argentina) del día
+     * en que el pedido terminó (entregado, cancelado o no entregado); después ya no abre.
      */
     @Transactional(readOnly = true)
     public Pedido getPorToken(String token) {
         Pedido pedido = repo.findByTokenSeguimiento(token)
                 .orElseThrow(() -> new ResourceNotFoundException("No encontramos este pedido."));
         Instant terminado = terminadoEn(pedido);
-        int horas = configuracionService.getInt(CONFIG_SEGUIMIENTO_VENCE_HORAS, 2);
-        if (terminado != null && horas > 0 && terminado.plus(java.time.Duration.ofHours(horas)).isBefore(Instant.now())) {
+        if (terminado != null && Instant.now().isAfter(finDelDia(terminado))) {
             throw new BadRequestException("Este link de seguimiento ya venció.");
         }
         return pedido;
+    }
+
+    /** 00:00 del día siguiente (hora de Argentina) al instante dado. */
+    static Instant finDelDia(Instant instante) {
+        return instante.atZone(ZONA_ARGENTINA).toLocalDate().plusDays(1).atStartOfDay(ZONA_ARGENTINA).toInstant();
     }
 
     private static Instant terminadoEn(Pedido p) {
@@ -1343,19 +1346,18 @@ public class PedidoService {
     public static final String SMS_ACEPTADO_DEFAULT =
             "{marca} le informa que un cadete aceptó su pedido N° {numero}. Datos del cadete y del pedido: {link}";
     public static final String SMS_FINALIZADO_DEFAULT =
-            "{marca}: su pedido N° {numero} fue entregado. Comprobante y calificación (disponible {horas} hs): {link}";
+            "{marca}: su pedido N° {numero} fue entregado. Comprobante y calificación (hasta las 23:59 de hoy): {link}";
     public static final String SMS_REENVIO_DEFAULT = "{marca} — seguí tu pedido N° {numero} acá: {link}";
 
     /**
      * Plantillas de SMS editables desde Configuración (ronda 10, punto 106). Variables: {link},
-     * {numero} (número de pedido), {marca} (nombre de la cadetería) y {horas} (vencimiento del link).
+     * {numero} (número de pedido) y {marca} (nombre de la cadetería).
      */
     private String armarSms(String claveConfiguracion, String porDefecto, Pedido pedido) {
         String plantilla = configuracionService.getString(claveConfiguracion, porDefecto);
         return plantilla.replace("{link}", linkSeguimiento(pedido))
                 .replace("{numero}", String.valueOf(pedido.getNumero()))
-                .replace("{marca}", configuracionService.getString("nombre_cadeteria", "Cadetería"))
-                .replace("{horas}", String.valueOf(configuracionService.getInt(CONFIG_SEGUIMIENTO_VENCE_HORAS, 2)));
+                .replace("{marca}", configuracionService.getString("nombre_cadeteria", "Cadetería"));
     }
 
     // --- Jobs programados ---

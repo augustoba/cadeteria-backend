@@ -118,6 +118,10 @@ public class PdfComprobanteService {
             if (p.getEntregaReceptorNombre() != null && !p.getEntregaReceptorNombre().isBlank()) {
                 agregarFila(datos, "Recibió:", p.getEntregaReceptorNombre(), labelFont, valueFont);
             }
+            if (p.getFinalizadoEn() == null) {
+                agregarFila(datos, "Estado:", p.getRetiradoEn() != null ? "Retirado, en camino al destino" : "En camino a retirar",
+                        labelFont, valueFont);
+            }
             if (p.getFinalizadoEn() != null) {
                 agregarFila(datos, "Entregado:",
                         FORMATO_FECHA.format(p.getFinalizadoEn()) + " " + FORMATO_HORA.format(p.getFinalizadoEn()),

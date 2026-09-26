@@ -16,12 +16,10 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-/** Link de seguimiento (2026-09-25): solo por token, y vence N horas después de terminado el pedido. */
+/** Link de seguimiento (2026-09-25): solo por token, y vale hasta el final del día en que terminó el pedido. */
 class PedidoServiceSeguimientoTest {
 
     private PedidoRepository repo;
@@ -40,7 +38,6 @@ class PedidoServiceSeguimientoTest {
                 mock(PedidoPrecioLogRepository.class), mock(WebPushService.class),
                 mock(PedidoParadaRepository.class), mock(MovimientoCreditoRepository.class),
                 mock(IncidenciaRepository.class), mock(PedidoCadeteExcluidoRepository.class), new AppProperties());
-        when(config.getInt(eq(PedidoService.CONFIG_SEGUIMIENTO_VENCE_HORAS), anyInt())).thenReturn(2);
     }
 
     @Test
@@ -50,28 +47,28 @@ class PedidoServiceSeguimientoTest {
     }
 
     @Test
-    void entregadoHaceMenosDeDosHorasAbre() {
-        tokenDe(pedido("FINALIZADO", Instant.now().minus(Duration.ofMinutes(90))));
+    void entregadoHoyAbre() {
+        tokenDe(pedido("FINALIZADO", Instant.now()));
         assertDoesNotThrow(() -> service.getPorToken("tok"));
     }
 
     @Test
-    void entregadoHaceMasDeDosHorasYaNoAbre() {
-        tokenDe(pedido("FINALIZADO", Instant.now().minus(Duration.ofHours(3))));
+    void entregadoAyerYaNoAbre() {
+        tokenDe(pedido("FINALIZADO", Instant.now().minus(Duration.ofDays(1))));
         assertThrows(BadRequestException.class, () -> service.getPorToken("tok"));
     }
 
     @Test
-    void conCeroHorasNoVence() {
-        when(config.getInt(eq(PedidoService.CONFIG_SEGUIMIENTO_VENCE_HORAS), anyInt())).thenReturn(0);
-        tokenDe(pedido("FINALIZADO", Instant.now().minus(Duration.ofDays(30))));
-        assertDoesNotThrow(() -> service.getPorToken("tok"));
+    void venceALaMedianocheDeArgentina() {
+        // Entregado 23:30 del 25/09 en Argentina (02:30 UTC del 26) -> vale hasta 00:00 del 26 en Argentina (03:00 UTC)
+        Instant entregado = Instant.parse("2026-09-26T02:30:00Z");
+        org.junit.jupiter.api.Assertions.assertEquals(Instant.parse("2026-09-26T03:00:00Z"), PedidoService.finDelDia(entregado));
     }
 
     @Test
     void unCanceladoTambienVence() {
         Pedido p = pedido("CANCELADO", null);
-        p.setCanceladoEn(Instant.now().minus(Duration.ofHours(5)));
+        p.setCanceladoEn(Instant.now().minus(Duration.ofDays(2)));
         tokenDe(p);
         assertThrows(BadRequestException.class, () -> service.getPorToken("tok"));
     }

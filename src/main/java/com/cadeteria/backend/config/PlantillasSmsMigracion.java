@@ -20,6 +20,10 @@ public class PlantillasSmsMigracion implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(PlantillasSmsMigracion.class);
 
+    /** Textos viejos de fábrica -> texto nuevo. El finalizado tuvo dos versiones viejas. */
+    private static final Map<String, String[]> VIEJO_A_NUEVO_EXTRA = Map.of(
+            "sms_template_finalizado", new String[]{"{marca}: su pedido N° {numero} fue entregado. Comprobante y calificación (disponible {horas} hs): {link}", PedidoService.SMS_FINALIZADO_DEFAULT});
+
     private static final Map<String, String[]> VIEJO_A_NUEVO = Map.of(
             "sms_template_aceptado", new String[]{"Tu pedido esta en camino, seguilo aca: {link}", PedidoService.SMS_ACEPTADO_DEFAULT},
             "sms_template_finalizado", new String[]{"Tu pedido fue entregado. Mira el detalle, descarga el comprobante y calificanos aca: {link}", PedidoService.SMS_FINALIZADO_DEFAULT},
@@ -33,7 +37,11 @@ public class PlantillasSmsMigracion implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        VIEJO_A_NUEVO.forEach((clave, textos) -> {
+        java.util.List<Map.Entry<String, String[]>> todos = new java.util.ArrayList<>(VIEJO_A_NUEVO.entrySet());
+        todos.addAll(VIEJO_A_NUEVO_EXTRA.entrySet());
+        todos.forEach(e -> {
+            String clave = e.getKey();
+            String[] textos = e.getValue();
             if (textos[0].equals(configuracionService.getString(clave, null))) {
                 configuracionService.set(clave, textos[1]);
                 log.info("Plantilla {} actualizada al texto nuevo (con cadetería y número de pedido).", clave);

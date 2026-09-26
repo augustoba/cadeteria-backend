@@ -3,6 +3,7 @@ package com.cadeteria.backend.controller;
 import com.cadeteria.backend.service.ConfiguracionService;
 import com.cadeteria.backend.service.WebPushService;
 import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,7 +17,10 @@ import java.util.concurrent.TimeUnit;
  * secretos, son el cloud name y el preset unsigned que ya se usan igual desde el panel.
  */
 @RestController
-@RequestMapping("/api/publico/configuracion")
+// Siempre JSON (2026-09-25): con otro Accept (ej. abrir la URL en el navegador) respondía XML, y
+// como estas respuestas se cachean, el navegador después le daba ese XML a la página de
+// seguimiento — que fallaba con "Algo salió mal" y mostraba "Cadetería" en vez del nombre.
+@RequestMapping(value = "/api/publico/configuracion", produces = MediaType.APPLICATION_JSON_VALUE)
 public class ConfiguracionPublicaController {
 
     /** Estos valores casi no cambian (config de cloudinary/marca/vapid) — 5 min de cache evita pegarle a la base en cada carga de pantalla pública. */

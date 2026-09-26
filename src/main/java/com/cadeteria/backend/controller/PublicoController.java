@@ -77,7 +77,10 @@ public class PublicoController {
     @GetMapping("/comprobante")
     public ResponseEntity<byte[]> comprobante(@PathVariable String token) {
         Pedido pedido = service.getPorToken(token);
-        if (!"FINALIZADO".equals(pedido.getEstado().getId())) {
+        // Desde que un cadete lo tomó (2026-09-25): mientras está en camino sirve como constancia
+        // de quién lo lleva; al entregar suma quién recibió y cuándo.
+        String estado = pedido.getEstado().getId();
+        if (!"FINALIZADO".equals(estado) && !"EN_CURSO".equals(estado)) {
             throw new BadRequestException("El comprobante todavia no esta disponible.");
         }
         byte[] pdf = pdfService.generar(pedido);
