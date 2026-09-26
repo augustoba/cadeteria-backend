@@ -10,7 +10,8 @@ public final class ConfiguracionDtos {
 
     public record ConfiguracionResponse(Map<String, String> valores) {}
 
-    public record ConfiguracionUpdateRequest(@NotBlank String clave, @NotBlank String valor) {}
+    /** valor puede ser vacío (2026-09-26): así el superadmin puede borrar la última API key de una lista. */
+    public record ConfiguracionUpdateRequest(@NotBlank String clave, @jakarta.validation.constraints.NotNull String valor) {}
 
     /** Subconjunto de configuración que necesita la app de cadetes (el resto es solo para el panel admin). */
     public record CadeteConfigResponse(
