@@ -101,7 +101,9 @@ public final class CadeteDtos {
             /** Notas libres del admin sobre este cadete (ronda 10, punto 103). */
             String notasInternas,
             /** Última versión de APK con la que se logueó, y cuándo — null si nunca lo reportó (mejora 2026-09-17). */
-            Integer ultimaVersionApp, Instant ultimaVersionAppEn
+            Integer ultimaVersionApp, Instant ultimaVersionAppEn,
+            /** Última calle que resolvió el teléfono del cadete, y cuándo (2026-09-26) — null si nunca mandó. */
+            String calleTelefono, Instant calleTelefonoEn
     ) {
         /** Conveniencia para los endpoints que no recalculan la calificación (una mutación puntual, no la lista). */
         public static CadeteResponse from(Cadete c) {
@@ -123,7 +125,8 @@ public final class CadeteDtos {
                     c.getModalidadPago(), c.isHabilitadoPago(), c.getPagoSemanalMontoPagado(), c.getPagoSemanalVenceEn(),
                     c.getMontoSemanalActual(),
                     c.getCreditoDisponible(), c.getNotasInternas(),
-                    c.getUltimaVersionApp(), c.getUltimaVersionAppEn());
+                    c.getUltimaVersionApp(), c.getUltimaVersionAppEn(),
+                    c.getCalleTelefono(), c.getCalleTelefonoEn());
         }
 
         /**
@@ -158,7 +161,8 @@ public final class CadeteDtos {
                     r.modalidadPago(), r.habilitadoPago(), r.pagoSemanalMontoPagado(), r.pagoSemanalVenceEn(),
                     r.montoSemanalActual(),
                     r.creditoDisponible(), r.notasInternas(),
-                    r.ultimaVersionApp(), r.ultimaVersionAppEn());
+                    r.ultimaVersionApp(), r.ultimaVersionAppEn(),
+                    r.calleTelefono(), r.calleTelefonoEn());
         }
     }
 

@@ -320,6 +320,163 @@ pisando la de fábrica (`CADETE_APP_DEFAULT_BASE_URL`). En producción el servid
 venir solo del código: mostrar el botón solo en debug (`BuildConfig.DEBUG`) y que release
 ignore la URL guardada. Anotado también en `despliegue.md` (§2).
 
+### 3f. ⚠️ Deuda (próxima sesión): app del cadete sin control del permiso de ubicación
+Visto probando en un Moto G32 el 2026-09-26: la app avisa si la **ubicación del teléfono** está
+apagada (`UbicacionHabilitada.kt`), pero **no revisa el permiso de ubicación**. `HomeScreen` lo pide
+al entrar (`RequestMultiplePermissions`) con un callback vacío y no hay ningún `checkSelfPermission`
+de ubicación. Con el permiso denegado el cadete se puede poner **Libre**, recibir viajes y el
+backend lo ve conectado **sin posición**. Si tocó "No permitir" dos veces, Android no vuelve a
+preguntar nunca.
+
+A programar (APK, ~30-40 min, después reinstalar encima; misma firma):
+1. Revisar el permiso al abrir y en cada `ON_RESUME`.
+2. Sin permiso: cartel fijo igual al de ubicación apagada, "Sin permiso de ubicación no podés
+   recibir viajes", con botón **"Dar permiso"** (vuelve a pedirlo) que pasa a **"Abrir ajustes"**
+   (`ACTION_APPLICATION_DETAILS_SETTINGS`) cuando `shouldShowRequestPermissionRationale` indica que
+   Android ya no muestra el cartel.
+3. No dejar pasar a **Libre** sin permiso; si se lo sacan estando libre, avisar.
+4. "Solo esta vez" anda igual; cuando Android lo borra, vuelve el cartel.
+
+**Y el servicio de ubicación que no arranca solo** (visto el mismo día: 20 min sin ubicaciones
+con el cadete en Libre): `LocationServiceController.iniciar` solo se llama al tocar el botón de
+estado (`HomeViewModel.toggleDisponibilidad` / `toggleOcupado`) y desde el widget. Si la app se
+abre con el cadete ya **Libre u Ocupado** (reinstalación, reinicio del teléfono, Motorola que mató
+el proceso), muestra "Libre" pero **no manda posición**. Arreglo: al cargar el cadete en `HomeScreen`
+(y al volver a primer plano), si el estado no es DESCONECTADO y hay permiso, iniciar el servicio
+(es idempotente). Mientras tanto, en la calle: Desconectado → Libre lo destraba. El panel ya lo
+delata con "hace X min" en la cola de espera (rama `calle-cadete-panel`).
+
+**Y la precisión en la calle**: `LocationTrackingService` pide `PRIORITY_BALANCED_POWER_ACCURACY`
+(Wi-Fi/antenas, error de decenas a cientos de metros) y `ThrottleCalle` solo resuelve la calle con
+error ≤ 30 m. En casa (Wi-Fi) anda; en la calle con datos móviles puede no mandar calle casi
+nunca → el panel muestra 🗺️ (Nominatim) y se aprenden menos cuadras del teléfono. Evaluar con la
+prueba del 2026-09-26: si pasa, pedir `PRIORITY_HIGH_ACCURACY` mientras el cadete está Libre o con
+viaje (más batería) o, al menos, en ráfagas para resolver la calle.
+
+Junto con esto, el **login con DNI**: el alta ya exige usuario = DNI, pero el login de la app acepta
+letras y solo dice "usuario o contraseña incorrectos" → teclado numérico y aviso "tu usuario es tu
+DNI, solo números". Ambos anotados también en `despliegue.md` (§2 y §7).
+
+### 3g. Aprender direcciones al cotizar (sin esperar a guardar el pedido) — analizado 2026-09-26
+Hoy un link de Google o un pin a mano se aprende recién al **crear el pedido** (panel) o al
+**aprobar la solicitud** (`/pedir`), vía `aprenderPin`. Si el operador busca, ve el precio y no
+guarda, se pierde. Además la cotización (`CotizacionService`) recibe solo lat/lng, no el texto.
+
+Acordado:
+- **Panel, sin botón nuevo** (el objetivo es que el operador haga lo mínimo): cuando se cotiza
+  con las dos direcciones (ya pasa solo), mandar también texto + fuente de cada una y aprenderlas
+  con los mismos controles de `aprenderPin` (altura al final, la calle del reverse coincide). Si
+  después mueve el pin, se recotiza y se pisa con el punto corregido. **Solo si quien cotiza es
+  admin.**
+- **`/pedir`: botón "Cotizar" + cartel "El viaje sale $X"** en vez del precio que cambia solo
+  (más claro para el cliente y menos cotizaciones/rutas por cada pin que mueve). **No aprender de
+  lo que cotiza un cliente** (cualquiera puede inventar pines y ensuciar la cache del panel); del
+  cliente se sigue aprendiendo al aprobar la solicitud. Variante a futuro: guardarlo "sin
+  confirmar" y usarlo recién con 2-3 clientes distintos en el mismo punto (columna
+  `confirmaciones` de `cuadra_coords`).
+
+Toca backend (cotizar con texto/fuente, aprender solo con rol admin) y front (panel manda los
+textos; `/pedir` botón + cartel). Rama aparte (el backend se edita también en la otra PC).
+
+### 3h. Buscador: la base propia solo encuentra el nombre exacto de la calle — visto 2026-09-26
+"colombia 4600" sale ✅ de la cache (cuadra aprendida por el teléfono, `android_geocoder`), pero
+**"colom 4600" no da nada**: `DireccionCacheService.buscar` busca el alias exacto
+(`findByVarianteNorm`) y los servicios de afuera tampoco entienden "colom".
+
+A programar (backend):
+1. Sin alias exacto, buscar calles de la cache que **empiecen** con lo tipeado ("colom" →
+   "colombia") y tengan esa cuadra.
+2. Mínimo 3-4 letras (con "sa" saldrían todas las "San…").
+3. Si coinciden varias (ej. "san 800" → San Juan 800 y San Lorenzo 800), **devolver todas** como
+   opciones, no adivinar.
+4. Segundo paso: tolerar errores de tipeo chicos ("colombai").
+
+Relacionado, menor: en `CadeteController.actualizarUbicacion`, `registrarCalleDelTelefono` se
+llama aunque `aprenderDelTelefono` no guarde (GPS con más de 30 m de error), así que ese punto
+tampoco lo consulta el respaldo por Nominatim del mapeo de calles. Llamarlo solo si guardó (el
+método ya devuelve `boolean`).
+
+### 3i. Panel: "Ubicación aproximada" del cadete ignora la calle del teléfono — visto 2026-09-26
+En la cola de espera (`cadetes-libres.component.ts` → `reverse`) la ubicación del cadete se
+traduce siempre con **Nominatim**, que engancha el punto a la calle más cercana de OSM: con el
+cadete en Colombia 4600 mostraba **Camino del Perú 1600** (la de 2 cuadras), aunque la cache tenía
+`colombia 4600` (`android_geocoder`, del teléfono) a ~10 m. Además cada consulta del panel
+**suma confirmaciones** a lo que devuelve Nominatim (`camino del peru 1600` llegó a 18 solo de
+mirar el panel).
+
+A programar (backend + panel):
+1. Guardar en el cadete la **última calle que mandó su teléfono** (con hora) y mostrar esa.
+2. Si no hay, el punto **aprendido más cercano** de `cuadra_coords` (ej. < 30 m, prefiriendo
+   `cadete_gps` / `android_geocoder`).
+3. Nominatim solo como último recurso.
+4. Que mirar el panel **no sume `confirmaciones`** (hoy `alimentarCacheSiEsPreciso` en `reverse`).
+5. Mostrar **hace cuánto** es la ubicación ("hace 12 min"): el cadete puede figurar Libre con una
+   posición vieja si la app dejó de mandar (pasó el mismo día con un Fake GPS).
+
+**Hecho el 2026-09-26 (rama `calle-cadete-panel`, backend + front):** 1 (`cadete.calle_telefono` /
+`calle_telefono_en`, se muestra con 📱 si llegó hasta 3 min antes de la última posición; si no, 🗺️
+Nominatim como antes), 5 ("· hace X min" pasados 2 min) y la cola de espera ahora escucha
+`/topic/admin/ubicaciones` en vivo (antes solo el Mapa). Con 📱 ya no se consulta Nominatim, así que
+tampoco suma confirmaciones. **Falta** 2 (punto aprendido más cercano) y 4 (que el reverse del panel
+no sume `confirmaciones` cuando cae a Nominatim). Probado en la calle el mismo día.
+
+### 3k. Misma calle con varios nombres en la cache (prueba en la calle del 2026-09-26)
+Salida de ~1 h 30 y ~25 km con 2 celulares: 301 cuadras nuevas, 113 calles. Google (teléfono) y OSM
+(Nominatim) nombran distinto la misma calle y la cache las guarda separadas: "general lamadrid" /
+"lamadrid" / "araoz de lamadrid gregorio", "avenida belgrano" / "avenida manuel belgrano", "avenida
+general roca" / "avenida nestor kirchner" / "avenida presidente nestor kirchner" (misma avenida,
+verificado por coordenadas), "mendoza" / "provincia de mendoza", etc. Buscar con un nombre no ve lo
+aprendido con el otro.
+
+Causa: `DireccionCacheService.guardar()` pasa por los alias lo tipeado, pero el nombre del
+proveedor (`calleCanonica`) se usa crudo para crear el alias y para la clave de `cuadra_coords`.
+
+Plan acordado (analizado también con otra IA, Kimi, que armó la lista):
+1. **Lista curada a mano** de alias variante → canónica (~23 pares), no reglas automáticas: con
+   ~120 calles es más seguro; las reglas de texto rompen trampas (camino del peru ≠ peru, bernabe
+   araoz ≠ araoz de lamadrid, general paz ≠ marcos paz, juan luis nougues ≠ pasaje ambrosio
+   nougues). Dudosos a verificar en el mapa: combate de san lorenzo / san lorenzo, eduardo bulnes /
+   avenida bulnes, las piedras / combate de las piedras. **Decidir antes**: canónica corta
+   ("lamadrid") u oficial ("araoz de lamadrid").
+2. **Script SQL** con backend parado: backup (`bak_cuadra_coords`, `bak_direccion_alias`), alias,
+   re-key de `cuadra_coords` y merge de las filas que chocan en la clave única (calle + localidad
+   + cuadra; ~52 grupos). Sobreviviente según la confianza de fuente que ya usa el código; sumar
+   `confirmaciones`.
+3. **Código**: un helper `canonicalizar(nombre)` (alias → canónica) usado en `guardar()` para el
+   nombre del proveedor **y** en `mismaCalle` (hoy no reconoce Roca = Kirchner y no aprende el pin).
+4. **Salteo del respaldo** (`MapeoCallesCadetesService`): hoy saltea al cadete si el teléfono mandó
+   calle en los últimos `intervalo` seg (10 s en la prueba) pero el teléfono la manda cada 120 m / 2
+   min → el respaldo corrió casi siempre en paralelo (62 % de lo aprendido) e infló "camino del
+   peru" estando quieto. Saltear si mandó calle en los últimos 2-3 min y no se movió > 120 m.
+5. **Esquinas** (aparte, calidad): puntos idénticos guardados con dos calles (perú 3700 / paraguay
+   3800). Promediar los puntos de cada cuadra con un contador **nuevo** de muestras — no con
+   `confirmaciones`, que también suma en cada búsqueda.
+6. Próxima prueba: **con un pedido EN CURSO** (sin eso `pedido_ubicacion` queda vacía y no se ven
+   huecos ni km reales) y los celulares en autos distintos.
+
+### 3j. Buscador: "el pin está sobre X" falla donde OSM tiene calles sin nombre — visto 2026-09-26
+Colombia 4695 (Barrio Tarcos): en OpenStreetMap las calles a 24 y 47 m del punto **no tienen
+nombre**, Colombia está a 65 m y no hay alturas cargadas. Resultado: escribir "Colombia 4695" pone
+el pin en otra altura, y al moverlo a la puerta el aviso `calleDistinta` del `address-picker` dice
+"estás sobre **Camino del Perú**" (la avenida a 113 m), que es falso. Google (teléfono y link) sí
+lo sabe.
+
+A programar:
+1. El aviso tiene que mirar primero la **cache propia** (punto aprendido más cercano, sobre todo
+   `android_geocoder` / `cadete_gps`) y recién después Nominatim. Mismo criterio que 3i.
+2. Si el reverse no trae calle o cae en una sin nombre, **no avisar**. (El aviso no bloquea el
+   pedido: el viaje y el precio salen con el pin corregido.)
+3. **Lo que sí traba: `aprenderPin` no aprende** si el reverse no confirma la calle tipeada, justo
+   en las calles que Nominatim no conoce (las que más hay que aprender): cada pedido a Colombia 4695
+   obliga a volver a arrastrar el pin. Aflojar solo en lo confiable:
+   - `google_link`: el punto es de Google → aprender aunque Nominatim no confirme.
+   - `manual` del admin: aprender si el reverse no trae calle o trae una sin nombre, con **menos
+     peso** (lo pisa lo que después aprenda el teléfono de un cadete, `android_geocoder` /
+     `cadete_gps`).
+   - Pin de cliente en `/pedir`: sin cambios (se aprende al aprobar la solicitud).
+4. Opcional, arreglo de raíz y gratis: **editar OpenStreetMap** (nombrar esas calles y cargar
+   alturas del barrio). Nominatim toma los cambios en minutos y sirve para todos.
+
 ### 3d. `/pedir`: textos del link de Google Maps para clientes
 El buscador de `/pedir` es el mismo componente que el del panel, así que ya acepta el link. Antes
 de liberar `/pedir`, revisar los textos pensando en un cliente desde el celular (ej. "tocá

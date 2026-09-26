@@ -178,7 +178,7 @@ public class CadeteController {
 
     @PatchMapping("/api/cadetes/me/ubicacion")
     public CadeteResponse actualizarUbicacion(Authentication auth, @Valid @RequestBody UbicacionRequest req) {
-        Cadete c = service.actualizarUbicacion(auth.getName(), req.lat(), req.lng());
+        Cadete c = service.actualizarUbicacion(auth.getName(), req.lat(), req.lng(), calleParaMostrar(req));
         publisher.publicarUbicacion(c);
         // Calle resuelta por el Geocoder del teléfono (2026-09-26): alimenta la cache y evita que el
         // mapeo de calles vuelva a consultar ese punto. Sin calle, el mapeo sigue como siempre.
@@ -187,6 +187,17 @@ public class CadeteController {
             geocodingProxyService.aprenderDelTelefono(req.calle(), req.altura(), req.localidad(), req.lat(), req.lng(), req.precision());
         }
         return CadeteResponse.from(c);
+    }
+
+    /** Máximo error del GPS para mostrar en el panel la calle del teléfono (más laxo que para aprenderla, 30 m). */
+    private static final float PRECISION_MAX_CALLE_PANEL_M = 100f;
+
+    /** "Colombia 4695, San Miguel de Tucumán" para el panel, o null si el ping no trae calle o el GPS es muy impreciso. */
+    private static String calleParaMostrar(UbicacionRequest req) {
+        if (req.calle() == null || req.calle().isBlank() || req.altura() == null) return null;
+        if (req.precision() != null && req.precision() > PRECISION_MAX_CALLE_PANEL_M) return null;
+        String base = req.calle().trim() + " " + req.altura();
+        return req.localidad() == null || req.localidad().isBlank() ? base : base + ", " + req.localidad().trim();
     }
 
     @PatchMapping("/api/cadetes/me/fcm-token")

@@ -26,6 +26,8 @@ class CadeteResponseTest {
         c.setFotoTarjetaVerdeUrl("https://res.cloudinary.com/demo/image/upload/v1/tarjeta.jpg");
         c.setCbu("0170099220000067797370");
         c.setAliasCbu("juan.moto.cadete");
+        c.setCalleTelefono("Colombia 4695, San Miguel de Tucumán");
+        c.setCalleTelefonoEn(java.time.Instant.now());
         return c;
     }
 
@@ -47,6 +49,9 @@ class CadeteResponseTest {
         assertNotNull(r.apellido());
         assertNotNull(r.dni());
         assertNotNull(r.id());
+        // La cola de espera muestra la calle que mandó el teléfono (2026-09-26).
+        assertNotNull(r.calleTelefono());
+        assertNotNull(r.calleTelefonoEn());
     }
 
     @Test

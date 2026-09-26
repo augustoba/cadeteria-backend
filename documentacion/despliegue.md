@@ -85,6 +85,15 @@ pasarlos a mano, pero no es la idea.
 - [ ] **App del cadete — HTTPS**: el manifest permite tráfico sin cifrar
       (`usesCleartextTraffic="true"`, necesario para el emulador). Con el backend en `https://`,
       apagarlo en release.
+- [ ] **App del cadete — permiso de ubicación** (2026-09-26): la app lo pide al entrar a la
+      pantalla principal pero **no revisa la respuesta** (no hay `checkSelfPermission` de
+      ubicación): con el permiso denegado y la ubicación del teléfono prendida, no avisa nada y no
+      manda posición. Solo avisa si la ubicación del teléfono está apagada
+      (`UbicacionHabilitada.kt`). **Pendiente de programar**: pantalla que bloquea "Sin permiso de
+      ubicación no podés recibir viajes" + botón "Abrir ajustes", y aviso si eligió "Solo esta vez".
+- [ ] **App del cadete — login con DNI** (2026-09-26): el alta ya exige usuario = DNI, pero el
+      login de la app acepta letras y solo contesta "usuario o contraseña incorrectos". **Pendiente**:
+      teclado numérico y aviso "tu usuario es tu DNI, solo números".
 - [ ] Panel → Configuración → **Versión mínima de la app** = la versión del APK que se reparte.
 - [ ] `/pedir` (pedidos de clientes): **todavía no se libera** (decisión 2026-09-25). Antes de
       liberarla, revisar los textos del link de Google Maps para el celular (pendientes 3d).
@@ -142,6 +151,8 @@ pasarlos a mano, pero no es la idea.
 | Código de verificación del teléfono en `/pedir` | Configuración (`verificacion_telefono_activa`) | apagado a propósito hasta probarlo con WhatsApp/SMS real (pendientes 3) |
 | Keys de Geoapify/LocationIQ commiteadas | `application.yml` | keys propias, dar de baja las viejas |
 | `application-local.yml` de esta PC | raíz del backend (gitignoreado) | no se sube; en el servidor, variables de entorno propias |
+| Cartel "✅ encontrada en servicio propio" / nombre del proveedor en los resultados del buscador de direcciones (2026-09-26, para ver si la cache aprendió la calle) | front, `address-picker.component.ts` (bloque `TEMPORAL`) | **sacarlo**: también lo ven los clientes en `/pedir` |
+| `FCM_CREDENTIALS_PATH` de esta PC (`C:\Users\august0\secretos\firebase-cadeteria.json`, variable de usuario de Windows) y `google-services.json` en `cadeteria-apk/app/` (proyecto Firebase `cadeteria-6a388`, apps `com.cadeteria.cadete` y `.debug`) | PC de desarrollo | en el servidor, la variable apuntando a su propia copia del JSON (nunca al repo) |
 | `TRUSTED_PROXIES='192\.0\.2\.1'` (solo para probar en una PC que un `X-Forwarded-For` inventado no saltea el límite) | variable de entorno | **no** usarla: poner las IPs reales del proxy (§1) |
 
 ---
@@ -192,13 +203,18 @@ Solo el **backend** necesita el túnel: el panel se mira en la PC (`localhost:42
    formato que cuando se pone la IP de la PC).
 6. PC: Configuración → Energía → **Suspender: nunca** (que se apague la pantalla está bien) y
    pausar Windows Update para ese rato.
-7. Teléfono: ubicación **"Permitir todo el tiempo"**, sacar la app de la **optimización de
-   batería** (Xiaomi/Samsung matan el servicio en segundo plano), datos móviles.
+7. Teléfono: instalar y configurar como en §7 (permiso de ubicación **"Mientras la app está en
+   uso"** — la app no pide "todo el tiempo" ni le hace falta —, batería **sin restricciones**),
+   datos móviles.
 8. Panel → Configuración, solo mientras dure la prueba:
    - `frecuencia_ubicacion_seg` más bajo si se quieren más puntos (ej. 15–20).
-   - `mapeo_calles_cadetes_intervalo_seg` en 30–60 para que la cache de direcciones aprenda de
-     la posición del cadete. **Volverlo a 1200 antes de tener muchos cadetes reales** (límite de
-     Nominatim, ver `MapeoCallesCadetesService`).
+   - `mapeo_calles_cadetes_intervalo_seg`: **no hace falta tocarlo**. Desde el 2026-09-26 el
+     teléfono manda calle/altura/localidad en cada ping y eso se guarda directo (`android_geocoder`,
+     sin límite, solo con precisión ≤ 30 m). Este intervalo es solo el respaldo por Nominatim
+     (1 consulta/seg) para cuando el teléfono no resolvió la calle. Si se baja a 30–60 para la
+     prueba, **volverlo a 1200 antes de tener muchos cadetes reales**.
+   - Lo que sí suma cuadras es `frecuencia_ubicacion_seg`: a 40 km/h, cada 15 seg ≈ una cuadra y
+     media entre ping y ping.
 9. **Antes de salir, un pedido asignado a vos y aceptado (EN CURSO)**: el recorrido
    (`pedido_ubicacion`) se guarda solo con un pedido en curso. Sin pedido ("libre") se guarda la
    última posición y lo que aprenda el mapeo de calles, pero no el trayecto. Ideal: un rato con
@@ -211,6 +227,25 @@ Solo el **backend** necesita el túnel: el panel se mira en la PC (`localhost:42
     Retirado → tiene que llegar "Llegaste al retiro… no te olvides de marcar Retirado"; idem en el
     destino. Probar también pasar por al lado sin frenar (no tiene que avisar) y con la pantalla
     apagada.
+
+### Panel desde otra PC (notebook) por un segundo túnel
+
+Para cargar pedidos desde la calle con una notebook. Probado el 2026-09-26 (sin túnel real):
+el servidor del panel rechaza direcciones de afuera ("Blocked request. This host is not
+allowed") y el backend rechaza el Origin del túnel (CORS). Se resuelve así, sin tocar código:
+
+1. PC: `npm start` en `cadeteria-frontend` (panel en 4200, con el proxy a 8080).
+2. Otra terminal abierta: `cloudflared tunnel --url http://localhost:4200 --http-host-header localhost`
+   → anotar la dirección (`https://<otra>.trycloudflare.com`).
+3. Levantar (o reiniciar) el backend con
+   `CORS_ORIGINS=http://localhost:4200,https://<otra>.trycloudflare.com`. Si el túnel del panel
+   se reinicia, cambia la dirección: reiniciar el backend con la nueva.
+4. `FRONT_BASE_URL=https://<otra>.trycloudflare.com` si también se quieren abrir el link de
+   seguimiento y el QR desde otro celular.
+5. Notebook: abrir esa dirección y entrar con el admin.
+
+Quedan dos túneles abiertos (8080 para la app, 4200 para el panel) y el backend + `npm start`
+corriendo en la PC.
 
 ### Al volver: qué mirar
 
@@ -232,3 +267,61 @@ Solo el **backend** necesita el túnel: el panel se mira en la PC (`localhost:42
 - Precisión: la APK pide ubicación en modo "balanceado" (ahorra batería): error de decenas de
   metros; mirar si el recorrido sale escalonado.
 - `TRUSTED_PROXIES` no hace falta: el túnel llega por localhost, que ya es de confianza.
+
+---
+
+## 7. Instalar la app en el celular del cadete (lo que hay que explicarle)
+
+Aprendido instalando en dos celulares (Moto G32 incluido) el 2026-09-26. La app se llama
+**"CADEM"** en el celular (no "cadete"); el paquete es `com.cadeteria.cadete` (release) o
+`com.cadeteria.cadete.debug` (prueba).
+
+### Paso a paso para el cadete
+
+1. Recibir la APK (WhatsApp como **documento**, Drive o cable) y abrirla. Si el visor de WhatsApp
+   falla, ⋮ → Guardar y abrirla desde la app **Archivos**.
+2. **"Instalar apps de fuentes desconocidas"** → permitir.
+3. **Play Protect** ("Blocked to protect your device" / "Bloqueada para proteger tu dispositivo"):
+   tocar **More details / Más detalles → Install anyway / Instalar de todas formas**. **"Got it" /
+   "Entendido" cancela la instalación.** Si igual no instala: Play Store → foto de perfil → Play
+   Protect → ⚙️ → apagar "Scan apps with Play Protect" / "Analizar apps", instalar y volver a
+   prenderlo. En Samsung, además: Ajustes → Seguridad y privacidad → **Bloqueador automático**.
+   Pasa con toda APK que no viene del Play Store; no es un problema de la app.
+4. Permisos al abrirla por primera vez:
+   - Ubicación: **"While using the app" / "Mientras la app está en uso"**. Alcanza: la posición la
+     manda un servicio con notificación fija que sigue con la pantalla apagada.
+   - **"Only this time" / "Solo esta vez"**: anda, pero al cerrar la app Android borra el permiso y
+     vuelve a preguntar.
+   - **"Don't allow" / "No permitir" dos veces → Android no vuelve a preguntar nunca** y la app
+     queda sin ubicación sin avisar (ver pendiente en §2). Se arregla en Ajustes → Apps → CADEM →
+     Permisos → Ubicación.
+   - Notificaciones: **Permitir** (sin esto no llegan los viajes nuevos con la app cerrada).
+   - Micrófono: lo pide al mandar un audio en el chat.
+5. **Batería sin restricciones**, si no el teléfono corta la app en segundo plano (huecos en el
+   recorrido): Ajustes → Apps → CADEM → **Batería / App battery usage → Sin restricciones /
+   Unrestricted**. En Xiaomi además "Inicio automático" activado; en Samsung sacarla de "Apps en
+   suspensión".
+6. Ubicación del teléfono prendida (si está apagada la app avisa sola).
+7. Login: **usuario = DNI** (solo números) y la contraseña que le da el admin.
+
+### "App not installed" / "La app no se instaló"
+
+- **"package conflicts with an existing package"**: ya hay una versión instalada **firmada en otra
+  PC** (cada PC firma distinto los builds de prueba) y Android no deja instalar encima. Hay que
+  desinstalar la vieja: Ajustes → Apps → buscar **"CADEM"** → Desinstalar.
+- **Si "CADEM" no aparece**, está en un perfil escondido:
+  - **Motorola: bóveda de Moto Secure ("Vault Profile")** — fue el caso del Moto G32: no se ve en
+    Ajustes → Apps del perfil normal.
+  - Samsung: **Carpeta segura**. Xiaomi: **Apps duales** / **Segundo espacio**.
+  - Perfil de trabajo (pestaña "Trabajo" en el cajón de apps) u otro usuario (Ajustes → Sistema →
+    Varios usuarios).
+- Último recurso, por cable desde la PC (depuración USB: Ajustes → Acerca del teléfono → 7 toques
+  en "Número de compilación"; Ajustes → Sistema → Opciones de desarrollador → Depuración USB):
+  ```
+  adb shell pm list users                                   # ¿hay otro perfil?
+  adb shell dumpsys package com.cadeteria.cadete.debug | grep "User "   # en cuál está instalada
+  adb uninstall com.cadeteria.cadete.debug                  # la saca de todos los perfiles
+  ```
+  Después apagar la depuración USB.
+- Para evitar todo esto en producción: **un solo keystore de release** (§2) — con la misma firma
+  siempre, las actualizaciones se instalan encima sin desinstalar.

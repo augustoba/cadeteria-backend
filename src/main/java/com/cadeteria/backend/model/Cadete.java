@@ -91,6 +91,11 @@ public class Cadete {
     private Double lng;
     private Instant ubicacionActualizadaEn;
 
+    /** Calle y altura que resolvió el Geocoder del teléfono en su último ping con calle (2026-09-26):
+     *  el panel la muestra como "ubicación aproximada" en vez de adivinarla con Nominatim. */
+    private String calleTelefono;
+    private Instant calleTelefonoEn;
+
     /** Recalculada por reverse geocoding en cada update de ubicacion (spec 5.1). */
     @ManyToOne
     @JoinColumn(name = "zona_actual_id")
@@ -436,6 +441,22 @@ public class Cadete {
 
     public void setUbicacionActualizadaEn(Instant ubicacionActualizadaEn) {
         this.ubicacionActualizadaEn = ubicacionActualizadaEn;
+    }
+
+    public String getCalleTelefono() {
+        return calleTelefono;
+    }
+
+    public void setCalleTelefono(String calleTelefono) {
+        this.calleTelefono = calleTelefono;
+    }
+
+    public Instant getCalleTelefonoEn() {
+        return calleTelefonoEn;
+    }
+
+    public void setCalleTelefonoEn(Instant calleTelefonoEn) {
+        this.calleTelefonoEn = calleTelefonoEn;
     }
 
     public Zona getZonaActual() {

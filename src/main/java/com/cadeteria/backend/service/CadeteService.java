@@ -290,10 +290,19 @@ public class CadeteService {
     }
 
     public Cadete actualizarUbicacion(String username, double lat, double lng) {
+        return actualizarUbicacion(username, lat, lng, null);
+    }
+
+    /** Con la calle que resolvió el teléfono para esta posición ("Colombia 4695, San Miguel de Tucumán"), o null. */
+    public Cadete actualizarUbicacion(String username, double lat, double lng, String calleTelefono) {
         Cadete c = getByUsername(username);
         c.setLat(lat);
         c.setLng(lng);
         c.setUbicacionActualizadaEn(Instant.now());
+        if (calleTelefono != null) {
+            c.setCalleTelefono(calleTelefono);
+            c.setCalleTelefonoEn(c.getUbicacionActualizadaEn());
+        }
         c.setZonaActual(geocodingService.resolverZona(lat, lng).orElse(c.getZonaActual()));
         Cadete guardado = repo.save(c);
         registrarPuntoDeTrayecto(guardado, lat, lng);
