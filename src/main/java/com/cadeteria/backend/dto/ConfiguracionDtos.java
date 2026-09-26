@@ -32,6 +32,11 @@ public final class ConfiguracionDtos {
             boolean checklistDocumentacionObligatorio,
             /** Fotos configurables (spec mejoras visuales §6): la app pide la foto ANTES de intentar, en vez de esperar el error. */
             boolean fotoRetiroObligatoria,
-            boolean fotoEntregaObligatoria
+            boolean fotoEntregaObligatoria,
+            /**
+             * "https://.../seguimiento/" (2026-09-25): la app le suma el token del pedido y arma el QR
+             * que el cadete le muestra al cliente para que confirme que es el cadete asignado.
+             */
+            String urlSeguimientoBase
     ) {}
 }

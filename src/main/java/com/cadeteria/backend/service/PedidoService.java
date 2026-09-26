@@ -1416,8 +1416,16 @@ public class PedidoService {
     }
 
     /** Textos por defecto (2026-09-25): con el nombre de la cadetería y el número de pedido. */
-    public static final String SMS_ACEPTADO_DEFAULT =
+    /** Texto anterior del aceptado (hasta 2026-09-25) — lo usa la migración de plantillas. */
+    public static final String SMS_ACEPTADO_ANTERIOR =
             "{marca} le informa que un cadete aceptó su pedido N° {numero}. Datos del cadete y del pedido: {link}";
+    /**
+     * Con la verificación del cadete (2026-09-25): antes de entregar, que el cliente compare los datos
+     * del link o escanee el QR que le muestra el cadete desde la app.
+     */
+    public static final String SMS_ACEPTADO_DEFAULT =
+            "{marca} le informa que un cadete aceptó su pedido N° {numero}. Antes de entregarle el pedido, dinero o valores, "
+                    + "verifique que sea el cadete que figura en este link o escanee el QR que él le muestra: {link}";
     public static final String SMS_FINALIZADO_DEFAULT =
             "{marca}: su pedido N° {numero} fue entregado. Comprobante y calificación (hasta las 23:59 de hoy): {link}";
     public static final String SMS_REENVIO_DEFAULT = "{marca} — seguí tu pedido N° {numero} acá: {link}";

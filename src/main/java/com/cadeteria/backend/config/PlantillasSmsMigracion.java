@@ -22,7 +22,8 @@ public class PlantillasSmsMigracion implements ApplicationRunner {
 
     /** Textos viejos de fábrica -> texto nuevo. El finalizado tuvo dos versiones viejas. */
     private static final Map<String, String[]> VIEJO_A_NUEVO_EXTRA = Map.of(
-            "sms_template_finalizado", new String[]{"{marca}: su pedido N° {numero} fue entregado. Comprobante y calificación (disponible {horas} hs): {link}", PedidoService.SMS_FINALIZADO_DEFAULT});
+            "sms_template_finalizado", new String[]{"{marca}: su pedido N° {numero} fue entregado. Comprobante y calificación (disponible {horas} hs): {link}", PedidoService.SMS_FINALIZADO_DEFAULT},
+            "sms_template_aceptado", new String[]{PedidoService.SMS_ACEPTADO_ANTERIOR, PedidoService.SMS_ACEPTADO_DEFAULT});
 
     private static final Map<String, String[]> VIEJO_A_NUEVO = Map.of(
             "sms_template_aceptado", new String[]{"Tu pedido esta en camino, seguilo aca: {link}", PedidoService.SMS_ACEPTADO_DEFAULT},

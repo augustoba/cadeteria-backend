@@ -43,11 +43,14 @@ public class CadeteController {
     private final ConfiguracionService configuracionService;
     private final PagoSemanalService pagoSemanalService;
     private final com.cadeteria.backend.service.CadeteSesionService sesionService;
+    private final String frontBaseUrl;
 
     public CadeteController(CadeteService service, WebSocketPublisher publisher, ConfiguracionService configuracionService,
                              PagoSemanalService pagoSemanalService,
-                             com.cadeteria.backend.service.CadeteSesionService sesionService) {
+                             com.cadeteria.backend.service.CadeteSesionService sesionService,
+                             com.cadeteria.backend.config.AppProperties props) {
         this.sesionService = sesionService;
+        this.frontBaseUrl = props.getFrontBaseUrl();
         this.service = service;
         this.publisher = publisher;
         this.configuracionService = configuracionService;
@@ -248,7 +251,8 @@ public class CadeteController {
                 valores.getOrDefault("telefono_soporte", ""),
                 configuracionService.getBoolean("checklist_documentacion_obligatorio", false),
                 configuracionService.getBoolean("foto_retiro_obligatoria", false),
-                configuracionService.getBoolean("foto_entrega_obligatoria", true)
+                configuracionService.getBoolean("foto_entrega_obligatoria", true),
+                frontBaseUrl + "/seguimiento/"
         );
     }
 
