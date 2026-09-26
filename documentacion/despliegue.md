@@ -190,6 +190,10 @@ Solo el **backend** necesita el túnel: el panel se mira en la PC (`localhost:42
    última posición y lo que aprenda el mapeo de calles, pero no el trayecto. Ideal: un rato con
    pedido y otro sin.
 10. En la calle: marcar Retirado y Entregado (con foto y firma) para probar también eso.
+11. **Aviso de llegada** (APK, 2026-09-26): quedarse ~1 minuto en el origen **sin** marcar
+    Retirado → tiene que llegar "Llegaste al retiro… no te olvides de marcar Retirado"; idem en el
+    destino. Probar también pasar por al lado sin frenar (no tiene que avisar) y con la pantalla
+    apagada.
 
 ### Al volver: qué mirar
 

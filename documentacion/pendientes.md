@@ -176,6 +176,24 @@ Direcciones que el buscador no encuentra — para ir llenando la base propia sin
 - Tests: backend 178 (antes 158), panel 13, APK 14. En vivo contra `cadeteria_prueba_claude`: 16
   chequeos (códigos, login y bloqueo, 3 "Aceptar" a la vez → comisión una vez, retiro repetido, IP).
 
+## Hecho el 2026-09-26 (madrugada): aviso de llegada al retiro y a la entrega (APK)
+
+- Cuando el cadete **se queda ~40 s a menos de 150 m** del origen de un viaje EN CURSO sin haber
+  marcado Retirado, el teléfono le avisa: "Llegaste al retiro — pedido #N. No te olvides de marcar
+  Retirado". Lo mismo con cada parada sin entregar y con el destino ("Entregado"). Al tocarlo abre
+  el viaje; **no marca nada solo** (el retiro puede pedir foto y la entrega nombre y firma).
+- Un solo aviso por punto; pasar por al lado sin quedarse no avisa; si ya lo marcó, no sale (antes
+  de avisar se releen los viajes) y si el aviso quedó en la barra, se borra solo.
+- Es **local del teléfono**: no depende del servidor ni de Firebase. Usa el servicio de ubicación
+  que ya corre mientras el cadete está disponible (no la API de geofences, que pedía el permiso de
+  ubicación "todo el tiempo"). Pings con más de 250 m de error no cuentan.
+- Canal de notificación propio, "Llegada al retiro o entrega" (sonido normal, vibración): el
+  cadete lo puede ajustar aparte en Ajustes.
+- Código: `location/AvisoLlegada.kt` (lógica, 6 tests) y `LocationTrackingService`. Radio, tiempo
+  y precisión son constantes en `AvisoLlegada` (no configurables desde el panel todavía).
+- Ojo: con `frecuencia_ubicacion_seg` alto (ej. 120) el aviso tarda más (hacen falta 2 pings
+  adentro). Con el default (45 s) llega ~45–90 s después de llegar.
+
 ## ⚠️ Falta probar (no se probó todavía)
 
 Lo de arriba se probó con tests (153 del backend), compilando panel y APK, y en su mayoría con
@@ -200,6 +218,8 @@ pruebas contra el backend en la base `cadeteria_prueba_claude`. **No se probó:*
   la patente, el alta de cadete del panel, nuevo pedido y `/pedir` — solo se compiló el panel. En
   la APK: mensajes del servidor al aceptar/finalizar/login y las validaciones del perfil (solo se
   compiló y corrieron los tests).
+- **El aviso de llegada en la calle** (solo tests): que llegue con la pantalla apagada, que no
+  avise al pasar por al lado y que no salga si ya se marcó Retirado. Se prueba mañana con el túnel.
 - **Cadetes ya cargados con datos que no cumplen el formato nuevo** (ej. una patente de auto o un
   nombre con números): al editarlos, el panel va a pedir corregir ese dato antes de guardar.
 
@@ -306,22 +326,10 @@ EN_CURSO. Propuesta, en orden:
 3. Volumen: un punto cada 45 s son ~1.000/cadete/día (70 cadetes ≈ 2 M filas/mes). Avisar al
    cadete por escrito al darlo de alta; nunca trackear desconectado (como hoy).
 
-**Aviso "llegaste al origen / destino" en la APK.** Buena idea y barata (~1-2 días):
-- Notificación **local** del teléfono (no depende del servidor ni de Firebase): "Llegaste al
-  retiro en <dirección>. No te olvides de marcar Retirado" → al tocarla abre el viaje (no marca
-  sola: el retiro puede pedir foto y tiene que confirmarlo el cadete). Igual con el destino y
-  "Entregado".
-- Solo con el pedido EN_CURSO y sin retirar (origen) / sin entregar (destino); **una sola vez**
-  por punto; si ya lo marcó, se cancela.
-- Usar la **API de geofences de Google Play Services** en vez de los pings: con un ping cada
-  45 s a 30 km/h hay ~375 m entre puntos y un radio de 100 m se puede saltear. La API la maneja el
-  sistema, anda en segundo plano y gasta poca batería (necesita ubicación "todo el tiempo").
-- Radio ~150 m y disparar al **quedarse ~1 min** adentro (dwell), no al pasar por al lado; el pin
-  del origen puede estar corrido y en el centro el GPS rebota entre edificios.
-- De yapa, si la app le avisa al backend "llegó al origen a las HH:MM": tiempo de espera en cada
-  comercio para métricas, el seguimiento del cliente puede decir "el cadete llegó", y se detecta
-  quien marca Retirado lejos del origen. Y los retiros/entregas marcados en la puerta mejoran las
-  coordenadas que aprende la cache de direcciones.
+**Aviso "llegaste al origen / destino" en la APK** → **hecho el 2026-09-26**, ver "Hecho el
+2026-09-26 (madrugada)". Queda como idea: que la app le avise al backend "llegó al origen a las
+HH:MM" (tiempo de espera en cada comercio, "el cadete llegó" en el seguimiento del cliente,
+detectar quien marca Retirado lejos del origen).
 
 ### 5b. Idea a futuro: avisos de controles de tránsito entre cadetes (solo analizado)
 Pedido el 2026-09-25, estilo Waze: el cadete toca "Avisar control", queda registrado con su
