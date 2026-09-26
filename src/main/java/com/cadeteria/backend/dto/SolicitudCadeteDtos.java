@@ -32,8 +32,8 @@ public final class SolicitudCadeteDtos {
             String fotoCarnetUrl,
             String fotoCarnetDorsoUrl,
             String fotoTarjetaVerdeUrl,
-            String fotoTarjetaVerdeDorsoUrl,
-            @NotBlank @Pattern(regexp = CadeteDtos.REGEX_USERNAME_DNI, message = CadeteDtos.MENSAJE_USERNAME_DNI) String usernamePropuesto
+            /** Ya no se pide "usuario" (2026-09-25): el usuario es el DNI, ver SolicitudCadeteService. */
+            String fotoTarjetaVerdeDorsoUrl
     ) {}
 
     public record SolicitudResponse(

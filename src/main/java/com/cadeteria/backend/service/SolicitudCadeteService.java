@@ -84,15 +84,20 @@ public class SolicitudCadeteService {
     /** El postulante envía el formulario — de un solo uso, queda EN_REVISION para el admin. */
     public SolicitudCadete enviarFormulario(String token, SolicitudFormRequest req) {
         SolicitudCadete s = validarToken(token);
-        if (cadeteRepo.findByUsername(req.usernamePropuesto().trim()).isPresent()) {
-            throw new BadRequestException("Ese usuario ya está en uso, elegí otro.");
+        // El usuario del cadete es su DNI: se acepta con puntos o espacios y se guarda solo con números.
+        String dni = req.dni().replaceAll("[.\\s]", "");
+        if (!dni.matches("^[0-9]{6,8}$")) {
+            throw new BadRequestException("El DNI tiene que ser solo números, hasta 8 dígitos (ej: 30111222).");
+        }
+        if (cadeteRepo.findByUsername(dni).isPresent()) {
+            throw new BadRequestException("Ya hay un cadete registrado con ese DNI.");
         }
         TipoVehiculo tipo = tipoVehiculoRepo.findById(req.tipoVehiculoId())
                 .orElseThrow(() -> ResourceNotFoundException.of("Tipo de vehiculo", req.tipoVehiculoId()));
 
         s.setNombre(req.nombre().trim());
         s.setApellido(req.apellido().trim());
-        s.setDni(req.dni().trim());
+        s.setDni(dni);
         s.setTelefono(req.telefono().trim());
         s.setEmail(req.email().trim());
         s.setTipoVehiculo(tipo);
@@ -106,7 +111,7 @@ public class SolicitudCadeteService {
         s.setFotoCarnetDorsoUrl(blankToNull(req.fotoCarnetDorsoUrl()));
         s.setFotoTarjetaVerdeUrl(blankToNull(req.fotoTarjetaVerdeUrl()));
         s.setFotoTarjetaVerdeDorsoUrl(blankToNull(req.fotoTarjetaVerdeDorsoUrl()));
-        s.setUsernamePropuesto(req.usernamePropuesto().trim());
+        s.setUsernamePropuesto(dni);
         s.setEstado("EN_REVISION");
         s.setEnviadaEn(Instant.now());
         return repo.save(s);
