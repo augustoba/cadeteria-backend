@@ -97,6 +97,9 @@ Direcciones que el buscador no encuentra — para ir llenando la base propia sin
   - Fotos del viaje: retiro (desde que retira), entrega y firma (al entregar).
   - Descargar comprobante desde "En camino". Logo y nombre de la cadetería arriba.
   - Aviso de verificar al cadete (datos o QR) antes de entregar el pedido, dinero o valores.
+  - Con un reclamo por problema abierto: la hora a la que se cierra solo si el cliente no responde.
+    A propósito **no** se le dice al cliente que el cadete queda bloqueado (es interno y le daría
+    presión sobre el cadete).
   - El link vale hasta las 23:59 del día en que terminó el pedido (salvo reclamo abierto).
   - Solo por token: sin búsqueda por número ni teléfono.
 - **Comprobante (PDF)**: encabezado logo | CADEM CADETERÍA | comprobante; sin teléfono fijo ni

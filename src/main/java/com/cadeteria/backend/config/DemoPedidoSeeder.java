@@ -62,10 +62,11 @@ public class DemoPedidoSeeder implements CommandLineRunner {
             "demo-pedido-01", "demo-pedido-02", "demo-pedido-03", "demo-pedido-04",
             "demo-pedido-05", "demo-pedido-06", "demo-pedido-07", "demo-pedido-08",
             // Variantes de reclamos y demoras (2026-09-26) — ver sembrarVariantesDeReclamos.
-            "demo-pedido-09", "demo-pedido-10", "demo-pedido-11", "demo-pedido-12");
+            "demo-pedido-09", "demo-pedido-10", "demo-pedido-11", "demo-pedido-12",
+            "demo-pedido-13", "demo-pedido-14");
     private static final List<String> OFERTA_IDS = List.of(
             "demo-oferta-01", "demo-oferta-02", "demo-oferta-03", "demo-oferta-04", "demo-oferta-05",
-            "demo-oferta-09", "demo-oferta-10", "demo-oferta-11");
+            "demo-oferta-09", "demo-oferta-10", "demo-oferta-11", "demo-oferta-13", "demo-oferta-14");
     private static final String SESION_ID = "demo-sesion-cadete";
 
     private final PedidoRepository pedidoRepo;
@@ -302,6 +303,37 @@ public class DemoPedidoSeeder implements CommandLineRunner {
         inc.setCreadaEn(ahora.minus(2, ChronoUnit.MINUTES));
         incidenciaRepo.save(inc);
 
+        // 13) El cliente dijo que SIGUE el problema: queda esperando contacto (no se cierra solo).
+        crearFinalizado("demo-pedido-13", "demo-oferta-13", 9_100_013L, otro, zona, moto,
+                "Ricardo Paz", "3815446677",
+                "Maipú 700, San Miguel de Tucumán", -26.8230, -65.2110,
+                "Av. Colón 1200, San Miguel de Tucumán", -26.8150, -65.2240,
+                new BigDecimal("1050.00"), BigDecimal.ZERO, "Ricardo Paz",
+                ahora.minus(90, ChronoUnit.MINUTES), ahora.minus(88, ChronoUnit.MINUTES),
+                ahora.minus(87, ChronoUnit.MINUTES), ahora.minus(75, ChronoUnit.MINUTES), ahora.minus(40, ChronoUnit.MINUTES));
+        Pedido p13 = pedidoRepo.findById("demo-pedido-13").orElseThrow();
+        String detalle13 = "El cliente reclama problemas en la entrega del pedido N° 9100013: \"Me dejaron el paquete en otra casa\".";
+        reclamo(p13, "PROBLEMA_ENTREGA", detalle13, ahora.minus(30, ChronoUnit.MINUTES));
+        p13.setReclamoEstado("CONTACTO");
+        pedidoRepo.save(p13);
+        incidenteDemo("demo-incidencia-13", p13, otro, detalle13, "ABIERTA", ahora.minus(30, ChronoUnit.MINUTES), null);
+
+        // 14) Reclamo ya cerrado (el cliente dijo que se solucionó).
+        crearFinalizado("demo-pedido-14", "demo-oferta-14", 9_100_014L, cadete, zona, moto,
+                "Ana Ledesma", "3815558899",
+                "Córdoba 900, San Miguel de Tucumán", -26.8260, -65.2150,
+                "Av. Aconquija 2000, Yerba Buena", -26.8160, -65.3000,
+                new BigDecimal("1400.00"), BigDecimal.ZERO, "Ana Ledesma",
+                ahora.minus(100, ChronoUnit.MINUTES), ahora.minus(98, ChronoUnit.MINUTES),
+                ahora.minus(97, ChronoUnit.MINUTES), ahora.minus(85, ChronoUnit.MINUTES), ahora.minus(60, ChronoUnit.MINUTES));
+        Pedido p14 = pedidoRepo.findById("demo-pedido-14").orElseThrow();
+        String detalle14 = "El cliente reclama problemas en la entrega del pedido N° 9100014: \"Faltaba la factura\".";
+        reclamo(p14, "PROBLEMA_ENTREGA", detalle14, ahora.minus(50, ChronoUnit.MINUTES));
+        p14.setReclamoEstado("CERRADO");
+        pedidoRepo.save(p14);
+        incidenteDemo("demo-incidencia-14", p14, cadete, detalle14, "CERRADA", ahora.minus(50, ChronoUnit.MINUTES),
+                "Solucionado según el cliente");
+
         Pedido p12 = base("demo-pedido-12", 9_100_012L, null, zona, moto,
                 "Martín Aguirre", "3815990022",
                 "24 de Septiembre 500, San Miguel de Tucumán", -26.8305, -65.2030,
@@ -310,6 +342,28 @@ public class DemoPedidoSeeder implements CommandLineRunner {
         p12.setEstado(estadoPedido("SIN_ASIGNAR"));
         p12.setCreadoEn(ahora.minus(45, ChronoUnit.MINUTES));
         pedidoRepo.save(p12);
+    }
+
+    private void incidenteDemo(String id, Pedido p, Cadete c, String detalle, String estado, Instant creada, String motivoCierre) {
+        com.cadeteria.backend.model.Incidencia inc = new com.cadeteria.backend.model.Incidencia();
+        inc.setId(id);
+        inc.setTitulo("Reclamo del cliente: problema con la entrega");
+        inc.setDescripcion(detalle);
+        inc.setPrioridad("GRAVE");
+        inc.setEstado(estado);
+        inc.setOrigen("RECLAMO_CLIENTE");
+        inc.setCadeteId(c.getId());
+        inc.setCadeteNombre(c.getNombre() + " " + c.getApellido());
+        inc.setPedidoId(p.getId());
+        inc.setPedidoNumero(p.getNumero());
+        inc.setCreadaPorUsername("cliente (seguimiento)");
+        inc.setCreadaEn(creada);
+        if ("CERRADA".equals(estado)) {
+            inc.setCerradaEn(creada.plus(5, ChronoUnit.MINUTES));
+            inc.setCerradaPorUsername("cliente (seguimiento)");
+            inc.setMotivoCierre(motivoCierre);
+        }
+        incidenciaRepo.save(inc);
     }
 
     private static void reclamo(Pedido p, String tipo, String detalle, Instant cuando) {
@@ -332,10 +386,12 @@ public class DemoPedidoSeeder implements CommandLineRunner {
                   Entregado .......................... {}demo-pedido-01
                   Reclamo: demora en el retiro ....... {}demo-pedido-09
                   Reclamo: demora en la entrega ...... {}demo-pedido-10
-                  Reclamo: problema con la entrega ... {}demo-pedido-11
+                  Reclamo: problema con la entrega ... {}demo-pedido-11   (esperando que responda; se cierra solo)
+                  Reclamo: pidió que lo contacten .... {}demo-pedido-13
+                  Reclamo: ya cerrado ................ {}demo-pedido-14
                   Cancelado .......................... {}demo-pedido-07
                 ====================================================""",
-                base, base, base, base, base, base, base, base, base);
+                base, base, base, base, base, base, base, base, base, base, base);
     }
 
     /**

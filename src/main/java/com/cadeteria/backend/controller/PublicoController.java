@@ -56,7 +56,8 @@ public class PublicoController {
             ).map(RutaService.Resumen::duracionMin).orElse(null);
         }
         return SeguimientoResponse.from(pedido, etaMinutos,
-                configuracionService.getString(ReclamoService.CONFIG_WHATSAPP_ATENCION, ""));
+                configuracionService.getString(ReclamoService.CONFIG_WHATSAPP_ATENCION, ""),
+                reclamoService.cierreAutomaticoDe(pedido).orElse(null));
     }
 
     /** El cliente califica desde esta misma página, una sola vez, cuando el pedido ya está FINALIZADO. */

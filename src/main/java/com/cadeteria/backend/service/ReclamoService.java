@@ -120,6 +120,25 @@ public class ReclamoService {
         return configuracionService.getString(CONFIG_WHATSAPP_ATENCION, "");
     }
 
+    /**
+     * Cuándo se cierra solo el reclamo por problema con la entrega si el cliente no responde (para
+     * mostrárselo en el seguimiento): creado + minutos hasta escribirle + minutos para cerrar, o
+     * mensaje enviado + minutos para cerrar. Vacío si no hay reclamo abierto o si pidió contacto.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Instant> cierreAutomaticoDe(Pedido p) {
+        if (!"PROBLEMA_ENTREGA".equals(p.getReclamoTipo()) || !p.isReclamoAbierto() || "CONTACTO".equals(p.getReclamoEstado())) {
+            return Optional.empty();
+        }
+        int minSeguimiento = configuracionService.getInt(CONFIG_MIN_SEGUIMIENTO, 10);
+        int minCierre = configuracionService.getInt(CONFIG_MIN_CIERRE, 10);
+        return incidenciaRepo.findByPedidoIdAndOrigenAndEstado(p.getId(), PedidoService.ORIGEN_RECLAMO, "ABIERTA").stream()
+                .findFirst()
+                .map(i -> i.getSeguimientoEnviadoEn() != null
+                        ? i.getSeguimientoEnviadoEn().plus(Duration.ofMinutes(minCierre))
+                        : i.getCreadaEn().plus(Duration.ofMinutes(minSeguimiento + minCierre)));
+    }
+
     // --- App del cadete ---
 
     /** El incidente por reclamo que lo tiene bloqueado, si hay (para el aviso en la app). */

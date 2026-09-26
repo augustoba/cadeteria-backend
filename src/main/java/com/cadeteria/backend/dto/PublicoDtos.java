@@ -44,7 +44,9 @@ public final class PublicoDtos {
             /** Reclamo del cliente (2026-09-26): tipo y estado, para los botones "Ya se solucionó" / "Sigue el problema". */
             String reclamoTipo, String reclamoEstado,
             /** WhatsApp de atención al cliente (Configuración) — "" si no está cargado. */
-            String whatsappAtencion
+            String whatsappAtencion,
+            /** Cuándo se cierra solo el reclamo si el cliente no responde — null si no se cierra solo (2026-09-26). */
+            java.time.Instant reclamoCierraEn
     ) {
         public static SeguimientoResponse from(Pedido p) {
             return from(p, null, "");
@@ -55,6 +57,11 @@ public final class PublicoDtos {
         }
 
         public static SeguimientoResponse from(Pedido p, Integer etaMinutos, String whatsappAtencion) {
+            return from(p, etaMinutos, whatsappAtencion, null);
+        }
+
+        public static SeguimientoResponse from(Pedido p, Integer etaMinutos, String whatsappAtencion,
+                                               java.time.Instant reclamoCierraEn) {
             boolean finalizado = "FINALIZADO".equals(p.getEstado().getId());
             boolean enCurso = "EN_CURSO".equals(p.getEstado().getId());
             Cadete cadete = p.getCadeteAsignado();
@@ -83,7 +90,8 @@ public final class PublicoDtos {
                     p.getRetiradoEn() != null ? p.getFotoRecepcionUrl() : null,
                     finalizado ? p.getFirmaReceptorUrl() : null,
                     p.getReclamoTipo(), p.getReclamoEstado(),
-                    whatsappAtencion == null ? "" : whatsappAtencion
+                    whatsappAtencion == null ? "" : whatsappAtencion,
+                    reclamoCierraEn
             );
         }
     }

@@ -150,6 +150,22 @@ class ReclamoServiceTest {
     }
 
     @Test
+    void laHoraDeCierreSeCuentaDesdeElMensajeODesdeElReclamo() {
+        Instant creada = Instant.parse("2026-09-26T03:00:00Z");
+        incidente.setCreadaEn(creada);
+        // sin mensaje todavía: creado + 10 (hasta escribirle) + 10 (para cerrar)
+        assertEquals(creada.plus(Duration.ofMinutes(20)), service.cierreAutomaticoDe(pedido).orElseThrow());
+
+        Instant enviado = Instant.parse("2026-09-26T03:12:00Z");
+        incidente.setSeguimientoEnviadoEn(enviado);
+        assertEquals(enviado.plus(Duration.ofMinutes(10)), service.cierreAutomaticoDe(pedido).orElseThrow());
+
+        // si pidió contacto no se cierra solo
+        pedido.setReclamoEstado("CONTACTO");
+        org.junit.jupiter.api.Assertions.assertTrue(service.cierreAutomaticoDe(pedido).isEmpty());
+    }
+
+    @Test
     void sinReclamoAbiertoLosBotonesNoHacenNada() {
         pedido.setReclamoEstado("CERRADO");
         assertThrows(BadRequestException.class, () -> service.clienteSolucionado("tok"));
