@@ -110,6 +110,12 @@ destildado**; antes de desplegar, sacar la opción o dejarla solo para un rol su
 existe ese rol). También revisar que `google_cache_dias` siga en lo que permitan las condiciones
 de Google en ese momento.
 
+### 3e. App del cadete: sacar "Cambiar servidor" en producción
+El login de la app tiene "Cambiar servidor" y la URL elegida queda guardada en el teléfono,
+pisando la de fábrica (`CADETE_APP_DEFAULT_BASE_URL`). En producción el servidor tiene que
+venir solo del código: mostrar el botón solo en debug (`BuildConfig.DEBUG`) y que release
+ignore la URL guardada. Anotado también en `despliegue.md` (§2).
+
 ### 3d. `/pedir`: textos del link de Google Maps para clientes
 El buscador de `/pedir` es el mismo componente que el del panel, así que ya acepta el link. Antes
 de liberar `/pedir`, revisar los textos pensando en un cliente desde el celular (ej. "tocá

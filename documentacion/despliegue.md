@@ -60,9 +60,21 @@ pasarlos a mano, pero no es la idea.
 - [ ] **Panel**: `src/app/core/config/site-config.ts` → `apiBaseUrl` y `wsBaseUrl` con la URL
       del backend (vacíos = usan el proxy de `ng serve`, solo sirve en desarrollo). Build con
       `npx ng build`.
-- [ ] **App del cadete**: en `cadeteria-apk/gradle.properties`,
-      `CADETE_APP_DEFAULT_BASE_URL` = URL del backend (hoy `http://10.0.2.2:8080`, que es el
-      emulador). Compilar con JDK 17.
+- [ ] **App del cadete — servidor fijo por código**: en `cadeteria-apk/gradle.properties`,
+      `CADETE_APP_DEFAULT_BASE_URL` = URL del backend de producción (hoy `http://10.0.2.2:8080`,
+      que es el emulador).
+- [ ] **App del cadete — sacar "Cambiar servidor"**: hoy el login tiene ese botón
+      (`LoginScreen` → `ServerConfigScreen`) y la URL que se elige queda guardada en el teléfono
+      (`SessionManager`, pisa a la de fábrica). En producción el servidor tiene que venir solo del
+      código: mostrar el botón únicamente en el build de debug (`BuildConfig.DEBUG`) y que el build
+      de release ignore la URL guardada. **Pendiente de programar** (pendientes 3e).
+- [ ] **App del cadete — build de release firmado**: hoy se reparte `app-debug.apk`. Para
+      producción: `assembleRelease` con un keystore propio (guardarlo bien: sin él no se pueden
+      publicar actualizaciones que se instalen encima), subir `versionCode`/`versionName` en cada
+      entrega. Compilar con JDK 17.
+- [ ] **App del cadete — HTTPS**: el manifest permite tráfico sin cifrar
+      (`usesCleartextTraffic="true"`, necesario para el emulador). Con el backend en `https://`,
+      apagarlo en release.
 - [ ] Panel → Configuración → **Versión mínima de la app** = la versión del APK que se reparte.
 - [ ] `/pedir` (pedidos de clientes): **todavía no se libera** (decisión 2026-09-25). Antes de
       liberarla, revisar los textos del link de Google Maps para el celular (pendientes 3d).
