@@ -37,10 +37,9 @@ public class SolicitudCadetePublicoController {
     @GetMapping("/{token}")
     public TokenEstadoResponse validar(@PathVariable String token) {
         try {
-            service.validarToken(token);
-            return new TokenEstadoResponse(true, null);
+            return new TokenEstadoResponse(true, null, service.correccionDe(service.validarToken(token)));
         } catch (RuntimeException e) {
-            return new TokenEstadoResponse(false, e.getMessage());
+            return new TokenEstadoResponse(false, e.getMessage(), null);
         }
     }
 

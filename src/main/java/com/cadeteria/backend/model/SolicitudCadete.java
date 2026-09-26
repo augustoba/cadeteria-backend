@@ -69,6 +69,16 @@ public class SolicitudCadete {
 
     private String motivoRechazo;
 
+    /**
+     * Estado A_CORREGIR (2026-09-25): qué datos o fotos marcó mal el admin y por qué, como JSON
+     * {"fotoCarnetUrl": "está borrosa", ...} — ver SolicitudCadeteService.CAMPOS_REVISABLES.
+     */
+    @Column(length = 3000)
+    private String observaciones;
+
+    /** Cuántas veces se le pidió corregir — null = nunca. */
+    private Integer correcciones;
+
     /** Una vez aprobada, el id del Cadete que se creó — para trazabilidad. */
     private String cadeteCreadoId;
 
@@ -254,6 +264,22 @@ public class SolicitudCadete {
 
     public void setUsernamePropuesto(String usernamePropuesto) {
         this.usernamePropuesto = usernamePropuesto;
+    }
+
+    public String getObservaciones() {
+        return observaciones;
+    }
+
+    public void setObservaciones(String observaciones) {
+        this.observaciones = observaciones;
+    }
+
+    public Integer getCorrecciones() {
+        return correcciones;
+    }
+
+    public void setCorrecciones(Integer correcciones) {
+        this.correcciones = correcciones;
     }
 
     public String getMotivoRechazo() {

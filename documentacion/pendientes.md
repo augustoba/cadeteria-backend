@@ -56,6 +56,18 @@ Direcciones que el buscador no encuentra — para ir llenando la base propia sin
 - **Recargo por volver al origen**: porcentaje del precio del viaje (no del recargo por dinero),
   Configuración → Pedidos → Tarifas, clave `recargo_retorno_origen_porcentaje`, default 50%. Se
   suma en el estimado de `/pedir` y en la sugerencia de precio al revisar la solicitud.
+- **Alta de cadete con corrección**: el admin marca con ✕ cada dato o foto mal, con el motivo, y
+  "Pedir corrección" le manda un mail con la lista y el mismo link, que abre el formulario
+  precargado (las fotos marcadas hay que subirlas de nuevo). "Reenviar link" renueva 7 días (y
+  reenvía el mail si estaba a corregir). "Rechazar del todo" también avisa por mail con el motivo.
+- **Registro**: el usuario es el DNI (ya no se pide aparte). Un DNI que ya estuvo registrado no se
+  bloquea: el admin ve "nunca se registró" o "ya estuvo registrado" con el motivo de la última baja
+  y el link a la ficha. Si lo aprueba, se reactiva el mismo cadete (conserva su historial); si hay
+  uno ACTIVO con ese DNI, no deja aprobar.
+- **Ficha del cadete** con solapas (desempeño, datos personales, vehículo, incidencias, altas y
+  bajas) y la foto arriba en todas.
+- ⚠️ Los mails (corrección, rechazo, alta) salen solo con `app.mail.host` configurado; si no, el
+  panel muestra el link para pasarlo a mano.
 - La cache ya no toma en cuenta las filas aproximadas viejas (anteriores al 2026-09-24): hacían
   parecer ambigua una cuadra y la búsqueda no encontraba la ubicación buena.
 
