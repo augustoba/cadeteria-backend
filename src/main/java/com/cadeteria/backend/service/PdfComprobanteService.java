@@ -122,6 +122,9 @@ public class PdfComprobanteService {
                 if (p.getCadeteAsignado().getDni() != null && !p.getCadeteAsignado().getDni().isBlank()) {
                     movil += " - DNI " + p.getCadeteAsignado().getDni();
                 }
+                if (p.getCadeteAsignado().getTelefono() != null && !p.getCadeteAsignado().getTelefono().isBlank()) {
+                    movil += " - Tel. " + p.getCadeteAsignado().getTelefono();
+                }
                 agregarFila(datos, "Móvil:", movil, labelFont, valueFont);
             }
             if (p.getEntregaReceptorNombre() != null && !p.getEntregaReceptorNombre().isBlank()) {

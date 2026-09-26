@@ -85,6 +85,8 @@ public final class PublicoDtos {
             String nombre,
             /** Apellido y DNI (2026-09-25): el cliente tiene que poder identificar a quién le entrega. */
             String apellido, String dni,
+            /** Teléfono del cadete (2026-09-25): para que el cliente lo llame o le escriba. */
+            String telefono,
             String fotoUrl, String tipoVehiculo, String vehiculoColor, String vehiculoPatente,
             /** Foto del vehículo (solo tiene sentido con MOTO — null en BICI). */
             String fotoVehiculoUrl,
@@ -93,7 +95,7 @@ public final class PublicoDtos {
     ) {
         public static CadeteInfo from(Cadete c) {
             if (c == null) return null;
-            return new CadeteInfo(c.getNombre(), c.getApellido(), c.getDni(), c.getFotoUrl(),
+            return new CadeteInfo(c.getNombre(), c.getApellido(), c.getDni(), c.getTelefono(), c.getFotoUrl(),
                     c.getTipoVehiculo() == null ? null : c.getTipoVehiculo().getNombre(),
                     c.getVehiculoColor(), c.getVehiculoPatente(), c.getFotoVehiculoUrl(),
                     c.getCbu(), c.getAliasCbu());
