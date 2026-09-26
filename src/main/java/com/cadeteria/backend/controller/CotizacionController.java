@@ -33,8 +33,9 @@ public class CotizacionController {
     public CotizacionResponse cotizar(
             @RequestParam double origenLat, @RequestParam double origenLng,
             @RequestParam(required = false) Double destinoLat, @RequestParam(required = false) Double destinoLng,
-            @RequestParam(required = false) BigDecimal montoDeclarado) {
-        return service.cotizar(origenLat, origenLng, destinoLat, destinoLng, montoDeclarado)
+            @RequestParam(required = false) BigDecimal montoDeclarado,
+            @RequestParam(defaultValue = "false") boolean retornaAlOrigen) {
+        return service.cotizar(origenLat, origenLng, destinoLat, destinoLng, montoDeclarado, retornaAlOrigen)
                 .map(c -> new CotizacionResponse(c.precioSugerido(), c.metodo(), c.zonaId(), c.zonaNombre(), c.distanciaKm()))
                 .orElseGet(CotizacionResponse::vacia);
     }

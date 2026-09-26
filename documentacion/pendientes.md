@@ -51,6 +51,11 @@ Direcciones que el buscador no encuentra — para ir llenando la base propia sin
 - **Ubicaciones de Google (API) en la cache**, con vencimiento: Configuración → Integraciones →
   "Direcciones encontradas con Google" (días, default 30; 0 = no guardar). Si una fuente propia
   confirma esa cuadra, la pisa y deja de vencer. Opción para que también venzan las de link.
+- `/pedir`: si tilda "lleva dinero" o "transporta valores", el monto es obligatorio; el celular
+  es obligatorio y con característica (10 a 13 dígitos). Lo valida el front y también el backend.
+- **Recargo por volver al origen**: porcentaje del precio del viaje (no del recargo por dinero),
+  Configuración → Pedidos → Tarifas, clave `recargo_retorno_origen_porcentaje`, default 50%. Se
+  suma en el estimado de `/pedir` y en la sugerencia de precio al revisar la solicitud.
 - La cache ya no toma en cuenta las filas aproximadas viejas (anteriores al 2026-09-24): hacían
   parecer ambigua una cuadra y la búsqueda no encontraba la ubicación buena.
 

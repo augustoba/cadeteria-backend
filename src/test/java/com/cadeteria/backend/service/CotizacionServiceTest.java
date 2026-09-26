@@ -8,6 +8,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -54,6 +55,32 @@ class CotizacionServiceTest {
         assertEquals(new BigDecimal("2960"), precioPara(5000));
         // 3,5 km -> 2000 + 1,5 x 320 = 2480
         assertEquals(new BigDecimal("2480"), precioPara(3500));
+    }
+
+    @Test
+    void volverAlOrigenSumaElPorcentajeDelViaje() {
+        when(config.getBigDecimal(eq("recargo_retorno_origen_porcentaje"), any())).thenReturn(BigDecimal.valueOf(50));
+        when(ruta.resumenSiDisponible(anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyString()))
+                .thenReturn(Optional.of(new RutaService.Resumen(5000, 10)));
+        // 5 km -> 2960 + 50% = 4440
+        assertEquals(new BigDecimal("4440"), service.cotizar(-26.83, -65.20, -26.80, -65.25, null, true).orElseThrow().precioSugerido());
+        // sin volver, igual que siempre
+        assertEquals(new BigDecimal("2960"), service.cotizar(-26.83, -65.20, -26.80, -65.25, null, false).orElseThrow().precioSugerido());
+    }
+
+    @Test
+    void elRecargoPorVolverNoSeAplicaSobreElRecargoPorDinero() {
+        when(config.getBigDecimal(eq("recargo_retorno_origen_porcentaje"), any())).thenReturn(BigDecimal.valueOf(50));
+        when(config.getBigDecimal(eq("recargo_dinero_transportado_umbral"), eq(BigDecimal.ZERO))).thenReturn(new BigDecimal("10000"));
+        when(config.getBigDecimal(eq("recargo_dinero_transportado_monto"), eq(BigDecimal.ZERO))).thenReturn(new BigDecimal("100"));
+        // 2 km -> 2000 + 50% (1000) + $25000 declarados (200) = 3200
+        assertEquals(new BigDecimal("3200"), service.precioParaKm(2, new BigDecimal("25000"), true));
+    }
+
+    @Test
+    void conPorcentajeEnCeroVolverNoCuestaMas() {
+        when(config.getBigDecimal(eq("recargo_retorno_origen_porcentaje"), any())).thenReturn(BigDecimal.ZERO);
+        assertEquals(new BigDecimal("2000"), service.precioParaKm(2, null, true));
     }
 
     @Test

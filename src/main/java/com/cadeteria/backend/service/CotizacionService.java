@@ -27,6 +27,10 @@ import java.util.Optional;
  * cadete): cada {@code recargo_dinero_transportado_umbral} pesos declarados suma
  * {@code recargo_dinero_transportado_monto}, redondeando el tramo incompleto hacia abajo (ej. con
  * umbral 10000 y monto 100, declarar $25000 suma $200). Umbral en 0 desactiva el recargo.
+ * <p>
+ * Si el cadete tiene que volver al origen (2026-09-25), se suma
+ * {@code recargo_retorno_origen_porcentaje} (default 50) del precio del viaje — sobre el tramo
+ * por distancia, no sobre el recargo por dinero. En 0 no hay recargo.
  */
 @Service
 public class CotizacionService {
@@ -47,6 +51,11 @@ public class CotizacionService {
 
     public Optional<Cotizacion> cotizar(double origenLat, double origenLng, Double destinoLat, Double destinoLng,
                                          BigDecimal montoDeclarado) {
+        return cotizar(origenLat, origenLng, destinoLat, destinoLng, montoDeclarado, false);
+    }
+
+    public Optional<Cotizacion> cotizar(double origenLat, double origenLng, Double destinoLat, Double destinoLng,
+                                         BigDecimal montoDeclarado, boolean retornaAlOrigen) {
         if (destinoLat == null || destinoLng == null) {
             return Optional.empty();
         }
@@ -64,16 +73,23 @@ public class CotizacionService {
             km = GeocodingService.distanciaKm(origenLat, origenLng, destinoLat, destinoLng) * factor.doubleValue();
             metodo = "DISTANCIA_ESTIMADA";
         }
-        return Optional.of(new Cotizacion(precioParaKm(km, montoDeclarado), metodo, null, null, km));
+        return Optional.of(new Cotizacion(precioParaKm(km, montoDeclarado, retornaAlOrigen), metodo, null, null, km));
     }
 
     /** Tarifa actual aplicada a una distancia: mínimo hasta distancia_minima_km + precio_por_km por km extra + recargo. */
     public BigDecimal precioParaKm(double km, BigDecimal montoDeclarado) {
+        return precioParaKm(km, montoDeclarado, false);
+    }
+
+    /** Igual, más el recargo por volver al origen (porcentaje del tramo por distancia). */
+    public BigDecimal precioParaKm(double km, BigDecimal montoDeclarado, boolean retornaAlOrigen) {
         BigDecimal precioPorKm = configuracionService.getBigDecimal("precio_por_km", BigDecimal.ZERO);
         BigDecimal precioBase = configuracionService.getBigDecimal("precio_base_viaje", BigDecimal.ZERO);
         BigDecimal distanciaMinimaKm = configuracionService.getBigDecimal("distancia_minima_km", BigDecimal.valueOf(2));
         double kmAdicionales = Math.max(0, km - distanciaMinimaKm.doubleValue());
-        return precioBase.add(precioPorKm.multiply(BigDecimal.valueOf(kmAdicionales)))
+        BigDecimal viaje = precioBase.add(precioPorKm.multiply(BigDecimal.valueOf(kmAdicionales)));
+        return viaje
+                .add(retornaAlOrigen ? recargoRetorno(viaje) : BigDecimal.ZERO)
                 .add(recargoPorDinero(montoDeclarado))
                 .setScale(0, RoundingMode.HALF_UP);
     }
@@ -84,6 +100,12 @@ public class CotizacionService {
      * "recargo_dinero_transportado_monto" al precio, redondeando el tramo incompleto hacia
      * abajo. Umbral en 0 (o sin dinero declarado) desactiva el recargo.
      */
+    private BigDecimal recargoRetorno(BigDecimal viaje) {
+        BigDecimal porcentaje = configuracionService.getBigDecimal("recargo_retorno_origen_porcentaje", BigDecimal.valueOf(50));
+        if (porcentaje.signum() <= 0) return BigDecimal.ZERO;
+        return viaje.multiply(porcentaje).divide(BigDecimal.valueOf(100));
+    }
+
     public BigDecimal recargoPorDinero(BigDecimal montoDeclarado) {
         if (montoDeclarado == null || montoDeclarado.signum() <= 0) {
             return BigDecimal.ZERO;

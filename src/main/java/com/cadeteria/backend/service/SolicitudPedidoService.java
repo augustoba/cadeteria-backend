@@ -115,6 +115,7 @@ public class SolicitudPedidoService {
         if (verificacionActiva() || (req.verificacionToken() != null && !req.verificacionToken().isBlank())) {
             sinVerificar = verificacionTelefonoService.consumirToken(req.verificacionToken(), req.clienteTelefono());
         }
+        validarDatosDelCliente(req);
         SolicitudPedido s = new SolicitudPedido();
         s.setSinVerificar(sinVerificar);
         s.setId(UUID.randomUUID().toString());
@@ -147,6 +148,24 @@ public class SolicitudPedidoService {
         s = repo.save(s);
         publisher.publicarAlertaSolicitudPedido(s);
         return s;
+    }
+
+    /**
+     * Lo mismo que valida "/pedir" (2026-09-25), por si llega un pedido armado a mano: si tildó que
+     * lleva dinero o valores, el monto es obligatorio (sin monto no hay recargo ni responsabilidad
+     * clara), y el teléfono tiene que tener la característica (10 a 13 dígitos).
+     */
+    private void validarDatosDelCliente(SolicitudPedidoRequest req) {
+        String digitos = req.clienteTelefono().replaceAll("\\D", "");
+        if (digitos.length() < 10 || digitos.length() > 13) {
+            throw new BadRequestException("El celular tiene que tener la característica, ej: 381 555 1234.");
+        }
+        if (req.llevaDinero() && (req.montoDeclarado() == null || req.montoDeclarado().signum() <= 0)) {
+            throw new BadRequestException("Indicá cuánto dinero lleva.");
+        }
+        if (req.llevaValores() && (req.montoValores() == null || req.montoValores().signum() <= 0)) {
+            throw new BadRequestException("Indicá cuánto valen los objetos de valor.");
+        }
     }
 
     @Transactional(readOnly = true)
