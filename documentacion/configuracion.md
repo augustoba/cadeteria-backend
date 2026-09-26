@@ -5,6 +5,8 @@ a punta: qué se define una sola vez al desplegar el servidor (variables de ento
 carga después desde el panel admin (pantalla **Configuración**), incluyendo dónde crear cuenta
 y sacar la API key de cada servicio externo.
 
+> Para subir a producción, usar el checklist de [`despliegue.md`](./despliegue.md).
+
 ## Checklist rápido
 
 Para una instalación nueva, en este orden:
@@ -43,7 +45,9 @@ Se definen una sola vez al desplegar el backend (variables de entorno, o copiand
 | `SERVER_PORT` | Puerto del backend | 8080 |
 | `WHATSAPP_GATEWAY_TOKEN` | Token que valida al gateway de WhatsApp (Node/Baileys) al conectarse por WebSocket | valor de desarrollo — cambiar en producción |
 | `FCM_CREDENTIALS_PATH` | Ruta al JSON de la cuenta de servicio de Firebase, para push a la app del cadete | vacío = push deshabilitado |
-| `MAIL_HOST` / `MAIL_PORT` / `MAIL_USERNAME` / `MAIL_PASSWORD` / `MAIL_FROM` | SMTP para el mail de alta de cadete | vacío = deshabilitado, no rompe el alta |
+| `MAIL_HOST` / `MAIL_PORT` / `MAIL_USERNAME` / `MAIL_PASSWORD` / `MAIL_FROM` | SMTP para los mails a cadetes: alta (usuario y contraseña), pedido de corrección y rechazo de la solicitud | vacío = deshabilitado, no rompe nada (el panel muestra la contraseña y el link para pasarlos a mano) |
+| `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | Borrar fotos de verdad al purgar datos viejos | vacío = solo se limpia la referencia en la base |
+| `GEOAPIFY_KEY` / `LOCATIONIQ_KEY` | Key "legado" del buscador de direcciones si no hay ninguna cargada en el panel | ⚠️ el default trae keys reales commiteadas — ver `despliegue.md` |
 | `SMS_ENABLED` / `SMS_GATEWAY_URL` / `SMS_GATEWAY_USER` / `SMS_GATEWAY_PASSWORD` | Gateway de SMS (proyecto android-sms-gateway) | deshabilitado por defecto |
 | `VERIFICACION_TRANSPORTE` | Por dónde sale el código de `/pedir`: `AUTO` (WhatsApp → SMS → sin verificar), `WHATSAPP` o `SMS` | `AUTO` |
 | `WHATSAPP_MODO_SIMULADO` | Solo desarrollo: los códigos no se mandan, quedan en "Mensajes enviados" del panel de WhatsApp con chip `SIMULADO` — **apagar en producción** (se ve en Salud del sistema) | `false` |
