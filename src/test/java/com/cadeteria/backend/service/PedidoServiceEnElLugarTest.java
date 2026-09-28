@@ -159,6 +159,16 @@ class PedidoServiceEnElLugarTest {
     }
 
     @Test
+    void gpsFalsoSeRegistraAunqueFalteLaFotoOElReceptor() {
+        // La app avisa el intento sin subir foto ni cargar receptor: igual tiene que quedar anotado.
+        FinalizarRequest sinNada = new FinalizarRequest(null, null, null, DESTINO_LAT, DESTINO_LNG, null, 5f, null, null,
+                Instant.now(), null, true);
+        assertThrows(UbicacionSimuladaException.class, () -> service.finalizar("p1", "30111222", sinNada));
+        assertEquals(Boolean.TRUE, pedido.getUbicacionSimulada());
+        assertEquals(1, cadete.getIntentosUbicacionSimulada());
+    }
+
+    @Test
     void gpsImprecisoNoBloqueaYQuedaAnotado() {
         // 250 m del origen con 200 m de error (adentro de un local): radio 150 + error 200.
         Pedido p = retirar(retiro(ORIGEN_LAT + 0.00225, ORIGEN_LNG, 200f, null, null, null, Instant.now()));

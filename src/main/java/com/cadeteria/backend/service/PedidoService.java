@@ -1239,6 +1239,7 @@ public class PedidoService {
         if (!"EN_CURSO".equals(pedido.getEstado().getId())) {
             throw new ConflictException("El pedido no está en curso.");
         }
+        registrarSiEsSimulada(pedido, cadete, marca);
         boolean sinFotoRetiro = fotoUrl == null || fotoUrl.isBlank();
         if (sinFotoRetiro && !archivoPerdido && configuracionService.getBoolean("foto_retiro_obligatoria", false)) {
             throw new BadRequestException("Hace falta sacarle una foto al pedido al retirarlo.");
@@ -1289,6 +1290,7 @@ public class PedidoService {
                 .findFirst()
                 .orElseThrow(() -> ResourceNotFoundException.of("Parada", paradaId));
         if (parada.getEntregadoEn() == null) {
+            registrarSiEsSimulada(pedido, cadete, req);
             if (pedido.getRetiradoEn() == null) {
                 throw new BadRequestException(PRIMERO_RETIRADO);
             }
@@ -1350,6 +1352,9 @@ public class PedidoService {
         }
         if (!"EN_CURSO".equals(pedido.getEstado().getId())) {
             throw new ConflictException("El pedido no está en curso.");
+        }
+        if (exigirComprobante) {
+            registrarSiEsSimulada(pedido, cadete, req);
         }
         if (exigirComprobante && pedido.getRetiradoEn() == null) {
             throw new BadRequestException(PRIMERO_RETIRADO);
@@ -1444,15 +1449,7 @@ public class PedidoService {
                     : (int) Math.round(GeocodingService.distanciaKm(marca.lat(), marca.lng(), puntoLat, puntoLng) * 1000);
             return new ControlLugar(distancia, false, false, hora);
         }
-        if (Boolean.TRUE.equals(marca.ubicacionSimulada())) {
-            pedido.setUbicacionSimulada(true);
-            repo.save(pedido);
-            cadete.setIntentosUbicacionSimulada((cadete.getIntentosUbicacionSimulada() == null ? 0 : cadete.getIntentosUbicacionSimulada()) + 1);
-            cadete.setUltimoIntentoUbicacionSimuladaEn(Instant.now());
-            cadeteRepo.save(cadete);
-            throw new UbicacionSimuladaException(
-                    "Tu celular está usando una ubicación simulada. Desactivá la app de GPS falso para poder marcar.");
-        }
+        registrarSiEsSimulada(pedido, cadete, marca);
         boolean enElLugar = Boolean.TRUE.equals(marca.enElLugar());
         if (puntoLat == null || puntoLng == null) {
             return new ControlLugar(null, false, false, hora); // el pedido no tiene el punto ubicado: nada que medir
@@ -1478,6 +1475,21 @@ public class PedidoService {
         }
         exigirFotoEnElLugar(tieneFoto);
         return new ControlLugar(distancia, true, imprecisa, hora);
+    }
+
+    /**
+     * GPS falso: se controla antes que cualquier otra cosa (foto, receptor, Retirado) para que el
+     * intento quede registrado siempre. La transacción no se deshace (noRollbackFor en los métodos).
+     */
+    private void registrarSiEsSimulada(Pedido pedido, Cadete cadete, MarcaEnLugar marca) {
+        if (marca == null || !Boolean.TRUE.equals(marca.ubicacionSimulada())) return;
+        pedido.setUbicacionSimulada(true);
+        repo.save(pedido);
+        cadete.setIntentosUbicacionSimulada((cadete.getIntentosUbicacionSimulada() == null ? 0 : cadete.getIntentosUbicacionSimulada()) + 1);
+        cadete.setUltimoIntentoUbicacionSimuladaEn(Instant.now());
+        cadeteRepo.save(cadete);
+        throw new UbicacionSimuladaException(
+                "Tu celular está usando una ubicación simulada. Desactivá la app de GPS falso para poder marcar.");
     }
 
     private static void exigirFotoEnElLugar(boolean tieneFoto) {
