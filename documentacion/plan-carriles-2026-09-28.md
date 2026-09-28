@@ -384,6 +384,12 @@ Rama `carril-b-en-el-lugar` en los 3 repos, pusheada (2026-09-28). **Todavía no
 - Métricas: tabla "Marcas en el lugar" por cadete para el rango aplicado.
 - El seguimiento **público** (el del cliente) no muestra nada de esto a propósito.
 
+**Mini mapa del viaje sin el camino dibujado — hecho.** APK `c1944d5` (la tarea anotada abajo en
+"Anotado el 2026-09-28"). `MapaViaje` muestra solo los 3 pines (origen, destino y "Vos") y encuadra
+los que haya (`BoundingBox`, zoom máximo 17). Se sacaron la `Polyline`, la llamada a `ruta(id)` del
+`ViajeViewModel` y el campo `ruta` del estado. El endpoint `/ruta` del backend queda (APK viejas).
+Compila; no se vio en un teléfono.
+
 **B2 APK — hecho.** `20968f2`.
 - `location/ControlEnLugar.kt` (lógica pura, misma regla que el backend) + `ControlEnLugarTest`.
 - Retirado / parada / Entregado: "Buscando tu ubicación…" (espera hasta 30 s un fix; la última
