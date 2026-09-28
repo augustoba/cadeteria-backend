@@ -13,7 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -92,17 +94,95 @@ public class DireccionCacheService {
      */
     @Transactional
     public ResultadoCache buscar(String calleTexto, int numero) {
+        String canonica = canonicaDeAlias(calleTexto);
+        return canonica == null ? null : buscarPorCanonica(canonica, numero);
+    }
+
+    /** Igual que {@link #buscar} pero con la calle canónica ya resuelta (ej. la que salió de {@link #callesQueEmpiezanCon}). */
+    @Transactional
+    public ResultadoCache buscarPorCanonica(String calleCanonica, int numero) {
+        CuadraCoords c = unicaFila(calleCanonica, numero);
+        return c == null ? null : confirmarYMapear(c);
+    }
+
+    /** La fila que respondería {@link #buscar}, sin sumarle una confirmación (para ver de qué fuente es). */
+    public CuadraCoords filaDe(String calleTexto, int numero) {
+        String canonica = canonicaDeAlias(calleTexto);
+        return canonica == null ? null : unicaFila(canonica, numero);
+    }
+
+    /** Si esa forma de escribir la calle ya tiene alias (o sea, la cache la conoce). */
+    public boolean conoceCalle(String calleTexto) {
+        return canonicaDeAlias(calleTexto) != null;
+    }
+
+    private String canonicaDeAlias(String calleTexto) {
         String norm = DireccionUtils.normalizar(calleTexto);
         return aliasRepository.findByVarianteNorm(norm)
                 // "Av. Gral. Roca" -> "avenida general roca" (2026-09-26), igual que canonicalizar().
                 .or(() -> aliasRepository.findByVarianteNorm(DireccionUtils.normalizar(DireccionUtils.expandirAbreviaturas(calleTexto))))
-                .map(alias -> coordsRepository.findByCalleCanonicaAndCuadra(alias.getCalleCanonica(), DireccionUtils.cuadra(numero))
-                        // Las aproximadas (guardadas antes del 2026-09-24) no sirven como respuesta y
-                        // hacían parecer ambigua una cuadra con una sola ubicación buena.
-                        .stream().filter(c -> !c.isApproximate() && !vencida(c)).toList())
-                .filter(candidatos -> candidatos.size() == 1)
-                .map(candidatos -> confirmarYMapear(candidatos.get(0)))
+                .map(DireccionAlias::getCalleCanonica)
                 .orElse(null);
+    }
+
+    private CuadraCoords unicaFila(String calleCanonica, int numero) {
+        List<CuadraCoords> candidatos = coordsRepository.findByCalleCanonicaAndCuadra(calleCanonica, DireccionUtils.cuadra(numero))
+                // Las aproximadas (guardadas antes del 2026-09-24) no sirven como respuesta y
+                // hacían parecer ambigua una cuadra con una sola ubicación buena.
+                .stream().filter(c -> !c.isApproximate() && !vencida(c)).toList();
+        return candidatos.size() == 1 ? candidatos.get(0) : null;
+    }
+
+    /** Mínimo de letras para completar una calle por el comienzo: con "sa" saldrían todas las "San…". */
+    static final int MIN_LETRAS_PREFIJO = 4;
+    private static final int MAX_CALLES_PREFIJO = 5;
+
+    /**
+     * Calles conocidas (canónicas) que empiezan con lo tipeado (3h, 2026-09-28): "colom" -> "colombia".
+     * Vacío si lo tipeado tiene menos de {@link #MIN_LETRAS_PREFIJO} letras. Busca en los alias, así
+     * que también encuentra por un nombre alternativo ("lamad" -> "lamadrid").
+     */
+    public List<String> callesQueEmpiezanCon(String calleTexto) {
+        String norm = DireccionUtils.normalizar(calleTexto);
+        if (norm.replace(" ", "").length() < MIN_LETRAS_PREFIJO) return List.of();
+        Set<String> canonicas = new LinkedHashSet<>();
+        for (DireccionAlias a : aliasRepository.findTop50ByVarianteNormStartingWith(norm)) {
+            canonicas.add(a.getCalleCanonica());
+            if (canonicas.size() >= MAX_CALLES_PREFIJO) break;
+        }
+        return List.copyOf(canonicas);
+    }
+
+    /**
+     * El punto aprendido de una fuente propia más cercano a (lat, lng), a menos de {@code radioM}
+     * (3i/3j, 2026-09-28): qué calle hay en un punto según lo que ya confirmaron los cadetes o las
+     * personas, antes de preguntarle a OpenStreetMap (que en barrios con calles sin nombre engancha
+     * la avenida de al lado). Prefiere lo medido en la calle (GPS del cadete, teléfono) a los pines.
+     */
+    public CuadraCoords masCercanaPropia(double lat, double lng, double radioM) {
+        double dLat = radioM / 111_320d;
+        double dLng = radioM / (111_320d * Math.cos(Math.toRadians(lat)));
+        return coordsRepository.findByLatBetweenAndLngBetween(lat - dLat, lat + dLat, lng - dLng, lng + dLng).stream()
+                .filter(c -> FUENTES_PROPIAS.contains(c.getProveedor()) && !c.isApproximate() && !vencida(c))
+                .filter(c -> distanciaM(lat, lng, c.getLat(), c.getLng()) <= radioM)
+                .min(Comparator.comparingInt((CuadraCoords c) -> MEDIDAS_EN_LA_CALLE.contains(c.getProveedor()) ? 0 : 1)
+                        .thenComparingDouble(c -> distanciaM(lat, lng, c.getLat(), c.getLng())))
+                .orElse(null);
+    }
+
+    /** Pines que puso una persona (panel, /pedir o link de Google Maps): los confirma o corrige el GPS del cadete. */
+    public static boolean esPin(String proveedor) {
+        return PROVEEDOR_MANUAL.equals(proveedor) || PROVEEDOR_MANUAL_SIN_CONFIRMAR.equals(proveedor)
+                || PROVEEDOR_GOOGLE_LINK.equals(proveedor);
+    }
+
+    private static final Set<String> MEDIDAS_EN_LA_CALLE = Set.of(PROVEEDOR_CADETE_GPS, PROVEEDOR_ANDROID_GEOCODER);
+    /** Los buscadores gratuitos no cuentan: son el mismo dato que devolvería el reverse. */
+    private static final Set<String> FUENTES_PROPIAS = Set.of(PROVEEDOR_CADETE_GPS, PROVEEDOR_ANDROID_GEOCODER,
+            PROVEEDOR_MANUAL, PROVEEDOR_MANUAL_SIN_CONFIRMAR, PROVEEDOR_GOOGLE_LINK);
+
+    private static double distanciaM(double lat1, double lng1, double lat2, double lng2) {
+        return GeocodingService.distanciaKm(lat1, lng1, lat2, lng2) * 1000;
     }
 
     private ResultadoCache confirmarYMapear(CuadraCoords c) {
@@ -152,7 +232,9 @@ public class DireccionCacheService {
                         // (2026-09-26: perú 3700 y paraguay 3800 quedaron en el mismo punto).
                         promediar(existente, lat, lng);
                         if (vence(previo)) existente.setCreadaEn(Instant.now());
-                    } else if (vence(previo) || confianza(proveedor) > confianza(previo)) {
+                    } else if (vence(previo) || confianza(proveedor) > confianza(previo)
+                            // Otro pin sin confirmar en la misma cuadra: el último es el corregido.
+                            || (PROVEEDOR_MANUAL_SIN_CONFIRMAR.equals(proveedor) && proveedor.equals(previo))) {
                         // Lo de Google se pisa: con una fuente propia deja de vencer, y con otra
                         // consulta a Google es un dato recién obtenido (vuelve a contar desde hoy).
                         // Y una fuente más confiable pisa a una menos confiable (2026-09-26): el GPS
@@ -220,15 +302,20 @@ public class DireccionCacheService {
     }
 
     /**
-     * Qué fuente pisa a cuál en una misma cuadra (2026-09-26): pin puesto a mano por una persona
-     * &gt; GPS del cadete en la puerta y link de Google Maps &gt; buscadores gratuitos &gt; Google API
-     * (que además vence). A igual confianza gana la primera y solo se suma una confirmación.
+     * Qué fuente pisa a cuál en una misma cuadra: GPS del cadete en la puerta &gt; pin a mano
+     * confirmado por el mapa y link de Google Maps &gt; pin a mano sin confirmar &gt; buscadores
+     * gratuitos &gt; Google API (que además vence). A igual confianza gana la primera y solo se suma
+     * una confirmación. 2026-09-28 (3j): el cadete pasó arriba del pin — antes un pin arrastrado por
+     * error a 40 m pisaba el punto que el cadete había confirmado parado en la puerta.
      */
     static int confianza(String proveedor) {
         if (proveedor == null) return 1;
         return switch (proveedor) {
-            case PROVEEDOR_MANUAL -> 4;
-            case PROVEEDOR_CADETE_GPS, PROVEEDOR_GOOGLE_LINK -> 3;
+            case PROVEEDOR_CADETE_GPS -> 4;
+            case PROVEEDOR_MANUAL, PROVEEDOR_GOOGLE_LINK -> 3;
+            // Una persona lo vio en el mapa: mejor que lo que interpola un buscador, pero no se
+            // promedia con él (ver guardar) y lo pisa un cadete o un pin confirmado.
+            case PROVEEDOR_MANUAL_SIN_CONFIRMAR -> 2;
             case GeocodingProxyService.PROVEEDOR_GOOGLE -> 0;
             // Mismo nivel que un buscador gratuito: viene de un punto en movimiento.
             case PROVEEDOR_ANDROID_GEOCODER -> 1;

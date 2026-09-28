@@ -162,10 +162,50 @@ no encuentra nada y los buscadores de afuera tampoco.
 A1 → A2 (backend 1-5) → A2 (panel 6-8) → A3.
 
 ### Avance (carril A)
-_(anotar acá qué se hizo, commits y qué se probó)_
+**Hecho el 2026-09-28** (rama `carril-a-direcciones`: backend `ad7fc3c`, panel `b3a638c`). A1, A2 y A3
+completos, salvo lo anotado como "queda".
+
+- **A1**: el endpoint público `/reverse` ahora llama a `reverseParaConsulta`, que **no alimenta la
+  cache**. `reverse()` (mapeo de calles de los cadetes, aprendizaje de pines) sigue igual.
+- **A2 backend**:
+  - Confianza nueva: `cadete_gps` 4 > `manual` / `google_link` 3 > `manual_sin_confirmar` 2 >
+    buscadores y `android_geocoder` 1 > `google` 0. Un pin ya no pisa lo que confirmó un cadete.
+  - `manual_sin_confirmar` no se promedia con los buscadores; otro pin sin confirmar en la misma
+    cuadra reemplaza al anterior (el último es el corregido).
+  - Pin del operador con **otra** calle en el mapa → `manual_sin_confirmar` (antes no se aprendía).
+  - Pin del cliente (`SolicitudPedidoService` → `aprenderPinDeCliente`) → **siempre** sin confirmar.
+  - `aprenderDeCadete` (firma sin cambios): si la dirección ya tiene un pin, el GPS del cadete lo
+    confirma o corrige **en la misma fila** (misma calle y localidad, así no queda ambigua). Si ni el
+    mapa ni el teléfono confirman la calle, lo corrige solo si marcó a **≤ 150 m** del pin (el radio
+    de "en el lugar"); más lejos no toca nada. Diferencia con lo escrito arriba: no hace falta el
+    corte de 50 m — cerca o lejos (hasta 150 m), gana el punto del cadete.
+  - `android_geocoder` quedó en 1 (vence a los 30 días: si pisara un pin, el pin se perdería al
+    vencer). Lo que corrige un pin es el GPS del cadete al marcar.
+- **A2.6 / 3i(2)**: `reverseParaConsulta` contesta primero con el **punto propio más cercano**
+  (≤ 30 m; cadete, teléfono o pin; prefiere lo medido en la calle), como "Colombia al 4600" con
+  `proveedor: "cache"`. Esto arregla también la "Ubicación aproximada" de la cola de espera sin
+  tocar `cadetes-libres`.
+- **A2.7-8 panel** (`address-picker`): si la calle distinta la dice la base propia, aviso ámbar
+  como antes; si la dice OpenStreetMap, texto gris que solo informa ("Si el pin está en la puerta,
+  dejalo así"). Nunca bloqueó ni bloquea.
+- **A3**: sin alias exacto, calles conocidas que **empiezan** con lo tipeado (≥ 4 letras, hasta 5).
+  Una sola → completa el nombre (sale de la cache, o se lo corrige a los buscadores de afuera); varias
+  → devuelve las que tienen esa cuadra aprendida (si ninguna, busca afuera como siempre). Queda: la
+  tolerancia a errores de tipeo.
+- **3h menor** (`CadeteController`): ya estaba hecho (solo registra la calle si `aprenderDelTelefono` guardó).
+
+Probado: 227 tests del backend (26 nuevos en `GeocodingProxyServicePinYBuscadorTest` y
+`DireccionCacheServicePinTest`; se actualizó `unBuscadorNoPisaUnPinPuestoAMano…` a la regla nueva),
+panel compilado, y el backend levantado contra `cadeteria_prueba_claude` con una copia de las 270
+direcciones aprendidas: el reverse en Colombia 4600 da "Colombia al 4600" (antes Camino del Perú),
+"colom 4600" y "colo 4600" dan Colombia 4600 desde la cache, y tres reverse seguidos ya no suben las
+confirmaciones de "camino del peru 1600" (que tenía **257**, infladas de mirar el panel). No probado:
+el cartel en el navegador y el flujo completo pin → pedido → cadete marca (cubierto por los tests).
 
 ### Para despliegue (carril A)
-_(lo que haya que hacer en producción: scripts SQL, claves de configuración, etc.)_
+- Nada obligatorio: sin claves de configuración ni columnas nuevas.
+- Opcional: las `confirmaciones` que ya están infladas por el panel (ej. `camino del peru 1600` = 257)
+  quedan así; no se usan para decidir nada todavía. Si algún día se usan, bajarlas antes.
 
 ### Pedidos al otro carril (A → B)
 _(si necesita algo de un archivo de B)_

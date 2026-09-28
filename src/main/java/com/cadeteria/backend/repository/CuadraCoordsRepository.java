@@ -20,6 +20,9 @@ public interface CuadraCoordsRepository extends JpaRepository<CuadraCoords, Stri
     /** Para el GUARDADO, donde la localidad ya la devolvió el geocoder junto con el resultado. */
     Optional<CuadraCoords> findByCalleCanonicaAndLocalidadAndCuadra(String calleCanonica, String localidad, int cuadra);
 
+    /** Filas dentro de un rectángulo (el punto aprendido más cercano a un pin o a un cadete, 2026-09-28). */
+    List<CuadraCoords> findByLatBetweenAndLngBetween(double latMin, double latMax, double lngMin, double lngMax);
+
     /** Purga de las ubicaciones de Google vencidas (ver DireccionCacheService#borrarVencidas). */
     long deleteByProveedorInAndCreadaEnBefore(Collection<String> proveedores, Instant limite);
 }
