@@ -356,13 +356,36 @@ Rama `carril-b-en-el-lugar` en los 3 repos, pusheada (2026-09-28). **Todavía no
 - `versionCode` 2 / `versionName` 1.1.0. `./gradlew testDebugUnitTest assembleDebug` (JDK 17): OK,
   29 tests. El `app-debug.apk` versionado **no** se commiteó.
 
-**Probado contra la base de desarrollo** (backend de la rama en el 8081): GET/PUT/vista previa del
-aviso, PUT sin `{link}` → 400, finalizar como admin sin motivo → 400 y con motivo → FINALIZADO con
-quién y por qué, métricas "en el lugar" con ese registro. Hibernate agregó las columnas nuevas sin
-problemas. **No probado**: el flujo del cadete contra el backend real (no se sabía la contraseña del
-cadete demo en esa base y no se reseteó; está cubierto por los tests), el flujo en un teléfono (GPS
-real, precisión, app de ubicación simulada, sin señal) y las pantallas del panel en el navegador
-(compilan, no se recorrieron).
+#### Qué se probó (carril B)
+- **Backend, tests automáticos:** `./mvnw test` → 224 OK, 0 fallas (18 nuevos). Son tests unitarios
+  con mocks (sin base de datos): cubren orden obligatorio, radio, "Estoy en el lugar" con y sin foto,
+  GPS falso, GPS impreciso, sin ubicación, hora del toque (válida, futura, anterior a la aceptación),
+  APK vieja, paradas, motivo del admin, editor del aviso y resumen de registros.
+- **Backend contra la base de desarrollo real** (MySQL local, backend de la rama en el puerto 8081,
+  por API con curl): leer el aviso, vista previa con un pedido real (#9100005), guardar sin `{link}`
+  → 400; finalizar como admin sin motivo → 400 y con motivo → FINALIZADO con `finalizadoPorAdmin` y
+  `finalizadoAdminMotivo`; `/api/admin/metricas/en-el-lugar` devolvió ese registro. Hibernate creó
+  las columnas nuevas sin errores.
+- **Panel:** `npx ng build` OK (compila; solo los warnings de siempre de módulos CommonJS).
+- **APK:** `./gradlew testDebugUnitTest assembleDebug` con JDK 17 → BUILD SUCCESSFUL, 29 tests OK
+  (6 nuevos de `ControlEnLugarTest`: cerca, lejos, sin ubicación, simulada, imprecisa, radio, textos).
+
+#### Qué NO se probó (carril B) — pendiente antes de producción
+- **Cadete contra el backend real:** Retirado / parada / Entregado por API no se probaron con la
+  base real (la contraseña del cadete demo de esa base no era `cadete123` y no se reseteó). Solo
+  tests con mocks.
+- **GPS falso guardado de verdad:** que el intento quede grabado aunque se devuelva el 400 depende de
+  `@Transactional(noRollbackFor = UbicacionSimuladaException.class)`. Con mocks no se puede probar
+  la transacción: falta confirmarlo contra MySQL (marcar con `ubicacionSimulada=true` y mirar
+  `pedido.ubicacion_simulada` y `cadete.intentos_ubicacion_simulada`).
+- **Pantallas del panel en el navegador:** no se recorrieron. Falta ver el editor del aviso
+  (Configuración → Integraciones), el modal "Finalizar" con motivo, los carteles rojos del detalle y
+  la tabla, "Marcas en el lugar" en la ficha del cadete y en Métricas.
+- **APK en un teléfono o emulador:** nada. Falta probar: "Buscando tu ubicación…", el cartel
+  "No estás en el lugar" y "Estoy en el lugar" con la cámara, el bloqueo de "Finalizar viaje" sin
+  Retirado, una app de GPS falso real (`isMock`), GPS impreciso adentro de un local, y sin datos
+  (la cola offline con hora del toque, las paradas encoladas y el orden retiro → parada → entrega).
+- **APK vieja contra el backend nuevo:** solo por tests (request sin `tocadoEn` no bloquea).
 
 ### Para despliegue (carril B)
 - Columnas nuevas (Hibernate las crea, todas nullable): en `pedido` `retiro_fuera_zona`,
