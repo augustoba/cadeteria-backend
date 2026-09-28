@@ -34,6 +34,17 @@ public class ConfiguracionService {
         repo.save(c);
     }
 
+    /**
+     * Guarda el valor y deja anotado quién lo cambió y cuándo, en la clave + "_editado"
+     * ("usuario|2026-09-28T17:32:00Z"). Sin historial: solo la última edición (3n, 2026-09-28).
+     */
+    public void setConAutor(String clave, String valor, String autor) {
+        set(clave, valor);
+        set(clave + SUFIJO_EDITADO, (autor == null ? "" : autor) + "|" + java.time.Instant.now());
+    }
+
+    public static final String SUFIJO_EDITADO = "_editado";
+
     @Transactional(readOnly = true)
     public boolean getBoolean(String clave, boolean porDefecto) {
         return repo.findById(clave).map(c -> Boolean.parseBoolean(c.getValor())).orElse(porDefecto);

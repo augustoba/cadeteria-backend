@@ -1523,19 +1523,39 @@ public class PedidoService {
         if (pedido.getClienteTelefono() == null || pedido.getClienteTelefono().isBlank()) {
             throw new BadRequestException("El pedido no tiene teléfono del cliente.");
         }
-        String cadete = pedido.getCadeteAsignado() == null ? "" : pedido.getCadeteAsignado().getNombre();
-        String texto = configuracionService.getString("whatsapp_template_en_camino", WHATSAPP_EN_CAMINO_DEFAULT)
-                .replace("{link}", linkSeguimiento(pedido))
-                .replace("{numero}", String.valueOf(pedido.getNumero()))
-                .replace("{cadete}", cadete)
-                .replace("{marca}", configuracionService.getString("nombre_cadeteria", "Cadetería"))
-                .replace("  ", " ");
+        String texto = armarAvisoEnCamino(pedido,
+                configuracionService.getString(CLAVE_WHATSAPP_EN_CAMINO, WHATSAPP_EN_CAMINO_DEFAULT));
         pedido.setClienteAvisadoEn(Instant.now());
         repo.save(pedido);
         publisher.publicarPedido(PedidoResponse.from(pedido));
         return new com.cadeteria.backend.dto.PedidoDtos.AvisoWhatsappResponse(
                 telefonoParaWhatsapp(pedido.getClienteTelefono()), texto, pedido.getClienteAvisadoEn());
     }
+
+    private String armarAvisoEnCamino(Pedido pedido, String plantilla) {
+        String cadete = pedido.getCadeteAsignado() == null ? "" : pedido.getCadeteAsignado().getNombre();
+        return plantilla
+                .replace("{link}", linkSeguimiento(pedido))
+                .replace("{numero}", String.valueOf(pedido.getNumero()))
+                .replace("{cadete}", cadete)
+                .replace("{marca}", configuracionService.getString("nombre_cadeteria", "Cadetería"))
+                .replace("  ", " ");
+    }
+
+    /**
+     * Vista previa del aviso "en camino" (3n, 2026-09-28): el texto que se está editando en Configuración,
+     * armado con el pedido real más reciente que tenga cadete (en curso o finalizado), no con uno inventado.
+     * Sin pedidos así devuelve null y el panel muestra la plantilla sin reemplazar.
+     */
+    @Transactional(readOnly = true)
+    public com.cadeteria.backend.dto.AvisoEnCaminoDtos.VistaPreviaResponse vistaPreviaAvisoEnCamino(String plantilla) {
+        return repo.findFirstByCadeteAsignadoIsNotNullAndEstadoIdInOrderByCreadoEnDesc(List.of("EN_CURSO", "FINALIZADO"))
+                .map(p -> new com.cadeteria.backend.dto.AvisoEnCaminoDtos.VistaPreviaResponse(
+                        armarAvisoEnCamino(p, plantilla), p.getNumero()))
+                .orElse(null);
+    }
+
+    public static final String CLAVE_WHATSAPP_EN_CAMINO = "whatsapp_template_en_camino";
 
     /** Por WhatsApp no hay límite de caracteres ni problema con las tildes (a diferencia del SMS). */
     public static final String WHATSAPP_EN_CAMINO_DEFAULT =

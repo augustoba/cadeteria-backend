@@ -63,6 +63,9 @@ public interface PedidoRepository extends JpaRepository<Pedido, String> {
     /** Para el ícono de alertas centralizado del panel (ronda 4, punto 18). */
     long countByEstadoIdInAndSmsFallidoTrue(List<String> estadoIds);
 
+    /** Pedido real para la vista previa del aviso "en camino" en Configuración (3n, 2026-09-28). */
+    Optional<Pedido> findFirstByCadeteAsignadoIsNotNullAndEstadoIdInOrderByCreadoEnDesc(List<String> estadoIds);
+
     /** Latido de vida del sistema para el panel de salud (mejora 48) — último pedido creado, sin importar el estado. */
     Optional<Pedido> findFirstByOrderByCreadoEnDesc();
 
