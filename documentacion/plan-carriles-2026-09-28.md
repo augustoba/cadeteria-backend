@@ -389,6 +389,18 @@ navegar a la **próxima parada sin entregar** y recién al final al destino (Goo
 `waypoints` en `https://www.google.com/maps/dir/?api=1&destination=...&waypoints=...`; Waze no
 acepta paradas). Es de la APK: se asigna después del carril B.
 
+### Mini mapa del viaje: sacar el camino dibujado (pedido del usuario, 2026-09-28)
+En la pantalla del viaje de la APK (`ui/viaje/ViajeScreen.kt`, `MapaViaje`, ~línea 895) además de los
+**3 pines** (cadete azul, origen naranja, destino rojo) se dibuja una **línea con el camino**
+(`Polyline`, ~línea 939), que sale de `GET /api/pedidos/me/{id}/ruta` (lo pide
+`ViajeViewModel`, ~línea 85). El usuario quiere **solo los pines, sin el caminito**: el camino lo
+arma Maps/Waze al navegar, y el dibujado puede no coincidir con el que va a hacer el cadete.
+- Sacar la `Polyline` y la llamada a `ruta(id)` del `ViajeViewModel` (y el campo `ruta` del estado
+  si ya no se usa). Así además se ahorra una consulta de ruta por cada vez que se abre el viaje.
+- Que el mapa encuadre los 3 pines (zoom para que se vean todos).
+- **No** borrar el endpoint `/ruta` del backend todavía: las APK viejas lo siguen pidiendo.
+- Es de la APK: **lo hace el carril B** (es chico, meterlo junto con lo demás de `ViajeScreen`).
+
 ---
 
 ## Después (no empezar todavía)
