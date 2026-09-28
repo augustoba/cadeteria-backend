@@ -536,8 +536,49 @@ nuevo, notificación con canal propio, lista "Avisos cerca tuyo".
 
 **Panel**: capa de avisos en el Mapa con íconos por tipo, popup con calle, hora y cadete, en vivo.
 
+### Avance (carril C)
+Rama `carril-c-avisos-calle` en los 3 repos, pusheada (2026-09-28). Salió de la rama del B y después
+se le mergeó `origin/develop` (con A y B ya adentro) sin conflictos. **No está en `develop`.**
+
+**Backend.**
+- Archivos nuevos: `model/AvisoCalle` (tabla `aviso_calle`), `repository/AvisoCalleRepository`,
+  `dto/AvisoCalleDtos`, `service/AvisoCalleService`, `controller/AvisoCalleController`. En
+  `WebSocketPublisher` se sumaron `publicarAvisoCalle` (`/queue/cadete/{id}/calle`) y
+  `publicarAvisoCalleAdmin` (`/topic/admin/avisos-calle`).
+- `POST /api/cadetes/me/avisos-calle` (`tipo`, `lat`, `lng`, `precision`),
+  `GET /api/cadetes/me/avisos-calle?lat=&lng=` y `GET /api/admin/avisos-calle` (como el Mapa: cualquier admin).
+- Tope de 5 por hora por cadete (429 con mensaje claro). Le llega a los cadetes activos, no
+  desconectados, con posición de hace menos de 10 min y a menos de `avisos_calle_radio_m` (1000),
+  menos al que avisó. Vence a los `avisos_calle_duracion_min` (60); vencido queda en la base.
+- Calle: `reverseParaConsulta` (carril A), redondeada a la cuadra ("Av. Mate de Luna 2400"); si falla
+  queda null y se muestra "cerca de tu ubicación". A los cadetes no se les dice quién avisó; al panel sí.
+- Tests: `AvisoCalleServiceTest` (a quién le llega, calle y vencimiento, tope por hora, sin calle,
+  activos cerca). `./mvnw test` con develop mergeado: 254 OK.
+
+**Panel.** `features/mapa/avisos-calle-capa.ts` (nuevo) + 5 líneas en `mapa.component.ts`: un ícono
+por tipo (🚓 🚧 💥 ✊), popup con tipo, calle, hora, "hace X min" y quién avisó. Carga los activos,
+recibe en vivo y se sacan solos al vencer (se repasa cada minuto). `ng build` OK.
+
+**APK.**
+- Inicio: botón "🚨 Avisar algo de la calle" → 4 botones grandes de un toque. Ubicación: la última si
+  es de menos de 2 min y con error ≤ 100 m, si no una nueva (15 s). Con GPS falso no manda. Sin
+  conexión: "No se pudo mandar, no hay conexión" (no se encola). Confirmación "Avisaste: Control en …".
+- Canal en vivo `/calle` (`RealtimeManager.avisosCalle`) y canal de notificación propio
+  "Avisos de la calle" (sonido de notificación y vibración corta, distintos a los viajes), texto de
+  una línea: "🚓 Control · Mate de Luna 2400 · hace 1 min".
+- Lista "Avisos cerca tuyo" en Inicio: se pide al abrir la app y al pasar a Libre, y se suman los que
+  llegan en vivo; los vencidos no se muestran.
+- El botón está solo en Inicio, no en la pantalla del viaje (el plan lo dejaba opcional).
+- Tests: `AvisosCalleTextoTest`. `./gradlew testDebugUnitTest assembleDebug` (JDK 17): 33 OK.
+
+**Qué NO se probó (carril C).** Nada contra el backend corriendo ni en un teléfono: crear un aviso,
+que les llegue a otros cadetes por el WebSocket, la notificación con su sonido, la lista al abrir, la
+capa del Mapa en el navegador en vivo, el 429 del tope. Solo tests con mocks y compilación.
+
 ### Para despliegue (carril C)
 - Tabla nueva `aviso_calle` (la crea Hibernate).
+- Claves opcionales sin pantalla: `avisos_calle_radio_m` (1000), `avisos_calle_duracion_min` (60).
+- La APK con los avisos es la misma `versionCode` 2 del carril B (no se volvió a subir).
 - Explicarle a los cadetes para qué es (y que queda registrado quién avisa) el día que se entregue.
 
 ---
