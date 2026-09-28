@@ -280,8 +280,20 @@ B1 (3n) → B2 backend (1, 2, 4-8, con tests) → B2 panel (motivo del admin, "f
 registros en ficha y Métricas) → B2 APK (1-6).
 
 ### Avance (carril B)
-Rama `carril-b-en-el-lugar` en los 3 repos, pusheada (2026-09-28). Trabajado en worktrees aparte
+Rama `carril-b-en-el-lugar` en los 3 repos, pusheada (2026-09-28). **Todavía no está en `develop`**
+(regla 4: se pasa cuando el usuario lo pida). Trabajado en worktrees aparte
 (`C:\proyectos\cadeteria\carril-b\...`) para no cambiarle la rama a las carpetas de siempre.
+
+**Para el carril A, lo que le importa de B:**
+- No se tocaron archivos de A. Las llamadas a `aprenderDeCadete` de `PedidoCadeteController` siguen
+  igual y no se agregó ninguna nueva.
+- Se tocaron dos archivos sin dueño: `CadeteController.configuracion()` (solo ese método, no
+  `actualizarUbicacion`) y `ConfiguracionDtos.CadeteConfigResponse` (dos campos al final).
+  `PedidoRepository` suma dos consultas nuevas. No deberían chocar con A al mergear.
+- Desde B, el cadete puede marcar lejos del pin con "Estoy en el lugar" (con foto): justo el caso
+  del pin mal ubicado del punto A2.3. `aprenderDeCadete` recibe el GPS igual que siempre.
+- La base de desarrollo ya tiene las columnas nuevas de B (las agregó Hibernate al probar), y el
+  pedido demo 05 quedó finalizado a mano por la prueba (se vuelve a crear al reiniciar).
 
 **B1 (3n) — hecho.** Backend `3a66b81`, panel `1384f66`.
 - Endpoint nuevo `AvisoEnCaminoController` en `/api/admin/configuracion/aviso-en-camino` (queda bajo
@@ -347,8 +359,10 @@ Rama `carril-b-en-el-lugar` en los 3 repos, pusheada (2026-09-28). Trabajado en 
 **Probado contra la base de desarrollo** (backend de la rama en el 8081): GET/PUT/vista previa del
 aviso, PUT sin `{link}` → 400, finalizar como admin sin motivo → 400 y con motivo → FINALIZADO con
 quién y por qué, métricas "en el lugar" con ese registro. Hibernate agregó las columnas nuevas sin
-problemas. **No probado**: el flujo del cadete en un teléfono (GPS real, precisión, app de ubicación
-simulada, sin señal) y las pantallas del panel en el navegador (compilan, no las recorrí).
+problemas. **No probado**: el flujo del cadete contra el backend real (no se sabía la contraseña del
+cadete demo en esa base y no se reseteó; está cubierto por los tests), el flujo en un teléfono (GPS
+real, precisión, app de ubicación simulada, sin señal) y las pantallas del panel en el navegador
+(compilan, no se recorrieron).
 
 ### Para despliegue (carril B)
 - Columnas nuevas (Hibernate las crea, todas nullable): en `pedido` `retiro_fuera_zona`,
