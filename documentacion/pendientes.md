@@ -30,6 +30,9 @@ operador en la oficina (los reclamos se resuelven entre cliente y cadete y se ci
 
 Primero los arreglos de lo que se usa todos los días, después la salida y recién ahí lo nuevo.
 
+**Los puntos 1-5 se hacen en paralelo entre dos IAs**: reparto, archivos de cada una y reglas en
+`plan-carriles-2026-09-28.md` (carril A = 2, 3, 4; carril B = 1, 5).
+
 | # | Qué | Toca | Detalle |
 | --- | --- | --- | --- |
 | 1 | **3n. Editar el aviso "en camino" desde el panel** | panel + back (poco) | Configuración → WhatsApp: texto con botones para `{cadete}` `{numero}` `{link}` `{marca}`, vista previa con un **pedido real reciente**, aviso si falta `{link}`, "Volver al texto original". Lo edita el admin. Guardar quién lo editó y cuándo (una línea, sin historial) |
