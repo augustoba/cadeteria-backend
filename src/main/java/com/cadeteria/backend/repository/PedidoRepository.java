@@ -63,6 +63,22 @@ public interface PedidoRepository extends JpaRepository<Pedido, String> {
     /** Para el ícono de alertas centralizado del panel (ronda 4, punto 18). */
     long countByEstadoIdInAndSmsFallidoTrue(List<String> estadoIds);
 
+    /**
+     * Pedidos con algo que anotar del control "en el lugar" (carril B, 2026-09-28): fuera de zona (retiro,
+     * entrega o alguna parada), GPS falso, GPS impreciso o finalizado por el admin. cadeteId null = todos.
+     */
+    @Query("select p from Pedido p where (:cadeteId is null or p.cadeteAsignado.id = :cadeteId)"
+            + " and p.creadoEn >= :desde and p.creadoEn < :hasta"
+            + " and (p.retiroFueraZona = true or p.entregaFueraZona = true or p.ubicacionSimulada = true"
+            + " or p.ubicacionImprecisa = true or p.finalizadoPorAdmin is not null"
+            + " or exists (select pp.id from PedidoParada pp where pp.pedido = p and pp.fueraZona = true))"
+            + " order by p.creadoEn desc")
+    List<Pedido> conRegistrosEnElLugar(@Param("cadeteId") String cadeteId, @Param("desde") Instant desde,
+                                       @Param("hasta") Instant hasta);
+
+    /** Pedido real para la vista previa del aviso "en camino" en Configuración (3n, 2026-09-28). */
+    Optional<Pedido> findFirstByCadeteAsignadoIsNotNullAndEstadoIdInOrderByCreadoEnDesc(List<String> estadoIds);
+
     /** Latido de vida del sistema para el panel de salud (mejora 48) — último pedido creado, sin importar el estado. */
     Optional<Pedido> findFirstByOrderByCreadoEnDesc();
 

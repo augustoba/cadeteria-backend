@@ -7,6 +7,7 @@ import com.cadeteria.backend.dto.PedidoDtos.ComentarioRequest;
 import com.cadeteria.backend.dto.PedidoDtos.ComentarioResponse;
 import com.cadeteria.backend.dto.PedidoDtos.FinalizarRequest;
 import com.cadeteria.backend.dto.PedidoDtos.NoEntregadoRequest;
+import com.cadeteria.backend.dto.PedidoDtos.ParadaEntregadaRequest;
 import com.cadeteria.backend.dto.PedidoDtos.HistorialResponse;
 import com.cadeteria.backend.dto.PedidoDtos.PedidoResponse;
 import com.cadeteria.backend.dto.PedidoDtos.RecepcionRequest;
@@ -126,7 +127,7 @@ public class PedidoCadeteController {
     public PedidoResponse recepcion(@PathVariable String id, @Valid @RequestBody RecepcionRequest req,
                                      Authentication auth) {
         Pedido p = service.registrarRecepcion(id, auth.getName(), req.fotoUrl(), req.lat(), req.lng(),
-                Boolean.TRUE.equals(req.archivoPerdido()));
+                Boolean.TRUE.equals(req.archivoPerdido()), req);
         // La puerta real del retiro alimenta la cache de direcciones (2026-09-26).
         geocodingProxyService.aprenderDeCadete(p.getOrigenDireccion(), p.getOrigenLat(), p.getOrigenLng(),
                 req.lat(), req.lng(), req.precision(), req.calleDetectada(), req.localidadDetectada());
@@ -149,10 +150,16 @@ public class PedidoCadeteController {
         return PedidoResponse.paraCadete(service.marcarNoEntregado(id, auth.getName(), req == null ? null : req.motivo()));
     }
 
-    /** Marca una parada intermedia como entregada (ronda 3, punto 38: varias entregas en la misma vuelta). */
+    /**
+     * Marca una parada intermedia como entregada (ronda 3, punto 38: varias entregas en la misma vuelta).
+     * Body opcional (carril B, 2026-09-28): la APK nueva manda su posición para el control "en el lugar";
+     * las viejas no mandan nada.
+     */
     @PostMapping("/{id}/paradas/{paradaId}/entregada")
-    public PedidoResponse marcarParadaEntregada(@PathVariable String id, @PathVariable String paradaId, Authentication auth) {
-        return PedidoResponse.paraCadete(service.marcarParadaEntregada(id, auth.getName(), paradaId));
+    public PedidoResponse marcarParadaEntregada(@PathVariable String id, @PathVariable String paradaId,
+                                                @Valid @RequestBody(required = false) ParadaEntregadaRequest req,
+                                                Authentication auth) {
+        return PedidoResponse.paraCadete(service.marcarParadaEntregada(id, auth.getName(), paradaId, req));
     }
 
     /** Nota de texto libre sobre el viaje (ej. "entregado en porteria a Fulano") — se ve en el detalle del panel. */

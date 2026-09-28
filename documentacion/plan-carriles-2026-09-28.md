@@ -321,11 +321,129 @@ B1 (3n) → B2 backend (1, 2, 4-8, con tests) → B2 panel (motivo del admin, "f
 registros en ficha y Métricas) → B2 APK (1-6).
 
 ### Avance (carril B)
-_(anotar acá qué se hizo, commits y qué se probó)_
+Rama `carril-b-en-el-lugar` en los 3 repos, pusheada (2026-09-28). **Todavía no está en `develop`**
+(regla 4: se pasa cuando el usuario lo pida). Trabajado en worktrees aparte
+(`C:\proyectos\cadeteria\carril-b\...`) para no cambiarle la rama a las carpetas de siempre.
+
+**Para el carril A, lo que le importa de B:**
+- No se tocaron archivos de A. Las llamadas a `aprenderDeCadete` de `PedidoCadeteController` siguen
+  igual y no se agregó ninguna nueva.
+- Se tocaron dos archivos sin dueño: `CadeteController.configuracion()` (solo ese método, no
+  `actualizarUbicacion`) y `ConfiguracionDtos.CadeteConfigResponse` (dos campos al final).
+  `PedidoRepository` suma dos consultas nuevas. No deberían chocar con A al mergear.
+- Desde B, el cadete puede marcar lejos del pin con "Estoy en el lugar" (con foto): justo el caso
+  del pin mal ubicado del punto A2.3. `aprenderDeCadete` recibe el GPS igual que siempre.
+- La base de desarrollo ya tiene las columnas nuevas de B (las agregó Hibernate al probar), y el
+  pedido demo 05 quedó finalizado a mano por la prueba (se vuelve a crear al reiniciar).
+
+**B1 (3n) — hecho.** Backend `3a66b81`, panel `1384f66`.
+- Endpoint nuevo `AvisoEnCaminoController` en `/api/admin/configuracion/aviso-en-camino` (queda bajo
+  el permiso `configuracion`): GET (texto actual, original, quién/cuándo), PUT (valida `{link}`;
+  vacío o igual al original = vuelve al del código), POST `/vista-previa` (arma el aviso con el último
+  pedido en curso o finalizado que tenga cadete; 204 si no hay).
+- Quién/cuándo en la clave `whatsapp_template_en_camino_editado` (`usuario|instante`, sin historial),
+  vía `ConfiguracionService.setConAutor`.
+- Panel: Configuración → Integraciones, debajo de las plantillas de SMS
+  (`aviso-en-camino-editor.component.ts`, con su propio botón "Guardar aviso").
+
+**B2 backend — hecho.** `f23fb09`, `311f79d`.
+- Orden: parada y Entregado del cadete exigen Retirado ("Primero marcá Retirado.").
+- Radio `en_lugar_radio_m` (150) contra origen / parada / destino. Lejos → 400 "Estás a 800 m del
+  retiro…". Con `enElLugar=true` y foto → marca y queda `retiro_fuera_zona` / `entrega_fuera_zona` /
+  `pedido_parada.fuera_zona` con la distancia. Sin foto → 400.
+- GPS falso (`ubicacionSimulada=true`): 400 y queda registrado en `pedido.ubicacion_simulada` y en
+  `cadete.intentos_ubicacion_simulada` (+ fecha). Se controla antes que foto/receptor/Retirado y la
+  transacción no se deshace (`UbicacionSimuladaException` + `noRollbackFor`).
+- GPS impreciso (`precision` > `en_lugar_precision_max_m`, 100): no bloquea, suma el error al radio y
+  anota `ubicacion_imprecisa`. (Criterio mío: con 5 km de distancia y 150 m de error igual frena.)
+- Hora del toque `tocadoEn`: se usa para `retiradoEn` / `finalizadoEn` / la parada, salvo que venga
+  más de 2 min en el futuro o antes de la aceptación (retiro) / del retiro (parada y entrega): ahí
+  se usa la hora de llegada (no se rechaza, para no trabar la cola offline).
+- **APK vieja**: se reconoce porque no manda `tocadoEn`. No se la bloquea: solo se anota la distancia
+  a la que marcó. Lo que sí la afecta es el orden (Entregado sin Retirado → 400).
+- Admin: `POST /api/admin/pedidos/{id}/finalizar` ahora recibe `FinalizarAdminRequest`
+  (`receptorNombre`, `fotoUrl`, `motivo` obligatorio). Guarda `finalizado_por_admin` y
+  `finalizado_admin_motivo`; se saltea Retirado y el control del lugar.
+- Parada: `POST .../paradas/{paradaId}/entregada` acepta body opcional (`lat`, `lng`, `precision`,
+  `tocadoEn`, `enElLugar`, `ubicacionSimulada`, `fotoUrl`). Sin body = APK vieja, como antes.
+- Registros: `GET /api/admin/cadetes/{id}/en-el-lugar` (ficha) y `GET /api/admin/metricas/en-el-lugar`
+  (permiso `metricas`), `EnElLugarService`. Salen de los pedidos, salvo el GPS falso (en el cadete).
+- `GET /api/cadetes/me/configuracion` suma `enLugarRadioM` y `enLugarPrecisionMaxM` (la APK controla
+  con los mismos valores). Esto tocó `CadeteController.configuracion()` y `ConfiguracionDtos`
+  (no son de ningún carril; A solo toca `actualizarUbicacion`, no deberían chocar).
+- Tests nuevos: `AvisoEnCaminoControllerTest`, `PedidoServiceEnElLugarTest` (16 casos: los del plan
+  más GPS impreciso, sin ubicación, paradas, horas insensatas), `EnElLugarServiceTest`. Ajustado
+  `PedidoServiceDobleToqueTest` (ahora marca Retirado antes de finalizar). `./mvnw test`: 224 OK.
+
+**B2 panel — hecho.** `93deaae`.
+- Modal "Finalizar" del dashboard: motivo obligatorio (el botón no se habilita sin motivo).
+- Detalle del pedido: "⚠️ Fuera de zona" en rojo (retiro, paradas con foto, entrega, con distancia),
+  "🚫 GPS falso", "📡 ubicación imprecisa" y "🛠 Finalizado por el admin (usuario): motivo".
+- Tabla del dashboard: "⚠️ fuera de zona" y "🛠 por el admin" junto a las horas.
+- Ficha del cadete → Desempeño: "Marcas en el lugar" (totales + últimos 20).
+- Métricas: tabla "Marcas en el lugar" por cadete para el rango aplicado.
+- El seguimiento **público** (el del cliente) no muestra nada de esto a propósito.
+
+**B2 APK — hecho.** `20968f2`.
+- `location/ControlEnLugar.kt` (lógica pura, misma regla que el backend) + `ControlEnLugarTest`.
+- Retirado / parada / Entregado: "Buscando tu ubicación…" (espera hasta 30 s un fix; la última
+  conocida solo si es de hace menos de 2 min), control de distancia, tarjeta "📍 No estás en el lugar"
+  con "Estoy en el lugar (sacar foto)" o "Volver". GPS falso (`isMock` / `isFromMockProvider`): no
+  marca y avisa al backend para que quede registrado.
+- "Finalizar viaje" deshabilitado hasta marcar Retirado ("Primero marcá Retirado.").
+- Cola sin señal: `RetiradoPendiente` / `FinalizarPendiente` guardan `tocadoEn`, `precision`,
+  `enElLugar`; nueva `ParadaPendiente`. Se reintenta en orden retiros → paradas → entregas.
+- Historial: "🛠 Finalizado por el admin: motivo" y "📍 Marcado con Estoy en el lugar".
+- `versionCode` 2 / `versionName` 1.1.0. `./gradlew testDebugUnitTest assembleDebug` (JDK 17): OK,
+  29 tests. El `app-debug.apk` versionado **no** se commiteó.
+
+#### Qué se probó (carril B)
+- **Backend, tests automáticos:** `./mvnw test` → 224 OK, 0 fallas (18 nuevos). Son tests unitarios
+  con mocks (sin base de datos): cubren orden obligatorio, radio, "Estoy en el lugar" con y sin foto,
+  GPS falso, GPS impreciso, sin ubicación, hora del toque (válida, futura, anterior a la aceptación),
+  APK vieja, paradas, motivo del admin, editor del aviso y resumen de registros.
+- **Backend contra la base de desarrollo real** (MySQL local, backend de la rama en el puerto 8081,
+  por API con curl): leer el aviso, vista previa con un pedido real (#9100005), guardar sin `{link}`
+  → 400; finalizar como admin sin motivo → 400 y con motivo → FINALIZADO con `finalizadoPorAdmin` y
+  `finalizadoAdminMotivo`; `/api/admin/metricas/en-el-lugar` devolvió ese registro. Hibernate creó
+  las columnas nuevas sin errores.
+- **Panel:** `npx ng build` OK (compila; solo los warnings de siempre de módulos CommonJS).
+- **APK:** `./gradlew testDebugUnitTest assembleDebug` con JDK 17 → BUILD SUCCESSFUL, 29 tests OK
+  (6 nuevos de `ControlEnLugarTest`: cerca, lejos, sin ubicación, simulada, imprecisa, radio, textos).
+
+#### Qué NO se probó (carril B) — pendiente antes de producción
+- **Cadete contra el backend real:** Retirado / parada / Entregado por API no se probaron con la
+  base real (la contraseña del cadete demo de esa base no era `cadete123` y no se reseteó). Solo
+  tests con mocks.
+- **GPS falso guardado de verdad:** que el intento quede grabado aunque se devuelva el 400 depende de
+  `@Transactional(noRollbackFor = UbicacionSimuladaException.class)`. Con mocks no se puede probar
+  la transacción: falta confirmarlo contra MySQL (marcar con `ubicacionSimulada=true` y mirar
+  `pedido.ubicacion_simulada` y `cadete.intentos_ubicacion_simulada`).
+- **Pantallas del panel en el navegador:** no se recorrieron. Falta ver el editor del aviso
+  (Configuración → Integraciones), el modal "Finalizar" con motivo, los carteles rojos del detalle y
+  la tabla, "Marcas en el lugar" en la ficha del cadete y en Métricas.
+- **APK en un teléfono o emulador:** nada. Falta probar: "Buscando tu ubicación…", el cartel
+  "No estás en el lugar" y "Estoy en el lugar" con la cámara, el bloqueo de "Finalizar viaje" sin
+  Retirado, una app de GPS falso real (`isMock`), GPS impreciso adentro de un local, y sin datos
+  (la cola offline con hora del toque, las paradas encoladas y el orden retiro → parada → entrega).
+- **APK vieja contra el backend nuevo:** solo por tests (request sin `tocadoEn` no bloquea).
 
 ### Para despliegue (carril B)
+- Columnas nuevas (Hibernate las crea, todas nullable): en `pedido` `retiro_fuera_zona`,
+  `retiro_distanciam`, `entrega_fuera_zona`, `entrega_distanciam`, `ubicacion_simulada`,
+  `ubicacion_imprecisa`, `finalizado_por_admin`, `finalizado_admin_motivo`; en `pedido_parada`
+  `entrega_lat`, `entrega_lng`, `fuera_zona`, `distanciam`, `foto_url`; en `cadete`
+  `intentos_ubicacion_simulada`, `ultimo_intento_ubicacion_simulada_en`. Sin script SQL.
+- Claves de configuración nuevas (con default en el código, sin pantalla): `en_lugar_radio_m` (150),
+  `en_lugar_precision_max_m` (100). Se guarda sola `whatsapp_template_en_camino_editado`.
+- Backend y panel van juntos: el panel viejo manda el finalizar del admin sin `motivo` (400).
+- APK nueva = `versionCode` 2. Después de repartirla a todos, subir `version_minima_app` a 2 para que
+  las viejas (que no controlan distancia) dejen de poder entrar.
 
 ### Pedidos al otro carril (B → A)
+- Ninguno obligatorio. No se tocaron las llamadas a `aprenderDeCadete` y no se agregó ninguna nueva
+  para las paradas. Si A quiere aprender también de las paradas, ahora llega su GPS
+  (`pedido_parada.entrega_lat/lng`, con `fuera_zona` si el cadete usó "Estoy en el lugar").
 
 ---
 

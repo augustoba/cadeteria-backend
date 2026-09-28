@@ -68,9 +68,12 @@ public final class PedidoDtos {
             @NotNull(message = "Falta ubicar la parada en el mapa.") @DecimalMin("-90") @DecimalMax("90") Double lat,
             @NotNull(message = "Falta ubicar la parada en el mapa.") @DecimalMin("-180") @DecimalMax("180") Double lng) {}
 
-    public record ParadaResponse(String id, int orden, String direccion, Double lat, Double lng, Instant entregadoEn) {
+    /** fueraZona/distanciaM/fotoUrl: control "en el lugar" al marcarla (carril B, 2026-09-28). */
+    public record ParadaResponse(String id, int orden, String direccion, Double lat, Double lng, Instant entregadoEn,
+                                 Boolean fueraZona, Integer distanciaM, String fotoUrl) {
         public static ParadaResponse from(com.cadeteria.backend.model.PedidoParada p) {
-            return new ParadaResponse(p.getId(), p.getOrden(), p.getDireccion(), p.getLat(), p.getLng(), p.getEntregadoEn());
+            return new ParadaResponse(p.getId(), p.getOrden(), p.getDireccion(), p.getLat(), p.getLng(), p.getEntregadoEn(),
+                    p.getFueraZona(), p.getDistanciaM(), p.getFotoUrl());
         }
     }
 
@@ -119,7 +122,12 @@ public final class PedidoDtos {
             /** DEMORA_RETIRO | DEMORA_ENTREGA | PROBLEMA_ENTREGA y ABIERTO | VISTO | CONTACTO | CERRADO (2026-09-26). */
             String reclamoTipo, String reclamoEstado,
             /** Cuándo el admin tocó "Avisar al cliente" por WhatsApp Web (2026-09-26) — null si no avisó. */
-            Instant clienteAvisadoEn
+            Instant clienteAvisadoEn,
+            /** Control "en el lugar" (carril B, 2026-09-28) — null en pedidos anteriores o marcados con una APK vieja. */
+            Boolean retiroFueraZona, Integer retiroDistanciaM, Boolean entregaFueraZona, Integer entregaDistanciaM,
+            Boolean ubicacionSimulada, Boolean ubicacionImprecisa,
+            /** Finalizado a mano desde el panel: quién y por qué (null si lo cerró el cadete). */
+            String finalizadoPorAdmin, String finalizadoAdminMotivo
     ) {
         public static PedidoResponse from(Pedido p) {
             return from(p, true, false);
@@ -183,7 +191,10 @@ public final class PedidoDtos {
                     p.getAsignadoPorUsername(), p.getCanceladoPorUsername(), p.isPrioritario(),
                     p.getOrigenCarga(), p.getCreadoPorUsername(),
                     p.getReclamoDetalle(), p.getUltimoReclamoEn(),
-                    p.getReclamoTipo(), p.getReclamoEstado(), p.getClienteAvisadoEn());
+                    p.getReclamoTipo(), p.getReclamoEstado(), p.getClienteAvisadoEn(),
+                    p.getRetiroFueraZona(), p.getRetiroDistanciaM(), p.getEntregaFueraZona(), p.getEntregaDistanciaM(),
+                    p.getUbicacionSimulada(), p.getUbicacionImprecisa(),
+                    p.getFinalizadoPorAdmin(), p.getFinalizadoAdminMotivo());
         }
     }
 
@@ -247,7 +258,48 @@ public final class PedidoDtos {
                                    @PositiveOrZero Float precision,
                                    /** Calle/localidad que resolvió el teléfono en ese punto (Geocoder de Android), opcionales. */
                                    @Size(max = 120) String calleDetectada,
-                                   @Size(max = 120) String localidadDetectada) {}
+                                   @Size(max = 120) String localidadDetectada,
+                                   /** Control "en el lugar" (carril B, 2026-09-28): ver {@link MarcaEnLugar}. */
+                                   Instant tocadoEn, Boolean enElLugar, Boolean ubicacionSimulada)
+            implements MarcaEnLugar {
+
+        /** Forma anterior (sin el control "en el lugar"), la que usan los tests viejos. */
+        public RecepcionRequest(String fotoUrl, Double lat, Double lng, Boolean archivoPerdido, Float precision,
+                                String calleDetectada, String localidadDetectada) {
+            this(fotoUrl, lat, lng, archivoPerdido, precision, calleDetectada, localidadDetectada, null, null, null);
+        }
+    }
+
+    /**
+     * Lo que manda la APK al marcar Retirado, una parada o Entregado (carril B, 2026-09-28). Todo
+     * opcional: una APK vieja no lo manda y el backend no se rompe.
+     * - tocadoEn: cuándo tocó el botón (la cola sin señal lo manda horas después). Si viene en el
+     *   futuro o antes de que el viaje empiece, se usa la hora de llegada.
+     * - enElLugar: tocó "Estoy en el lugar" porque el control de distancia no lo dejaba (con foto).
+     * - ubicacionSimulada: la ubicación venía de una app de GPS falso (no lo deja y queda registrado).
+     */
+    public interface MarcaEnLugar {
+        Double lat();
+        Double lng();
+        Float precision();
+        Instant tocadoEn();
+        Boolean enElLugar();
+        Boolean ubicacionSimulada();
+    }
+
+    /** Parada intermedia entregada (carril B, 2026-09-28): body opcional para no romper APKs viejas. */
+    public record ParadaEntregadaRequest(
+            @DecimalMin("-90") @DecimalMax("90") Double lat, @DecimalMin("-180") @DecimalMax("180") Double lng,
+            @PositiveOrZero Float precision, Instant tocadoEn, Boolean enElLugar, Boolean ubicacionSimulada,
+            @Size(max = 500) String fotoUrl) implements MarcaEnLugar {}
+
+    /** "Finalizar" desde el panel: el motivo es obligatorio porque se saltea el control del lugar. */
+    public record FinalizarAdminRequest(
+            @Size(max = 100, message = "El nombre de quien recibe puede tener hasta 100 letras.")
+            @Pattern(regexp = Validaciones.VACIO_O + Validaciones.NOMBRE_PERSONA, message = Validaciones.MSJ_RECEPTOR) String receptorNombre,
+            @Size(max = 500) String fotoUrl,
+            @NotBlank(message = "Contá por qué lo finalizás a mano.")
+            @Size(max = 500, message = "El motivo puede tener hasta 500 caracteres.") String motivo) {}
 
     /** Botón "Rechazar": motivo opcional, texto libre (spec Métricas: detectar patrones de rechazo). */
     public record RechazarRequest(@Size(max = 300, message = "El motivo puede tener hasta 300 caracteres.") String motivo) {}
@@ -271,7 +323,17 @@ public final class PedidoDtos {
             @PositiveOrZero Float precision,
             /** Calle/localidad que resolvió el teléfono en ese punto (Geocoder de Android), opcionales. */
             @Size(max = 120) String calleDetectada,
-            @Size(max = 120) String localidadDetectada) {
+            @Size(max = 120) String localidadDetectada,
+            /** Control "en el lugar" (carril B, 2026-09-28): ver {@link MarcaEnLugar}. */
+            Instant tocadoEn, Boolean enElLugar, Boolean ubicacionSimulada) implements MarcaEnLugar {
+
+        /** Forma anterior (sin el control "en el lugar"), la que usan los tests viejos. */
+        public FinalizarRequest(String receptorNombre, String fotoUrl, String firmaUrl, Double lat, Double lng,
+                                Boolean archivoPerdido, Float precision, String calleDetectada, String localidadDetectada) {
+            this(receptorNombre, fotoUrl, firmaUrl, lat, lng, archivoPerdido, precision, calleDetectada, localidadDetectada,
+                    null, null, null);
+        }
+
         public boolean seperdioElArchivo() {
             return Boolean.TRUE.equals(archivoPerdido);
         }

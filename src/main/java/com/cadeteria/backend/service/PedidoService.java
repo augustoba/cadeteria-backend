@@ -4,8 +4,12 @@ import com.cadeteria.backend.common.GoneException;
 import com.cadeteria.backend.common.ConflictException;
 import com.cadeteria.backend.common.BadRequestException;
 import com.cadeteria.backend.common.ResourceNotFoundException;
+import com.cadeteria.backend.common.UbicacionSimuladaException;
 import com.cadeteria.backend.dto.PedidoDtos.DireccionFrecuenteResponse;
+import com.cadeteria.backend.dto.PedidoDtos.FinalizarAdminRequest;
 import com.cadeteria.backend.dto.PedidoDtos.FinalizarRequest;
+import com.cadeteria.backend.dto.PedidoDtos.MarcaEnLugar;
+import com.cadeteria.backend.dto.PedidoDtos.ParadaEntregadaRequest;
 import com.cadeteria.backend.dto.PedidoDtos.PedidoRequest;
 import com.cadeteria.backend.dto.PedidoDtos.PedidoResponse;
 import com.cadeteria.backend.model.Cadete;
@@ -1214,6 +1218,16 @@ public class PedidoService {
      */
     public Pedido registrarRecepcion(String pedidoId, String cadeteUsername, String fotoUrl, Double lat, Double lng,
                                      boolean archivoPerdido) {
+        return registrarRecepcion(pedidoId, cadeteUsername, fotoUrl, lat, lng, archivoPerdido, null);
+    }
+
+    /**
+     * Con el control "en el lugar" (carril B, 2026-09-28): a más del radio del origen no deja marcar,
+     * salvo "Estoy en el lugar" con foto (queda como fuera de zona). marca null = APK vieja, solo registra.
+     */
+    @Transactional(noRollbackFor = UbicacionSimuladaException.class)
+    public Pedido registrarRecepcion(String pedidoId, String cadeteUsername, String fotoUrl, Double lat, Double lng,
+                                     boolean archivoPerdido, MarcaEnLugar marca) {
         Pedido pedido = getParaActualizar(pedidoId);
         Cadete cadete = cadeteDelUsername(cadeteUsername);
         validarPertenencia(pedido, cadete);
@@ -1225,14 +1239,20 @@ public class PedidoService {
         if (!"EN_CURSO".equals(pedido.getEstado().getId())) {
             throw new ConflictException("El pedido no está en curso.");
         }
+        registrarSiEsSimulada(pedido, cadete, marca);
         boolean sinFotoRetiro = fotoUrl == null || fotoUrl.isBlank();
         if (sinFotoRetiro && !archivoPerdido && configuracionService.getBoolean("foto_retiro_obligatoria", false)) {
             throw new BadRequestException("Hace falta sacarle una foto al pedido al retirarlo.");
         }
+        ControlLugar control = controlarEnLugar(pedido, cadete, marca, pedido.getOrigenLat(), pedido.getOrigenLng(),
+                "retiro", !sinFotoRetiro || archivoPerdido, pedido.getAceptadoEn());
         if (sinFotoRetiro && archivoPerdido) {
             dejarComentarioArchivoPerdido(pedido, cadete, "retiro");
         }
-        pedido.setRetiradoEn(Instant.now());
+        pedido.setRetiradoEn(control.hora());
+        pedido.setRetiroDistanciaM(control.distanciaM());
+        if (control.fueraZona()) pedido.setRetiroFueraZona(true);
+        if (control.imprecisa()) pedido.setUbicacionImprecisa(true);
         // "Demora en el retiro" queda resuelta cuando retira (2026-09-26).
         if ("DEMORA_RETIRO".equals(pedido.getReclamoTipo()) && pedido.isReclamoAbierto()) {
             pedido.setReclamoEstado("CERRADO");
@@ -1253,6 +1273,12 @@ public class PedidoService {
      * pedido entero, y exige que todas las paradas ya estén entregadas.
      */
     public Pedido marcarParadaEntregada(String pedidoId, String cadeteUsername, String paradaId) {
+        return marcarParadaEntregada(pedidoId, cadeteUsername, paradaId, null);
+    }
+
+    /** Con el control "en el lugar" contra la parada (carril B, 2026-09-28); req null = APK vieja. */
+    @Transactional(noRollbackFor = UbicacionSimuladaException.class)
+    public Pedido marcarParadaEntregada(String pedidoId, String cadeteUsername, String paradaId, ParadaEntregadaRequest req) {
         Pedido pedido = getParaActualizar(pedidoId);
         Cadete cadete = cadeteDelUsername(cadeteUsername);
         validarPertenencia(pedido, cadete);
@@ -1264,41 +1290,74 @@ public class PedidoService {
                 .findFirst()
                 .orElseThrow(() -> ResourceNotFoundException.of("Parada", paradaId));
         if (parada.getEntregadoEn() == null) {
-            parada.setEntregadoEn(Instant.now());
+            registrarSiEsSimulada(pedido, cadete, req);
+            if (pedido.getRetiradoEn() == null) {
+                throw new BadRequestException(PRIMERO_RETIRADO);
+            }
+            boolean conFoto = req != null && req.fotoUrl() != null && !req.fotoUrl().isBlank();
+            ControlLugar control = controlarEnLugar(pedido, cadete, req, parada.getLat(), parada.getLng(),
+                    "punto de la parada", conFoto, pedido.getRetiradoEn());
+            parada.setEntregadoEn(control.hora());
+            if (req != null) {
+                parada.setEntregaLat(req.lat());
+                parada.setEntregaLng(req.lng());
+                if (conFoto) parada.setFotoUrl(req.fotoUrl().trim());
+            }
+            parada.setDistanciaM(control.distanciaM());
+            if (control.fueraZona()) parada.setFueraZona(true);
+            if (control.imprecisa()) {
+                pedido.setUbicacionImprecisa(true);
+                repo.save(pedido);
+            }
             pedidoParadaRepo.save(parada);
         }
         publisher.publicarPedido(PedidoResponse.from(pedido));
         return pedido;
     }
 
+    @Transactional(noRollbackFor = UbicacionSimuladaException.class)
     public Pedido finalizar(String pedidoId, String cadeteUsername, FinalizarRequest req) {
         Pedido pedido = getParaActualizar(pedidoId);
         Cadete cadete = cadeteDelUsername(cadeteUsername);
         validarPertenencia(pedido, cadete);
-        return finalizarInterno(pedido, cadete, req, true);
+        return finalizarInterno(pedido, cadete, req, true, null, null);
     }
 
     /**
      * Cierre manual desde el panel (boton "Finalizar" del dashboard): para cuando el cadete
      * no puede finalizar el viaje el mismo por quedarse sin datos/internet. A diferencia del
-     * cierre normal, no exige nombre de receptor ni foto — es una excepcion que confirma el admin.
+     * cierre normal, no exige nombre de receptor ni foto, ni Retirado, ni estar en el lugar — pero
+     * sí el motivo (carril B, 2026-09-28): queda quién, cuándo y por qué.
      */
-    public Pedido finalizarComoAdmin(String pedidoId, FinalizarRequest req) {
+    public Pedido finalizarComoAdmin(String pedidoId, FinalizarAdminRequest req, String adminUsername) {
+        if (req.motivo() == null || req.motivo().isBlank()) {
+            throw new BadRequestException("Contá por qué lo finalizás a mano.");
+        }
         Pedido pedido = getParaActualizar(pedidoId);
         Cadete cadete = pedido.getCadeteAsignado();
         if (cadete == null) {
             throw new ConflictException("El pedido no tiene cadete asignado.");
         }
-        return finalizarInterno(pedido, cadete, req, false);
+        FinalizarRequest cierre = new FinalizarRequest(req.receptorNombre(), req.fotoUrl(), null, null, null,
+                null, null, null, null);
+        return finalizarInterno(pedido, cadete, cierre, false,
+                adminUsername == null || adminUsername.isBlank() ? "admin" : adminUsername, req.motivo().trim());
     }
 
-    private Pedido finalizarInterno(Pedido pedido, Cadete cadete, FinalizarRequest req, boolean exigirComprobante) {
+    private Pedido finalizarInterno(Pedido pedido, Cadete cadete, FinalizarRequest req, boolean exigirComprobante,
+                                    String adminUsername, String motivoAdmin) {
         // Ya finalizado (doble toque o reintento de la cola sin conexión): OK sin repetir SMS ni push.
         if ("FINALIZADO".equals(pedido.getEstado().getId())) {
             return pedido;
         }
         if (!"EN_CURSO".equals(pedido.getEstado().getId())) {
             throw new ConflictException("El pedido no está en curso.");
+        }
+        if (exigirComprobante) {
+            registrarSiEsSimulada(pedido, cadete, req);
+        }
+        if (exigirComprobante && pedido.getRetiradoEn() == null) {
+            throw new BadRequestException(PRIMERO_RETIRADO);
         }
         long paradasSinEntregar = pedido.getParadas().stream().filter(p -> p.getEntregadoEn() == null).count();
         if (exigirComprobante && paradasSinEntregar > 0) {
@@ -1319,6 +1378,11 @@ public class PedidoService {
         if (exigirComprobante && sinFirma && !perdido && configuracionService.getBoolean("firma_receptor_obligatoria", false)) {
             throw new BadRequestException("Hace falta la firma digital de quien recibió.");
         }
+        // El admin se saltea el control del lugar (para eso deja el motivo).
+        ControlLugar control = exigirComprobante
+                ? controlarEnLugar(pedido, cadete, req, pedido.getDestinoLat(), pedido.getDestinoLng(),
+                        "destino", !sinFoto || perdido, pedido.getRetiradoEn())
+                : new ControlLugar(null, false, false, Instant.now());
         if (exigirComprobante && perdido && (sinFoto || sinFirma)) {
             dejarComentarioArchivoPerdido(pedido, cadete, "entrega");
         }
@@ -1327,8 +1391,15 @@ public class PedidoService {
         pedido.setFirmaReceptorUrl(sinFirma ? null : req.firmaUrl().trim());
         pedido.setEntregaLat(req.lat());
         pedido.setEntregaLng(req.lng());
+        pedido.setEntregaDistanciaM(control.distanciaM());
+        if (control.fueraZona()) pedido.setEntregaFueraZona(true);
+        if (control.imprecisa()) pedido.setUbicacionImprecisa(true);
+        if (adminUsername != null) {
+            pedido.setFinalizadoPorAdmin(adminUsername);
+            pedido.setFinalizadoAdminMotivo(motivoAdmin);
+        }
         pedido.setEstado(estado("FINALIZADO"));
-        pedido.setFinalizadoEn(Instant.now());
+        pedido.setFinalizadoEn(control.hora());
         // Las demoras (retiro o entrega) quedan resueltas al entregar (2026-09-26).
         if (pedido.getReclamoTipo() != null && pedido.getReclamoTipo().startsWith("DEMORA_") && pedido.isReclamoAbierto()) {
             pedido.setReclamoEstado("CERRADO");
@@ -1342,6 +1413,104 @@ public class PedidoService {
                 SMS_FINALIZADO_DEFAULT, pedido));
         webPushService.enviarA(pedido, "Pedido entregado", "Tu pedido fue entregado. Descargá el comprobante y calificanos.");
         return pedido;
+    }
+
+    static final String PRIMERO_RETIRADO = "Primero marcá Retirado.";
+    /** Radio alrededor del punto del pedido dentro del cual se puede marcar (sin pantalla para editarlo). */
+    static final String CLAVE_RADIO_M = "en_lugar_radio_m";
+    /** Error del GPS a partir del cual la ubicación se considera imprecisa (no bloquea, queda anotado). */
+    static final String CLAVE_PRECISION_MAX_M = "en_lugar_precision_max_m";
+    /** Tolerancia para relojes de celular adelantados al mandar la hora del toque. */
+    private static final Duration TOLERANCIA_RELOJ = Duration.ofMinutes(2);
+
+    /** Resultado del control "en el lugar": distanciaM null = no se pudo medir (sin GPS o sin punto). */
+    record ControlLugar(Integer distanciaM, boolean fueraZona, boolean imprecisa, Instant hora) {}
+
+    /**
+     * Retirado / parada / Entregado solo en el lugar (carril B, 2026-09-28). La APK ya controla antes
+     * de mandar; esto vuelve a controlar con la posición recibida:
+     * - GPS falso: no deja, y queda registrado en el pedido y en el cadete (sin deshacer la transacción).
+     * - APK vieja (no manda tocadoEn): no bloquea, solo anota la distancia.
+     * - Sin posición: solo con "Estoy en el lugar" y foto (queda fuera de zona, sin distancia).
+     * - A más del radio: no deja, salvo "Estoy en el lugar" con foto (queda fuera de zona; nadie lo aprueba).
+     * - GPS impreciso (típico adentro de un local): suma el error al radio, no bloquea y queda anotado.
+     * La hora que devuelve es la del toque (cola sin señal) si es sensata, si no la de llegada.
+     */
+    private ControlLugar controlarEnLugar(Pedido pedido, Cadete cadete, MarcaEnLugar marca, Double puntoLat, Double puntoLng,
+                                          String nombrePunto, boolean tieneFoto, Instant noAntesDe) {
+        Instant hora = horaDelToque(marca == null ? null : marca.tocadoEn(), noAntesDe);
+        if (marca == null) {
+            return new ControlLugar(null, false, false, hora);
+        }
+        if (marca.tocadoEn() == null) {
+            // APK anterior al control (la nueva siempre manda la hora del toque): no se la bloquea,
+            // solo queda anotado a qué distancia marcó. Para obligar a actualizar: version_minima_app.
+            Integer distancia = marca.lat() == null || marca.lng() == null || puntoLat == null || puntoLng == null ? null
+                    : (int) Math.round(GeocodingService.distanciaKm(marca.lat(), marca.lng(), puntoLat, puntoLng) * 1000);
+            return new ControlLugar(distancia, false, false, hora);
+        }
+        registrarSiEsSimulada(pedido, cadete, marca);
+        boolean enElLugar = Boolean.TRUE.equals(marca.enElLugar());
+        if (puntoLat == null || puntoLng == null) {
+            return new ControlLugar(null, false, false, hora); // el pedido no tiene el punto ubicado: nada que medir
+        }
+        if (marca.lat() == null || marca.lng() == null) {
+            if (!enElLugar) {
+                throw new BadRequestException("No se pudo leer tu ubicación. Si ya estás en el lugar, tocá \"Estoy en el lugar\" y sacá una foto.");
+            }
+            exigirFotoEnElLugar(tieneFoto);
+            return new ControlLugar(null, true, false, hora);
+        }
+        int distancia = (int) Math.round(GeocodingService.distanciaKm(marca.lat(), marca.lng(), puntoLat, puntoLng) * 1000);
+        int radio = configuracionService.getInt(CLAVE_RADIO_M, 150);
+        int precisionMax = configuracionService.getInt(CLAVE_PRECISION_MAX_M, 100);
+        boolean imprecisa = marca.precision() != null && marca.precision() > precisionMax;
+        int tolerancia = radio + (imprecisa ? Math.round(marca.precision()) : 0);
+        if (distancia <= tolerancia) {
+            return new ControlLugar(distancia, false, imprecisa, hora);
+        }
+        if (!enElLugar) {
+            throw new BadRequestException("Estás a " + formatearDistancia(distancia) + " del " + nombrePunto
+                    + ". Si ya estás en el lugar, tocá \"Estoy en el lugar\" y sacá una foto.");
+        }
+        exigirFotoEnElLugar(tieneFoto);
+        return new ControlLugar(distancia, true, imprecisa, hora);
+    }
+
+    /**
+     * GPS falso: se controla antes que cualquier otra cosa (foto, receptor, Retirado) para que el
+     * intento quede registrado siempre. La transacción no se deshace (noRollbackFor en los métodos).
+     */
+    private void registrarSiEsSimulada(Pedido pedido, Cadete cadete, MarcaEnLugar marca) {
+        if (marca == null || !Boolean.TRUE.equals(marca.ubicacionSimulada())) return;
+        pedido.setUbicacionSimulada(true);
+        repo.save(pedido);
+        cadete.setIntentosUbicacionSimulada((cadete.getIntentosUbicacionSimulada() == null ? 0 : cadete.getIntentosUbicacionSimulada()) + 1);
+        cadete.setUltimoIntentoUbicacionSimuladaEn(Instant.now());
+        cadeteRepo.save(cadete);
+        throw new UbicacionSimuladaException(
+                "Tu celular está usando una ubicación simulada. Desactivá la app de GPS falso para poder marcar.");
+    }
+
+    private static void exigirFotoEnElLugar(boolean tieneFoto) {
+        if (!tieneFoto) {
+            throw new BadRequestException("Para marcar con \"Estoy en el lugar\" hace falta una foto.");
+        }
+    }
+
+    /** La hora del toque, salvo que venga en el futuro o antes de que empiece esa etapa del viaje. */
+    static Instant horaDelToque(Instant tocadoEn, Instant noAntesDe) {
+        Instant ahora = Instant.now();
+        if (tocadoEn == null || tocadoEn.isAfter(ahora.plus(TOLERANCIA_RELOJ))
+                || (noAntesDe != null && tocadoEn.isBefore(noAntesDe))) {
+            return ahora;
+        }
+        return tocadoEn.isAfter(ahora) ? ahora : tocadoEn;
+    }
+
+    static String formatearDistancia(int metros) {
+        if (metros < 1000) return metros + " m";
+        return String.format(java.util.Locale.forLanguageTag("es-AR"), "%.1f km", metros / 1000.0);
     }
 
     /**
@@ -1523,19 +1692,39 @@ public class PedidoService {
         if (pedido.getClienteTelefono() == null || pedido.getClienteTelefono().isBlank()) {
             throw new BadRequestException("El pedido no tiene teléfono del cliente.");
         }
-        String cadete = pedido.getCadeteAsignado() == null ? "" : pedido.getCadeteAsignado().getNombre();
-        String texto = configuracionService.getString("whatsapp_template_en_camino", WHATSAPP_EN_CAMINO_DEFAULT)
-                .replace("{link}", linkSeguimiento(pedido))
-                .replace("{numero}", String.valueOf(pedido.getNumero()))
-                .replace("{cadete}", cadete)
-                .replace("{marca}", configuracionService.getString("nombre_cadeteria", "Cadetería"))
-                .replace("  ", " ");
+        String texto = armarAvisoEnCamino(pedido,
+                configuracionService.getString(CLAVE_WHATSAPP_EN_CAMINO, WHATSAPP_EN_CAMINO_DEFAULT));
         pedido.setClienteAvisadoEn(Instant.now());
         repo.save(pedido);
         publisher.publicarPedido(PedidoResponse.from(pedido));
         return new com.cadeteria.backend.dto.PedidoDtos.AvisoWhatsappResponse(
                 telefonoParaWhatsapp(pedido.getClienteTelefono()), texto, pedido.getClienteAvisadoEn());
     }
+
+    private String armarAvisoEnCamino(Pedido pedido, String plantilla) {
+        String cadete = pedido.getCadeteAsignado() == null ? "" : pedido.getCadeteAsignado().getNombre();
+        return plantilla
+                .replace("{link}", linkSeguimiento(pedido))
+                .replace("{numero}", String.valueOf(pedido.getNumero()))
+                .replace("{cadete}", cadete)
+                .replace("{marca}", configuracionService.getString("nombre_cadeteria", "Cadetería"))
+                .replace("  ", " ");
+    }
+
+    /**
+     * Vista previa del aviso "en camino" (3n, 2026-09-28): el texto que se está editando en Configuración,
+     * armado con el pedido real más reciente que tenga cadete (en curso o finalizado), no con uno inventado.
+     * Sin pedidos así devuelve null y el panel muestra la plantilla sin reemplazar.
+     */
+    @Transactional(readOnly = true)
+    public com.cadeteria.backend.dto.AvisoEnCaminoDtos.VistaPreviaResponse vistaPreviaAvisoEnCamino(String plantilla) {
+        return repo.findFirstByCadeteAsignadoIsNotNullAndEstadoIdInOrderByCreadoEnDesc(List.of("EN_CURSO", "FINALIZADO"))
+                .map(p -> new com.cadeteria.backend.dto.AvisoEnCaminoDtos.VistaPreviaResponse(
+                        armarAvisoEnCamino(p, plantilla), p.getNumero()))
+                .orElse(null);
+    }
+
+    public static final String CLAVE_WHATSAPP_EN_CAMINO = "whatsapp_template_en_camino";
 
     /** Por WhatsApp no hay límite de caracteres ni problema con las tildes (a diferencia del SMS). */
     public static final String WHATSAPP_EN_CAMINO_DEFAULT =

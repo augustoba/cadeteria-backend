@@ -34,6 +34,55 @@ public class PedidoParada {
     /** null hasta que el cadete la marca como entregada. */
     private Instant entregadoEn;
 
+    /** Dónde estaba el cadete al marcarla y el control "en el lugar" (carril B, 2026-09-28) — null en APKs viejas. */
+    private Double entregaLat;
+    private Double entregaLng;
+    private Boolean fueraZona;
+    private Integer distanciaM;
+    /** Foto obligatoria cuando usó "Estoy en el lugar" lejos de la parada. */
+    @Column(length = 500)
+    private String fotoUrl;
+
+    public Double getEntregaLat() {
+        return entregaLat;
+    }
+
+    public void setEntregaLat(Double entregaLat) {
+        this.entregaLat = entregaLat;
+    }
+
+    public Double getEntregaLng() {
+        return entregaLng;
+    }
+
+    public void setEntregaLng(Double entregaLng) {
+        this.entregaLng = entregaLng;
+    }
+
+    public Boolean getFueraZona() {
+        return fueraZona;
+    }
+
+    public void setFueraZona(Boolean fueraZona) {
+        this.fueraZona = fueraZona;
+    }
+
+    public Integer getDistanciaM() {
+        return distanciaM;
+    }
+
+    public void setDistanciaM(Integer distanciaM) {
+        this.distanciaM = distanciaM;
+    }
+
+    public String getFotoUrl() {
+        return fotoUrl;
+    }
+
+    public void setFotoUrl(String fotoUrl) {
+        this.fotoUrl = fotoUrl;
+    }
+
     public String getId() {
         return id;
     }

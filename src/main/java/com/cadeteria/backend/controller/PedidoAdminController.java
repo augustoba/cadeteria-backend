@@ -7,7 +7,7 @@ import com.cadeteria.backend.dto.PedidoDtos.CancelarRequest;
 import com.cadeteria.backend.dto.PedidoDtos.ComentarioRequest;
 import com.cadeteria.backend.dto.PedidoDtos.ComentarioResponse;
 import com.cadeteria.backend.dto.PedidoDtos.ClienteEncontradoResponse;
-import com.cadeteria.backend.dto.PedidoDtos.FinalizarRequest;
+import com.cadeteria.backend.dto.PedidoDtos.FinalizarAdminRequest;
 import com.cadeteria.backend.dto.PedidoDtos.PedidoRequest;
 import com.cadeteria.backend.dto.PedidoDtos.PedidoResponse;
 import com.cadeteria.backend.dto.PedidoDtos.PuntoTrayectoResponse;
@@ -222,10 +222,14 @@ public class PedidoAdminController {
         return PedidoResponse.from(service.reintentarEntrega(id));
     }
 
-    /** Boton "Finalizar": cierre manual para cuando el cadete no tiene internet para hacerlo el mismo. */
+    /**
+     * Boton "Finalizar": cierre manual para cuando el cadete no tiene internet para hacerlo el mismo.
+     * Motivo obligatorio (carril B, 2026-09-28): se saltea el control "en el lugar".
+     */
     @PostMapping("/{id}/finalizar")
-    public PedidoResponse finalizar(@PathVariable String id, @Valid @RequestBody FinalizarRequest req) {
-        return PedidoResponse.from(service.finalizarComoAdmin(id, req));
+    public PedidoResponse finalizar(@PathVariable String id, @Valid @RequestBody FinalizarAdminRequest req,
+                                    Authentication auth) {
+        return PedidoResponse.from(service.finalizarComoAdmin(id, req, auth == null ? null : auth.getName()));
     }
 
     /** Botón "Avisar al cliente" (2026-09-26): marca el pedido como avisado y devuelve el WhatsApp ya armado. */
