@@ -106,13 +106,12 @@ public class AvisoCalleService {
 
     /**
      * "Mate de Luna 2400": calle y altura redondeada a la cuadra. null si no se pudo (se muestra
-     * "cerca de tu ubicación"). Pendiente al juntar con el carril A: usar
-     * {@code geocoding.reverseParaConsulta(lat, lng)} (primero la base propia, no alimenta la cache);
-     * ese método todavía no está en esta rama.
+     * "cerca de tu ubicación"). Usa {@code reverseParaConsulta} (carril A): primero la base propia y no
+     * alimenta la cache de direcciones.
      */
     String calleDe(double lat, double lng) {
         try {
-            GeocodingProxyService.GeoAddress r = geocoding.reverse(lat, lng);
+            GeocodingProxyService.GeoAddress r = geocoding.reverseParaConsulta(lat, lng);
             if (r == null || r.street() == null || r.street().isBlank()) return null;
             return r.number() == null ? r.street() : r.street() + " " + (r.number() / 100) * 100;
         } catch (RuntimeException e) {

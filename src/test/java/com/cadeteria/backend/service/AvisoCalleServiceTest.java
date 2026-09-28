@@ -47,7 +47,7 @@ class AvisoCalleServiceTest {
         avisa = cadete("c-avisa", "LIBRE", LAT, LNG, Instant.now());
         when(cadeteRepo.findByUsername("30111222")).thenReturn(Optional.of(avisa));
         when(repo.save(any(AvisoCalle.class))).thenAnswer(i -> i.getArgument(0));
-        when(geocoding.reverse(anyDouble(), anyDouble())).thenReturn(new GeocodingProxyService.GeoAddress(
+        when(geocoding.reverseParaConsulta(anyDouble(), anyDouble())).thenReturn(new GeocodingProxyService.GeoAddress(
                 "Av. Mate de Luna 2437, San Miguel de Tucumán", "Av. Mate de Luna", 2437, "San Miguel de Tucumán",
                 LAT, LNG, false, "nominatim"));
     }
@@ -116,7 +116,7 @@ class AvisoCalleServiceTest {
     @Test
     void sinCalleQuedaNull() {
         when(cadeteRepo.findAll()).thenReturn(List.of(avisa));
-        when(geocoding.reverse(anyDouble(), anyDouble())).thenThrow(new RuntimeException("Nominatim caído"));
+        when(geocoding.reverseParaConsulta(anyDouble(), anyDouble())).thenThrow(new RuntimeException("Nominatim caído"));
         assertNull(service.crear("30111222", "ACCIDENTE", LAT, LNG).getCalle());
     }
 
