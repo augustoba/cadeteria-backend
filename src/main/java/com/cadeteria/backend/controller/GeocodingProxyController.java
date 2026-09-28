@@ -42,6 +42,6 @@ public class GeocodingProxyController {
 
     @GetMapping("/reverse")
     public GeoAddress reverse(@RequestParam double lat, @RequestParam double lng) {
-        return service.reverse(lat, lng);
+        return service.reverseParaConsulta(lat, lng);
     }
 }

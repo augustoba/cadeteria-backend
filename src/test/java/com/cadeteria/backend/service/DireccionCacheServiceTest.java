@@ -318,17 +318,20 @@ class DireccionCacheServiceTest {
     }
 
     @Test
-    void unBuscadorNoPisaUnPinPuestoAMano() {
+    void unBuscadorNoPisaUnPinPuestoAManoPeroElCadeteEnLaPuertaSi() {
         CuadraCoords existente = coords("colombia", SMT, 4600, -26.7955, -65.2569, 1);
         existente.setProveedor(DireccionCacheService.PROVEEDOR_MANUAL);
         when(aliasRepository.findByVarianteNorm(anyString())).thenReturn(Optional.of(alias("colombia", "colombia")));
         when(coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra("colombia", SMT, 4600)).thenReturn(Optional.of(existente));
 
         service.guardar("Colombia", 4650, "Colombia", SMT, -26.80, -65.25, false, "locationiq");
-        service.guardar("Colombia", 4650, "Colombia", SMT, -26.79, -65.24, false, DireccionCacheService.PROVEEDOR_CADETE_GPS);
-
         assertEquals(-26.7955, existente.getLat());
         assertEquals(DireccionCacheService.PROVEEDOR_MANUAL, existente.getProveedor());
+
+        // 2026-09-28 (3j): el GPS del cadete parado en la puerta le gana al pin (antes era al revés).
+        service.guardar("Colombia", 4650, "Colombia", SMT, -26.79, -65.24, false, DireccionCacheService.PROVEEDOR_CADETE_GPS);
+        assertEquals(-26.79, existente.getLat());
+        assertEquals(DireccionCacheService.PROVEEDOR_CADETE_GPS, existente.getProveedor());
         assertEquals(3, existente.getConfirmaciones());
     }
 
