@@ -31,7 +31,7 @@ operador en la oficina (los reclamos se resuelven entre cliente y cadete y se ci
 Primero los arreglos de lo que se usa todos los días, después la salida y recién ahí lo nuevo.
 
 **Los puntos 1-5 se hacen en paralelo entre dos IAs**: reparto, archivos de cada una y reglas en
-`plan-carriles-2026-09-28.md` (carril A = 2, 3, 4; carril B = 1, 5).
+`plan-carriles-2026-09-28.md` (carril A = 2, 3, 4, lo hace Claude; carril B = 1, 5, lo hace la otra IA).
 
 | # | Qué | Toca | Detalle |
 | --- | --- | --- | --- |

@@ -7,8 +7,8 @@ su carril. Si para terminar necesita tocar un archivo del otro carril, **no lo t
 
 | Carril | Quién | Tema | Repos |
 | --- | --- | --- | --- |
-| **A — Direcciones** | la otra IA | 3i(4), 3j, 3h (buscador, pin del mapa, cache de direcciones) | backend + panel |
-| **B — Pedidos en el lugar** | Claude (esta PC) | 3n (aviso "en camino" editable) + Retirado/Entregado solo en el lugar + finalizado por el admin con motivo | backend + panel + APK |
+| **A — Direcciones** | Claude (PC de Windows del usuario) | 3i(4), 3j, 3h (buscador, pin del mapa, cache de direcciones) | backend + panel |
+| **B — Pedidos en el lugar** | la otra IA | 3n (aviso "en camino" editable) + Retirado/Entregado solo en el lugar + finalizado por el admin con motivo | backend + panel + APK |
 
 El contexto de cada punto (por qué, qué se vio en la calle) está en `pendientes.md`: secciones
 "Plan acordado el 2026-09-28", 3h, 3i, 3j, 3k y 3n. Leerlas antes de empezar.
@@ -75,7 +75,7 @@ Cuando el cadete marca **Retirado** o **Entregado**, `PedidoCadeteController` (c
 
 ---
 
-## Carril A — Direcciones (la otra IA)
+## Carril A — Direcciones (Claude)
 
 Objetivo: que la base propia de direcciones sea confiable y se use primero; que el pin del mapa
 no se equivoque ni moleste; que el buscador entienda nombres incompletos.
@@ -161,7 +161,7 @@ no encuentra nada y los buscadores de afuera tampoco.
 A1 → A2 (backend 1-5) → A2 (panel 6-8) → A3.
 
 ### Avance (carril A)
-_(la otra IA anota acá qué hizo, commits y qué probó)_
+_(anotar acá qué se hizo, commits y qué se probó)_
 
 ### Para despliegue (carril A)
 _(lo que haya que hacer en producción: scripts SQL, claves de configuración, etc.)_
@@ -171,30 +171,116 @@ _(si necesita algo de un archivo de B)_
 
 ---
 
-## Carril B — Pedidos en el lugar (Claude, esta PC)
+## Carril B — Pedidos en el lugar (la otra IA)
 
-### B1. 3n: editar el aviso "en camino" desde el panel
-- Configuración → WhatsApp: cuadro de texto de `whatsapp_template_en_camino` con botones para
-  insertar `{cadete}`, `{numero}`, `{link}`, `{marca}`; vista previa con **un pedido real reciente**;
-  aviso si falta `{link}`; botón "Volver al texto original". Lo edita el admin.
-- Guardar quién lo editó y cuándo (una línea, sin historial).
+Objetivo: que el cadete no pueda marcar Retirado ni Entregado si no está en el lugar (con una
+salida para cuando la dirección del pedido está mal ubicada), que funcione sin señal, que el
+admin tenga que explicar por qué finaliza a mano, y que el texto del aviso "en camino" se edite
+desde el panel. Contexto del negocio: el dueño quiere salir de la oficina, así que **nada de esto
+puede necesitar que alguien apruebe algo en el panel**: se deja registrado y listo.
+
+### Cómo está hoy (verificado el 2026-09-28)
+- **Retirado**: APK → `POST /api/pedidos/me/{id}/recepcion` (`PedidoCadeteController.recepcion` →
+  `PedidoService.registrarRecepcion`), body `RecepcionRequest` (`fotoUrl`, `lat`, `lng`,
+  `archivoPerdido`, `precision`, `calleDetectada`, `localidadDetectada`). Guarda `retiroLat/Lng`
+  en `Pedido`. **No controla la distancia.**
+- **Entregado**: `POST /api/pedidos/me/{id}/finalizar` (`PedidoService.finalizar`, línea ~1274),
+  body `FinalizarRequest` (nombre de quien recibe, foto, firma, `lat`, `lng`, `precision`, ...).
+  Exige paradas entregadas y foto/nombre/firma si la configuración los pide. **No exige Retirado
+  antes y no controla la distancia.**
+- **Parada intermedia**: `POST /api/pedidos/me/{id}/paradas/{paradaId}/entregada` — **no manda
+  posición**. Hay que agregarle `lat`/`lng`/`precision`/hora (body opcional, para no romper APKs
+  viejas).
+- **Finalizar el admin**: `POST /api/admin/pedidos/{id}/finalizar` (`PedidoAdminController` →
+  `PedidoService.finalizarComoAdmin`), usa el mismo `FinalizarRequest`. En el panel:
+  `core/services/pedido.service.ts` → `finalizar()` (manda `receptorNombre` y `fotoUrl`); el botón
+  está en `features/dashboard/dashboard.component.ts`. **No pide motivo.**
+- **Sin señal**: la APK ya tiene una cola (`data/local/PendingActionsStore.kt`,
+  `data/repository/PendingActionsRepository.kt`): guarda `RetiradoPendiente` / `FinalizarPendiente`
+  con foto (URL o archivo local) y `lat`/`lng`, y los reintenta al volver la conexión. **No guarda
+  la hora del toque ni la precisión**, así que el backend registra la hora de llegada.
+- **Pantallas de la APK**: `ui/viaje/ViajeScreen.kt` y `ViajeViewModel.kt` (botones Retirado /
+  Entregado / parada). Ubicación: `location/LocationTrackingService.kt`; ya existe
+  `location/AvisoLlegada.kt` (avisa "llegaste al retiro" a menos de 150 m; sirve de referencia).
+- **GPS falso**: no se detecta en ningún lado.
+- **Aviso "en camino"**: `PedidoService` (~línea 1527) lee `whatsapp_template_en_camino` con
+  default `WHATSAPP_EN_CAMINO_DEFAULT`; variables `{marca}`, `{cadete}`, `{numero}`, `{link}`.
+  El botón del panel es `shared/aviso-cliente.component.ts`. Hoy el texto solo se cambia en la base.
+
+### B1. 3n: editar el aviso "en camino" desde el panel (empezar por acá, es corto)
+- Configuración → sección WhatsApp: cuadro de texto de `whatsapp_template_en_camino` con botones
+  para insertar `{cadete}`, `{numero}`, `{link}`, `{marca}`.
+- **Vista previa con un pedido real reciente** (el último en curso o finalizado), no uno inventado.
+- Aviso si falta `{link}` (sin el link el aviso no sirve). Botón "Volver al texto original"
+  (el default del código).
+- Lo edita el **admin** (no hace falta superadmin: es texto de la cadetería).
+- Guardar **quién lo editó y cuándo** (una línea: "Editado por X el 28/09 14:32"; sin historial).
+- Los SMS salen sin tildes, pero este aviso va por la app de WhatsApp: acá las tildes están bien.
 
 ### B2. Retirado / Entregado solo en el lugar
-Decidido con el usuario el 2026-09-28 (detalle en `pendientes.md`):
-1. No se puede marcar Entregado sin Retirado (backend + APK).
-2. Radio de **150 m** del origen (Retirado), de cada parada y del destino (Entregado). Control en la
-   APK y otra vez en el backend.
-3. GPS falso (ubicación simulada) → no deja marcar, queda registrado.
-4. Sin señal: la cola que ya existe (`PendingActionsStore`) guarda también la **hora en que se tocó**
-   el botón y la precisión; el backend usa esa hora.
-5. "Estoy en el lugar": foto obligatoria, nadie lo aprueba, queda "fuera de zona" en el pedido y en
-   los registros del cadete (ficha y Métricas).
-6. GPS impreciso (> ~100 m): no bloquea, queda la advertencia registrada.
-7. Finalizado por el admin: motivo obligatorio; queda quién, cuándo y por qué; el pedido figura
-   "Finalizado por el admin".
+Decidido con el usuario el 2026-09-28:
+
+1. **Orden obligatorio**: no se puede marcar Entregado (ni una parada) sin Retirado. Backend
+   (`finalizar` → error claro "Primero marcá Retirado") y APK (el botón Entregado deshabilitado
+   hasta marcar Retirado).
+2. **Radio de 150 m**: al tocar Retirado la APK compara su posición con el origen del pedido; en
+   cada parada, con la parada; en Entregado, con el destino. Más lejos → no deja y dice "Estás a
+   800 m del retiro". El **backend vuelve a controlar** con la posición recibida (no confiar solo en
+   el teléfono). Radio en una clave de configuración con default 150 (`en_lugar_radio_m`), sin
+   pantalla para editarla.
+3. **GPS falso**: si la ubicación viene de una app de ubicación simulada (`Location.isMock` en
+   Android 12+, `isFromMockProvider` antes), no deja marcar y queda registrado (mandar el dato al
+   backend, que lo guarda en el pedido y lo cuenta en el cadete).
+4. **Sin señal**: el GPS anda sin datos (tarda más en ubicarse: mostrar "Buscando tu ubicación…" y
+   esperar un fix, con un tope razonable). El control de distancia se hace en el teléfono; a la cola
+   (`RetiradoPendiente` / `FinalizarPendiente`, y lo nuevo de paradas) se le agregan **la hora del
+   toque** y la **precisión**. El backend usa esa hora para `retiradoEn` / la hora de entrega y
+   para sus controles, con un límite de sensatez (no aceptar horas futuras ni anteriores a la
+   aceptación del viaje).
+5. **"Estoy en el lugar"**: cuando el control no deja marcar (típico: la dirección del pedido está
+   mal ubicada en el mapa, como Colombia 4695), aparece este botón. Pide **foto obligatoria** (aunque
+   la configuración no exija foto) y marca igual. **Nadie lo aprueba.** Queda:
+   - en el pedido, marcado **"fuera de zona"** (en rojo en el detalle del panel), con la distancia;
+   - en los **registros del cadete**: cuántas veces lo usó, visible en su ficha
+     (`features/cadetes/cadete-ficha.component.ts`) y en Métricas (`features/metricas/`).
+6. **GPS impreciso** (error > ~100 m, típico adentro de un local): no bloquea, marca con la
+   advertencia "ubicación imprecisa" guardada en el pedido.
+7. **Finalizado por el admin**: se saltea el control de distancia pero el **motivo es obligatorio**
+   (campo de texto en el panel, validado también en el backend). Se guarda quién, cuándo y por qué,
+   y el pedido figura **"Finalizado por el admin"** en el detalle, en el seguimiento del panel y en
+   el historial del cadete.
+8. **Compatibilidad**: las APK viejas mandan los requests sin los campos nuevos; el backend no se
+   puede romper con eso (campos opcionales). Decidir si en ese caso controla con lo que llegue o
+   solo registra. Existe `version_minima_app` en Configuración para forzar la actualización al
+   desplegar.
+9. **No tocar** las llamadas a `geocodingProxyService.aprenderDeCadete(...)` de
+   `PedidoCadeteController` (ver "punto de contacto"). Si se agrega GPS a las paradas, **no**
+   agregar una llamada nueva a `aprenderDeCadete`: anotarlo en "Pedidos al otro carril".
+
+Datos nuevos sugeridos en `Pedido` (nullable): `retiro_fuera_zona`, `retiro_distancia_m`,
+`entrega_fuera_zona`, `entrega_distancia_m`, `ubicacion_simulada`, `ubicacion_imprecisa`,
+`finalizado_por_admin` (usuario), `finalizado_admin_motivo`. Los contadores del cadete pueden salir
+de una consulta sobre los pedidos (no hace falta columna en `Cadete`).
+
+Tests del backend: finalizar sin Retirado → error; lejos sin "Estoy en el lugar" → error; lejos con
+"Estoy en el lugar" y foto → ok y marcado; sin foto → error; GPS simulado → error; admin sin motivo
+→ error; hora del toque respetada; request viejo sin campos nuevos → no rompe.
+
+### Cómo compilar y probar la APK
+- **JDK 17** (con JDK 21 `assembleDebug` falla en `jlink`):
+  `./gradlew testDebugUnitTest assembleDebug -Dorg.gradle.java.home=<ruta a un JDK 17>`.
+- `app/build/outputs/apk/debug/app-debug.apk` está versionado: no commitear el que cambia en cada
+  build salvo que el usuario lo pida.
+- El emulador no tiene servicios de ubicación de Google: la posición se fija a mano desde sus
+  controles. El GPS real, la precisión y la ubicación simulada conviene confirmarlos en un celular.
+  Usuarios demo y cómo levantar el backend: `documentacion/apk.md` y `backend.md`.
+
+### Orden sugerido para B
+B1 (3n) → B2 backend (1, 2, 4-8, con tests) → B2 panel (motivo del admin, "fuera de zona",
+registros en ficha y Métricas) → B2 APK (1-6).
 
 ### Avance (carril B)
-_(Claude anota acá)_
+_(anotar acá qué se hizo, commits y qué se probó)_
 
 ### Para despliegue (carril B)
 
