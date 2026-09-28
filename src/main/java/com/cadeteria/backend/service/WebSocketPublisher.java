@@ -116,6 +116,16 @@ public class WebSocketPublisher {
         template.convertAndSend("/queue/cadete/" + cadeteId + "/avisos", Map.of("mensaje", mensaje, "avisoId", avisoId));
     }
 
+    /** "Avisos de la calle" (carril C): canal propio, no se mezcla con /avisos (que tiene su propio manejo). */
+    public void publicarAvisoCalle(String cadeteId, com.cadeteria.backend.dto.AvisoCalleDtos.AvisoCalleResponse aviso) {
+        template.convertAndSend("/queue/cadete/" + cadeteId + "/calle", aviso);
+    }
+
+    /** "Avisos de la calle" para el Mapa del panel, en vivo. */
+    public void publicarAvisoCalleAdmin(com.cadeteria.backend.dto.AvisoCalleDtos.AvisoCalleResponse aviso) {
+        template.convertAndSend("/topic/admin/avisos-calle", aviso);
+    }
+
     /** Comando de envío para el gateway propio de WhatsApp (Baileys + chips descartables). */
     public void publicarComandoWhatsapp(ComandoEnvio comando) {
         template.convertAndSend("/topic/whatsapp/comandos", comando);
