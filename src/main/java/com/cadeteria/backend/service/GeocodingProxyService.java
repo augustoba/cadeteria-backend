@@ -1,6 +1,7 @@
 package com.cadeteria.backend.service;
 
 import com.cadeteria.backend.config.AppProperties;
+import com.cadeteria.backend.model.CuadraCoords;
 import com.cadeteria.backend.util.DireccionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,6 +84,13 @@ public class GeocodingProxyService {
     public static final String CONFIG_REVERSE_RESPALDO_MAX_DIA = "reverse_respaldo_max_dia";
     /** El GPS del cadete tiene que caer a menos de esto del pin del pedido (si no, marcó en otro lado). */
     private static final double DISTANCIA_MAX_AL_PIN_M = 2000;
+    /**
+     * Sin que el mapa ni el teléfono confirmen la calle, el GPS del cadete corrige un pin solo si
+     * marcó a menos de esto (el radio en que la app lo deja marcar Retirado/Entregado, 2026-09-28).
+     */
+    private static final double DISTANCIA_CADETE_CORRIGE_PIN_M = 150;
+    /** Radio para contestar "qué calle hay acá" con un punto propio en vez de preguntarle a OSM. */
+    static final int RADIO_CALLE_PROPIA_M = 30;
     private static final String LOCATIONIQ_REVERSE_URL = "https://us1.locationiq.com/v1/reverse";
     private static final String GEOAPIFY_REVERSE_URL = "https://api.geoapify.com/v1/geocode/reverse";
 
@@ -122,20 +130,44 @@ public class GeocodingProxyService {
         Integer numero = tieneNumero ? Integer.parseInt(m.group(2)) : null;
 
         if (numero != null) {
-            DireccionCacheService.ResultadoCache cacheado = direccionCache.buscar(streetPart, numero);
-            // Una entrada aproximada (sin la altura exacta) no sirve como respuesta única: el pin
-            // queda en cualquier punto de la calle y hasta con la localidad equivocada (bug del
-            // 2026-09-24: "Colombia 4695" devolvía solo Yerba Buena). Se ignora y se busca en vivo.
-            if (cacheado != null && !cacheado.approximate()) {
-                String calle = DireccionUtils.nombreParaMostrar(cacheado.calleCanonica());
-                String base = calle + " " + numero;
-                String label = cacheado.localidad() != null && !cacheado.localidad().isBlank()
-                        ? base + ", " + cacheado.localidad() : base;
-                return List.of(new GeoAddress(label, calle, numero, cacheado.localidad(),
-                        cacheado.lat(), cacheado.lng(), cacheado.approximate(), PROVEEDOR_CACHE));
+            GeoAddress cacheado = desdeCache(direccionCache.buscar(streetPart, numero), numero);
+            if (cacheado != null) return List.of(cacheado);
+        }
+
+        // 3h (2026-09-28): "colom 4600" no es ninguna calle, pero la cache conoce "colombia". Con una
+        // sola calle que empiece así se completa el nombre — también antes de preguntar afuera, que
+        // con "colom" no encuentran nada. Con varias ("sant" -> Santiago, Santa Fe...) no se adivina:
+        // se ofrecen las que ya tienen esa cuadra aprendida.
+        if (!direccionCache.conoceCalle(streetPart)) {
+            List<String> candidatas = direccionCache.callesQueEmpiezanCon(streetPart);
+            if (candidatas.size() == 1) {
+                streetPart = DireccionUtils.nombreParaMostrar(candidatas.get(0));
+                q = numero != null ? streetPart + " " + numero : streetPart;
+                if (numero != null) {
+                    GeoAddress cacheado = desdeCache(direccionCache.buscarPorCanonica(candidatas.get(0), numero), numero);
+                    if (cacheado != null) return List.of(cacheado);
+                }
+            } else if (candidatas.size() > 1 && numero != null) {
+                List<GeoAddress> opciones = new ArrayList<>();
+                for (String canonica : candidatas) {
+                    GeoAddress op = desdeCache(direccionCache.buscarPorCanonica(canonica, numero), numero);
+                    if (op != null) opciones.add(op);
+                }
+                if (!opciones.isEmpty()) return opciones;
             }
         }
 
+        List<GeoAddress> out = buscarAfuera(q, streetPart, numero);
+        if (numero != null && !out.isEmpty() && !out.get(0).approximate() && esLaCalleTipeada(streetPart, out.get(0).street())) {
+            GeoAddress mejor = out.get(0);
+            direccionCache.guardar(streetPart, numero, mejor.street(), mejor.locality(),
+                    mejor.lat(), mejor.lng(), mejor.approximate(), mejor.proveedor());
+        }
+        return out;
+    }
+
+    /** Los buscadores gratuitos, con el texto completo y con la calle sola (+ la altura tipeada). */
+    List<GeoAddress> buscarAfuera(String q, String streetPart, Integer numero) {
         List<GeoAddress> resultados = new ArrayList<>();
         resultados.addAll(queryNominatim(q, numero));
         resultados.addAll(queryGeoapify(q, numero));
@@ -145,13 +177,22 @@ public class GeocodingProxyService {
             queryGeoapify(streetPart, null).forEach(r -> resultados.add(conNumero(r, numero)));
             queryLocationIq(streetPart, null).forEach(r -> resultados.add(conNumero(r, numero)));
         }
-        List<GeoAddress> out = dedupe(resultados);
-        if (numero != null && !out.isEmpty() && !out.get(0).approximate() && esLaCalleTipeada(streetPart, out.get(0).street())) {
-            GeoAddress mejor = out.get(0);
-            direccionCache.guardar(streetPart, numero, mejor.street(), mejor.locality(),
-                    mejor.lat(), mejor.lng(), mejor.approximate(), mejor.proveedor());
-        }
-        return out;
+        return dedupe(resultados);
+    }
+
+    /**
+     * Un acierto de la cache como resultado del buscador. Una entrada aproximada (sin la altura
+     * exacta) no sirve como respuesta única: el pin queda en cualquier punto de la calle y hasta con
+     * la localidad equivocada (bug del 2026-09-24: "Colombia 4695" devolvía solo Yerba Buena).
+     */
+    private GeoAddress desdeCache(DireccionCacheService.ResultadoCache cacheado, int numero) {
+        if (cacheado == null || cacheado.approximate()) return null;
+        String calle = DireccionUtils.nombreParaMostrar(cacheado.calleCanonica());
+        String base = calle + " " + numero;
+        String label = cacheado.localidad() != null && !cacheado.localidad().isBlank()
+                ? base + ", " + cacheado.localidad() : base;
+        return new GeoAddress(label, calle, numero, cacheado.localidad(),
+                cacheado.lat(), cacheado.lng(), false, PROVEEDOR_CACHE);
     }
 
     /**
@@ -269,6 +310,18 @@ public class GeocodingProxyService {
     }
 
     /**
+     * Pin que puso un cliente en /pedir, al aprobar la solicitud (3j, 2026-09-28): cualquiera puede
+     * inventar un pin, así que entra siempre como sin confirmar (aunque el mapa confirme la calle, la
+     * altura puede estar mal) y lo confirma o corrige el primer cadete que marque ahí.
+     */
+    @Async
+    public void aprenderPinDeCliente(String direccion, Double lat, Double lng, String fuente) {
+        if (!DireccionCacheService.PROVEEDOR_MANUAL.equals(fuente)
+                && !DireccionCacheService.PROVEEDOR_GOOGLE_LINK.equals(fuente)) return;
+        aprender(direccion, lat, lng, DireccionCacheService.PROVEEDOR_MANUAL_SIN_CONFIRMAR);
+    }
+
+    /**
      * El cadete marcó Retirado/Entregado parado en la puerta (2026-09-26): la dirección escrita en el
      * pedido + el GPS del teléfono en ese momento es la mejor fuente para la cache — justo en las
      * direcciones que usan los clientes y en las calles donde los buscadores gratuitos no tienen
@@ -329,25 +382,47 @@ public class GeocodingProxyService {
         if (!m.matches()) return;
         String calleTipeada = m.group(1).trim();
         int numero = Integer.parseInt(m.group(2));
+        // 3j (2026-09-28): si para esta dirección ya hay un pin puesto por una persona, el GPS del
+        // cadete parado en la puerta lo confirma o lo corrige — en la MISMA fila (misma calle y
+        // localidad), así no queda una segunda fila que haga ambigua la cuadra.
+        CuadraCoords pinPrevio = null;
+        if (DireccionCacheService.PROVEEDOR_CADETE_GPS.equals(fuente)) {
+            CuadraCoords fila = direccionCache.filaDe(calleTipeada, numero);
+            if (fila != null && DireccionCacheService.esPin(fila.getProveedor())) pinPrevio = fila;
+        }
         GeoAddress r = reverse(lat, lng);
-        if (r != null && (mismaCalle(calleTipeada, r.street()) || direccionCache.mismaCanonica(calleTipeada, r.street()))) {
-            direccionCache.guardar(calleTipeada, numero, r.street(), r.locality(), lat, lng, false, fuente);
+        if (r != null && esLaCalleTipeada(calleTipeada, r.street())) {
+            if (pinPrevio != null) confirmarPin(pinPrevio, calleTipeada, numero, lat, lng, "el mapa confirma la calle");
+            else direccionCache.guardar(calleTipeada, numero, r.street(), r.locality(), lat, lng, false, fuente);
             return;
         }
         // El reverse (datos de OSM) no la confirma, pero el teléfono sí: se usa su nombre de calle.
-        if (calleTelefono != null && !calleTelefono.isBlank()
-                && (mismaCalle(calleTipeada, calleTelefono) || direccionCache.mismaCanonica(calleTipeada, calleTelefono))) {
-            direccionCache.guardar(calleTipeada, numero, DireccionUtils.expandirAbreviaturas(calleTelefono.trim()),
+        if (calleTelefono != null && !calleTelefono.isBlank() && esLaCalleTipeada(calleTipeada, calleTelefono)) {
+            if (pinPrevio != null) confirmarPin(pinPrevio, calleTipeada, numero, lat, lng, "el teléfono confirma la calle");
+            else direccionCache.guardar(calleTipeada, numero, DireccionUtils.expandirAbreviaturas(calleTelefono.trim()),
                     limpiarLocalidad(localidadTelefono == null ? "" : localidadTelefono), lat, lng, false, fuente);
             return;
         }
+        // Ni el mapa ni el teléfono confirman la calle (Colombia 4695): el cadete igual corrige el pin
+        // si marcó cerca, dentro del radio en que la app lo deja marcar "en el lugar".
+        if (pinPrevio != null) {
+            double distancia = GeocodingService.distanciaKm(pinPrevio.getLat(), pinPrevio.getLng(), lat, lng) * 1000;
+            if (distancia <= DISTANCIA_CADETE_CORRIGE_PIN_M) {
+                confirmarPin(pinPrevio, calleTipeada, numero, lat, lng, "marcó a " + Math.round(distancia) + " m del pin");
+            } else {
+                log.info("El GPS del cadete no corrige el pin de \"{}\": marcó a {} m y ni el mapa ni el teléfono "
+                        + "confirman la calle.", direccion, Math.round(distancia));
+            }
+            return;
+        }
         // Donde OSM no conoce la calle (2026-09-26, Colombia 4695: calles sin nombre y "Camino del
-        // Perú" a 113 m) el reverse nunca confirma y no se aprendía nunca. Se confía igual en:
-        // el link de Google Maps (el punto es de Google), y en el pin a mano si el reverse no trajo
-        // ninguna calle — este último con confianza baja, así lo pisa lo que aprenda un cadete.
-        boolean sinCalleEnReverse = r == null || r.street() == null || r.street().isBlank();
+        // Perú" a 113 m) el reverse nunca confirma y no se aprendía nunca. Se confía igual en el
+        // link de Google Maps (el punto es de Google), y en el pin a mano — sin confirmar, con
+        // confianza baja, así lo pisa lo que aprenda un cadete. Desde el 2026-09-28 también si el
+        // reverse trajo OTRA calle (antes solo si no traía ninguna): el mapa se equivoca justo ahí.
         String fuenteSinConfirmar = DireccionCacheService.PROVEEDOR_GOOGLE_LINK.equals(fuente) ? fuente
-                : DireccionCacheService.PROVEEDOR_MANUAL.equals(fuente) && sinCalleEnReverse
+                : DireccionCacheService.PROVEEDOR_MANUAL.equals(fuente)
+                        || DireccionCacheService.PROVEEDOR_MANUAL_SIN_CONFIRMAR.equals(fuente)
                         ? DireccionCacheService.PROVEEDOR_MANUAL_SIN_CONFIRMAR : null;
         if (fuenteSinConfirmar != null) {
             String localidad = r == null || r.locality() == null ? "" : limpiarLocalidad(r.locality());
@@ -359,6 +434,13 @@ public class GeocodingProxyService {
         }
         log.info("No se aprende el pin de \"{}\": el reverse dio \"{}\" y el teléfono \"{}\".", direccion,
                 r == null ? null : r.street(), calleTelefono);
+    }
+
+    /** El punto del cadete pasa a ser el de la dirección, con la confianza más alta (pisa al pin). */
+    private void confirmarPin(CuadraCoords pin, String calleTipeada, int numero, double lat, double lng, String motivo) {
+        direccionCache.guardar(calleTipeada, numero, pin.getCalleCanonica(), pin.getLocalidad(), lat, lng, false,
+                DireccionCacheService.PROVEEDOR_CADETE_GPS);
+        log.info("Pin de \"{} {}\" ({}) confirmado por el GPS del cadete: {}.", calleTipeada, numero, pin.getProveedor(), motivo);
     }
 
     private static final Set<String> PALABRAS_GENERICAS = Set.of(
@@ -393,6 +475,36 @@ public class GeocodingProxyService {
      * usa el buscador de los clientes. Lo que sale con altura alimenta la cache.
      */
     public GeoAddress reverse(double lat, double lng) {
+        GeoAddress r = reverseProveedores(lat, lng);
+        if (r != null) alimentarCacheSiEsPreciso(r);
+        return r;
+    }
+
+    /**
+     * El reverse que pide el panel o /pedir (cola de espera, pin arrastrado), 2026-09-28:
+     * <ul>
+     *   <li>primero la base propia: el punto aprendido más cercano (menos de {@value #RADIO_CALLE_PROPIA_M}
+     *       m) de un cadete, del teléfono o de un pin (3i/3j: donde OSM tiene calles sin nombre engancha
+     *       la avenida de al lado y el panel decía "Camino del Perú" en Colombia 4695);</li>
+     *   <li>y NO alimenta la cache: mirar el panel no confirma nada (3i: "camino del peru 1600" llegó a
+     *       18 confirmaciones solo de tener la cola de espera abierta). El mapeo de calles de los
+     *       cadetes y el aprendizaje de pines siguen usando {@link #reverse}.</li>
+     * </ul>
+     * Lo que sale de la base propia viene con {@code proveedor = "cache"} y la altura redondeada a la cuadra.
+     */
+    public GeoAddress reverseParaConsulta(double lat, double lng) {
+        CuadraCoords propia = direccionCache.masCercanaPropia(lat, lng, RADIO_CALLE_PROPIA_M);
+        if (propia != null) {
+            String calle = DireccionUtils.nombreParaMostrar(propia.getCalleCanonica());
+            String base = calle + " al " + propia.getCuadra();
+            String loc = propia.getLocalidad();
+            return new GeoAddress(loc == null || loc.isBlank() ? base : base + ", " + loc, calle, propia.getCuadra(), loc,
+                    lat, lng, true, PROVEEDOR_CACHE);
+        }
+        return reverseProveedores(lat, lng);
+    }
+
+    GeoAddress reverseProveedores(double lat, double lng) {
         GeoAddress r = reverseNominatim(lat, lng);
         if ((r == null || r.approximate()) && permitirRespaldo()) {
             GeoAddress respaldo = reverseLocationIq(lat, lng);
@@ -402,7 +514,6 @@ public class GeocodingProxyService {
             }
             if (respaldo != null && (r == null || !respaldo.approximate())) r = respaldo;
         }
-        if (r != null) alimentarCacheSiEsPreciso(r);
         return r;
     }
 

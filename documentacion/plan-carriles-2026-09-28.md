@@ -9,6 +9,7 @@ su carril. Si para terminar necesita tocar un archivo del otro carril, **no lo t
 | --- | --- | --- | --- |
 | **A — Direcciones** | Claude (PC de Windows del usuario) | 3i(4), 3j, 3h (buscador, pin del mapa, cache de direcciones) | backend + panel |
 | **B — Pedidos en el lugar** | la otra IA | 3n (aviso "en camino" editable) + Retirado/Entregado solo en el lugar + finalizado por el admin con motivo | backend + panel + APK |
+| **C — Avisos de la calle** | la otra IA, después del B | 5b (botón "Avisar" del cadete, aviso a los cercanos, capa en el Mapa) | backend + panel + APK |
 
 El contexto de cada punto (por qué, qué se vio en la calle) está en `pendientes.md`: secciones
 "Plan acordado el 2026-09-28", 3h, 3i, 3j, 3k y 3n. Leerlas antes de empezar.
@@ -161,10 +162,50 @@ no encuentra nada y los buscadores de afuera tampoco.
 A1 → A2 (backend 1-5) → A2 (panel 6-8) → A3.
 
 ### Avance (carril A)
-_(anotar acá qué se hizo, commits y qué se probó)_
+**Hecho el 2026-09-28** (rama `carril-a-direcciones`: backend `ad7fc3c`, panel `b3a638c`). A1, A2 y A3
+completos, salvo lo anotado como "queda".
+
+- **A1**: el endpoint público `/reverse` ahora llama a `reverseParaConsulta`, que **no alimenta la
+  cache**. `reverse()` (mapeo de calles de los cadetes, aprendizaje de pines) sigue igual.
+- **A2 backend**:
+  - Confianza nueva: `cadete_gps` 4 > `manual` / `google_link` 3 > `manual_sin_confirmar` 2 >
+    buscadores y `android_geocoder` 1 > `google` 0. Un pin ya no pisa lo que confirmó un cadete.
+  - `manual_sin_confirmar` no se promedia con los buscadores; otro pin sin confirmar en la misma
+    cuadra reemplaza al anterior (el último es el corregido).
+  - Pin del operador con **otra** calle en el mapa → `manual_sin_confirmar` (antes no se aprendía).
+  - Pin del cliente (`SolicitudPedidoService` → `aprenderPinDeCliente`) → **siempre** sin confirmar.
+  - `aprenderDeCadete` (firma sin cambios): si la dirección ya tiene un pin, el GPS del cadete lo
+    confirma o corrige **en la misma fila** (misma calle y localidad, así no queda ambigua). Si ni el
+    mapa ni el teléfono confirman la calle, lo corrige solo si marcó a **≤ 150 m** del pin (el radio
+    de "en el lugar"); más lejos no toca nada. Diferencia con lo escrito arriba: no hace falta el
+    corte de 50 m — cerca o lejos (hasta 150 m), gana el punto del cadete.
+  - `android_geocoder` quedó en 1 (vence a los 30 días: si pisara un pin, el pin se perdería al
+    vencer). Lo que corrige un pin es el GPS del cadete al marcar.
+- **A2.6 / 3i(2)**: `reverseParaConsulta` contesta primero con el **punto propio más cercano**
+  (≤ 30 m; cadete, teléfono o pin; prefiere lo medido en la calle), como "Colombia al 4600" con
+  `proveedor: "cache"`. Esto arregla también la "Ubicación aproximada" de la cola de espera sin
+  tocar `cadetes-libres`.
+- **A2.7-8 panel** (`address-picker`): si la calle distinta la dice la base propia, aviso ámbar
+  como antes; si la dice OpenStreetMap, texto gris que solo informa ("Si el pin está en la puerta,
+  dejalo así"). Nunca bloqueó ni bloquea.
+- **A3**: sin alias exacto, calles conocidas que **empiezan** con lo tipeado (≥ 4 letras, hasta 5).
+  Una sola → completa el nombre (sale de la cache, o se lo corrige a los buscadores de afuera); varias
+  → devuelve las que tienen esa cuadra aprendida (si ninguna, busca afuera como siempre). Queda: la
+  tolerancia a errores de tipeo.
+- **3h menor** (`CadeteController`): ya estaba hecho (solo registra la calle si `aprenderDelTelefono` guardó).
+
+Probado: 227 tests del backend (26 nuevos en `GeocodingProxyServicePinYBuscadorTest` y
+`DireccionCacheServicePinTest`; se actualizó `unBuscadorNoPisaUnPinPuestoAMano…` a la regla nueva),
+panel compilado, y el backend levantado contra `cadeteria_prueba_claude` con una copia de las 270
+direcciones aprendidas: el reverse en Colombia 4600 da "Colombia al 4600" (antes Camino del Perú),
+"colom 4600" y "colo 4600" dan Colombia 4600 desde la cache, y tres reverse seguidos ya no suben las
+confirmaciones de "camino del peru 1600" (que tenía **257**, infladas de mirar el panel). No probado:
+el cartel en el navegador y el flujo completo pin → pedido → cadete marca (cubierto por los tests).
 
 ### Para despliegue (carril A)
-_(lo que haya que hacer en producción: scripts SQL, claves de configuración, etc.)_
+- Nada obligatorio: sin claves de configuración ni columnas nuevas.
+- Opcional: las `confirmaciones` que ya están infladas por el panel (ej. `camino del peru 1600` = 257)
+  quedan así; no se usan para decidir nada todavía. Si algún día se usan, bajarlas antes.
 
 ### Pedidos al otro carril (A → B)
 _(si necesita algo de un archivo de B)_
@@ -412,6 +453,120 @@ Compila; no se vio en un teléfono.
 
 ---
 
+## Carril C — Avisos de la calle (la otra IA, cuando termine el B)
+
+**No empezar hasta terminar el carril B**: toca la APK (pantallas del cadete y conexión en vivo), que
+es del B. Mientras tanto nadie más lo hace. Rama: `carril-c-avisos-calle` en los 3 repos, saliendo
+de `develop` **después** de que el B esté en `develop`. Mismas reglas de arriba.
+
+Pedido del dueño el 2026-09-25 (idea tipo Waze), primera versión acordada el 2026-09-28. Es la única
+función nueva de esta tanda: no tiene que demorar la salida a producción.
+
+### Qué es
+Un cadete ve algo en la calle (un control, una calle cortada, un accidente, un piquete), toca un
+botón y a los demás cadetes que andan cerca les llega el aviso. El panel lo ve en el Mapa (sirve
+para anticipar demoras). Se llama **"Avisos de la calle"**, nunca "anticontroles" ni similar: la
+app es de la cadetería y no tiene que parecer que la empresa ayuda a esquivar controles (si hay un
+accidente, queda registrado). Por la misma razón, el control es **una categoría más** entre otras
+que también sirven para la operación.
+
+### Primera versión (decidida)
+1. **APK — botón "🚨 Avisar"** en la pantalla principal (y, si queda cómodo, en la del viaje). Abre
+   4 opciones grandes de **un solo toque**: **Control**, **Calle cortada**, **Accidente**,
+   **Piquete**. Sin escribir nada. La ubicación y la hora se toman solas (la última posición del
+   servicio de ubicación; si es de hace más de 2 min o con error > 100 m, pedir una nueva).
+   Confirmación corta: "Avisaste: Control en Mate de Luna 2400".
+2. **A quién le llega**: a los cadetes **no Desconectados** cuya última posición está a menos de
+   **1 km** del aviso, **menos al que avisó**. Sonido **distinto** al de los viajes, vibración y
+   **texto de una línea**: "🚨 Control · Mate de Luna 2400 · hace 1 min". Nada que haya que leer
+   largo mientras maneja.
+3. **Vence solo a los 60 minutos.** Vencido, deja de mostrarse en la APK y en el Mapa (queda en la
+   base como historial).
+4. **Panel → Mapa** (`features/mapa/mapa.component.ts`): íconos de los avisos activos (uno por
+   categoría) con la calle, la hora, "hace X min" y **quién avisó**. Se actualiza en vivo.
+5. **Contra avisos falsos**: solo cadetes logueados; tope de **5 avisos por hora** por cadete (el
+   backend devuelve un error claro si se pasa); cada aviso guarda el cadete. No hay aprobación.
+6. **Al abrir la app** (o al pasar a Libre), la APK pide los avisos activos cercanos y los muestra en
+   una lista chica "Avisos cerca tuyo" (categoría, calle, hace cuánto), así no se pierde los que
+   llegaron mientras estaba desconectado.
+
+**Segunda etapa (NO en esta versión)**: al pasar a menos de ~100 m de un aviso activo, la app
+pregunta "¿Sigue ahí?" con dos botones: **Sigue** (extiende 30 min) / **Ya no está** (con dos "ya no
+está" de cadetes distintos, se borra). Contar en la ficha del cadete cuántos avisos suyos marcaron
+"ya no está". Mapa con los avisos adentro de la APK.
+
+### Cómo está hoy (verificado el 2026-09-28)
+- **Conexión en vivo con la APK**: STOMP por WebSocket. Backend: `service/WebSocketPublisher.java`
+  (`template.convertAndSend(...)`). APK: `realtime/RealtimeManager.kt` y `realtime/StompClient.kt`, ya
+  suscripta a `/queue/cadete/{cadeteId}/viajes`, `/chat` y `/avisos`. **Usar un canal nuevo**
+  `/queue/cadete/{cadeteId}/calle` (no mezclar con `/avisos`, que ya tiene su propio manejo).
+  El panel escucha `/topic/admin/...` (ej. `/topic/admin/ubicaciones` en el Mapa): usar
+  `/topic/admin/avisos-calle`.
+- **Firebase (push) NO está configurado** en esta etapa. Por eso el aviso va por el WebSocket: le
+  llega al cadete con la app abierta o en segundo plano con la conexión viva (el caso normal del
+  cadete Libre u Ocupado, que tiene el servicio de ubicación corriendo). Si más adelante hay
+  Firebase, sumar una push como respaldo.
+- **Posición de los cadetes**: el backend ya guarda la última (`Cadete` lat/lng y
+  `ubicacion_actualizada_en`, que llega cada `frecuencia_ubicacion_seg`, default 45 s). Para "a
+  menos de 1 km" alcanza con esa posición (ignorar las de hace más de 10 min).
+- **Calle del aviso** ("Mate de Luna 2400"): llamar a `GeocodingProxyService.reverseParaConsulta(lat, lng)`
+  (del carril A: primero la base propia, no alimenta la cache). Es un método público: **usarlo, no
+  modificarlo**. Si no trae calle, mostrar "cerca de tu ubicación".
+- **Notificaciones de la APK**: `push/NotificationHelper.kt` (`crearCanales`, `mostrar`). Crear un
+  **canal propio** "Avisos de la calle" con su sonido, así el cadete lo puede silenciar aparte.
+- **Distancia**: ya existe `GeocodingService.distanciaKm(...)` en el backend.
+
+### Qué construir
+**Backend** (todo en archivos nuevos, salvo sumar dos métodos a `WebSocketPublisher`):
+- Entidad `AvisoCalle`: `id`, `tipo` (CONTROL, CALLE_CORTADA, ACCIDENTE, PIQUETE), `lat`, `lng`,
+  `calle` (texto), `cadete` (quien avisó), `creadoEn`, `venceEn`. Tabla nueva `aviso_calle`.
+- `AvisoCalleService`: crear (tope por hora, calle con `reverseParaConsulta`, vence a los 60 min
+  — `avisos_calle_duracion_min` con default 60 y `avisos_calle_radio_m` con default 1000, sin
+  pantalla), mandar a los cadetes cercanos y al panel, listar activos cerca de un punto, listar
+  activos para el panel.
+- Endpoints: cadete `POST /api/cadetes/me/avisos-calle` (`tipo`, `lat`, `lng`, `precision`) y
+  `GET /api/cadetes/me/avisos-calle?lat=&lng=` (activos cerca); admin `GET /api/admin/avisos-calle`
+  (activos). Respetar la seguridad que ya usan los controllers de cadete y de admin.
+- Tests: tope por hora, a quién le llega (dentro/fuera de 1 km, no al que avisó, no a
+  desconectados, no a posiciones viejas), vencimiento.
+
+**APK**: botón y selector de 4 opciones, llamada al endpoint (si no hay señal: avisar "No se pudo
+mandar, no hay conexión" — **no** encolar: un aviso de hace 20 min ya no sirve), suscripción al canal
+nuevo, notificación con canal propio, lista "Avisos cerca tuyo".
+
+**Panel**: capa de avisos en el Mapa con íconos por tipo, popup con calle, hora y cadete, en vivo.
+
+### Para despliegue (carril C)
+- Tabla nueva `aviso_calle` (la crea Hibernate).
+- Explicarle a los cadetes para qué es (y que queda registrado quién avisa) el día que se entregue.
+
+---
+
+## Anotado el 2026-09-28 (sin asignar)
+
+### Navegación con paradas
+Visto en `ui/viaje/ViajeScreen.kt` (~línea 319): los botones **Maps** y **Waze** abren la navegación
+**desde donde está el cadete** hasta **un solo punto**: el **origen** mientras no marcó Retirado y el
+**destino final** después. **Las paradas intermedias no se tienen en cuenta**: en un viaje con
+paradas, después de retirar lo manda directo al destino final. Arreglo posible: después de Retirado,
+navegar a la **próxima parada sin entregar** y recién al final al destino (Google Maps también acepta
+`waypoints` en `https://www.google.com/maps/dir/?api=1&destination=...&waypoints=...`; Waze no
+acepta paradas). Es de la APK: se asigna después del carril B.
+
+### Mini mapa del viaje: sacar el camino dibujado (pedido del usuario, 2026-09-28)
+En la pantalla del viaje de la APK (`ui/viaje/ViajeScreen.kt`, `MapaViaje`, ~línea 895) además de los
+**3 pines** (cadete azul, origen naranja, destino rojo) se dibuja una **línea con el camino**
+(`Polyline`, ~línea 939), que sale de `GET /api/pedidos/me/{id}/ruta` (lo pide
+`ViajeViewModel`, ~línea 85). El usuario quiere **solo los pines, sin el caminito**: el camino lo
+arma Maps/Waze al navegar, y el dibujado puede no coincidir con el que va a hacer el cadete.
+- Sacar la `Polyline` y la llamada a `ruta(id)` del `ViajeViewModel` (y el campo `ruta` del estado
+  si ya no se usa). Así además se ahorra una consulta de ruta por cada vez que se abre el viaje.
+- Que el mapa encuadre los 3 pines (zoom para que se vean todos).
+- **No** borrar el endpoint `/ruta` del backend todavía: las APK viejas lo siguen pidiendo.
+- Es de la APK: **lo hace el carril B** (es chico, meterlo junto con lo demás de `ViajeScreen`).
+
+---
+
 ## Después (no empezar todavía)
-Se reparte cuando los dos carriles estén en `develop`: salida a producción (ver `pendientes.md`),
-**5d** avisos al dueño por WhatsApp, **5b** avisos de la calle.
+Se reparte cuando los carriles A y B estén en `develop`: salida a producción (ver `pendientes.md`) y
+**5d** avisos al dueño por WhatsApp. **5b** avisos de la calle es el carril C (arriba).

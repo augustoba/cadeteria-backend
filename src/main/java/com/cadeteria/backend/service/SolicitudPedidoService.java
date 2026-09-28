@@ -314,9 +314,10 @@ public class SolicitudPedidoService {
                 requiereMoto, false, null, null, s.getOrigenFuente(), s.getDestinoFuente());
         Pedido pedido = pedidoService.crear(req, PedidoService.ORIGEN_WEB, null);
         // El pin del cliente se aprende recién acá, con la solicitud ya revisada por el admin:
-        // desde /pedir cualquiera podría mandar un pin mal puesto a propósito.
-        geocodingProxyService.aprenderPin(s.getOrigenDireccion(), s.getOrigenLat(), s.getOrigenLng(), s.getOrigenFuente());
-        geocodingProxyService.aprenderPin(s.getDestinoDireccion(), s.getDestinoLat(), s.getDestinoLng(), s.getDestinoFuente());
+        // desde /pedir cualquiera podría mandar un pin mal puesto a propósito. Y entra sin confirmar
+        // (lo confirma o corrige el primer cadete que marque ahí, 3j 2026-09-28).
+        geocodingProxyService.aprenderPinDeCliente(s.getOrigenDireccion(), s.getOrigenLat(), s.getOrigenLng(), s.getOrigenFuente());
+        geocodingProxyService.aprenderPinDeCliente(s.getDestinoDireccion(), s.getDestinoLat(), s.getDestinoLng(), s.getDestinoFuente());
         return pedido;
     }
 
