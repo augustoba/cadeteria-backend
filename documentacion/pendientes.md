@@ -1,14 +1,14 @@
 # Pendientes
 
-Última actualización: 2026-09-26.
+Última actualización: 2026-09-28.
 
 > El backlog largo (las 11 rondas de propuestas) vive en `MEJORAS-PROPUESTAS.md`, en la raíz
 > del proyecto. **Ese archivo está fuera de cualquier repo git**, así que no viaja con el
 > código. Este archivo es el pendiente corto y accionable, versionado acá a propósito.
 
 Todo el trabajo nuevo va en la rama **`develop`** de los 3 repos (`cadeteria`, `admin-front`,
-`cadete-app`). Lo del 2026-09-24 al 26 está en la rama **`pendientes-2026-09-24`** de los 3, sin
-mergear ni pushear todavía.
+`cadete-app`). Lo del 2026-09-24 al 26 ya está en `develop` (pusheado el 2026-09-26), salvo la
+rama `aviso-whatsapp-web` (backend + panel, aviso "en camino"), sin pushear al 2026-09-28.
 
 ## Plan de salida (acordado con el cliente el 2026-09-25)
 
@@ -25,6 +25,49 @@ mergear ni pushear todavía.
 
 Objetivo de fondo: que el dueño pueda salir a buscar clientes. Minimizar lo que necesita un
 operador en la oficina (los reclamos se resuelven entre cliente y cadete y se cierran solos).
+
+## Plan acordado el 2026-09-28 (en este orden)
+
+Primero los arreglos de lo que se usa todos los días, después la salida y recién ahí lo nuevo.
+
+| # | Qué | Toca | Detalle |
+| --- | --- | --- | --- |
+| 1 | **3n. Editar el aviso "en camino" desde el panel** | panel + back (poco) | Configuración → WhatsApp: texto con botones para `{cadete}` `{numero}` `{link}` `{marca}`, vista previa con un **pedido real reciente**, aviso si falta `{link}`, "Volver al texto original". Lo edita el admin. Guardar quién lo editó y cuándo (una línea, sin historial) |
+| 2 | **3j. Pin del mapa** | back + panel | El cartel "el pin está sobre X" mira primero la base propia y no avisa si OpenStreetMap no trae calle o trae una sin nombre (nunca bloquea). Pin del **cliente** (`/pedir`): nunca se aprende. Pin del **operador**: se guarda **sin confirmar** (sirve de sugerencia); lo confirma el GPS del cadete al marcar **Entregado** a menos de ~50 m, y si está más lejos gana el punto del cadete. **Un pin nunca pisa un punto ya confirmado por un cadete** (`cadete_gps` / `android_geocoder`). Si el admin finaliza a mano, el pin queda sin confirmar (dato débil, que se vea así en reportes) |
+| 3 | **3i(4). Mirar el panel no suma confirmaciones** | back | `reverse` del panel (`alimentarCacheSiEsPreciso`) no suma `confirmaciones` a lo que devuelve Nominatim. El 3i(2) (punto aprendido más cercano) queda para después: es cosmético |
+| 4 | **3h. "colom 4600" → "colombia"** | back | Sin alias exacto: calles conocidas que **empiecen** con lo tipeado (mínimo 4 letras). Una sola → se usa; varias → se muestran todas como opciones. **Corregir el nombre antes de preguntar afuera** (a Nominatim/Google les llega "colombia 4600"). Errores de tipeo (fuzzy): después, es donde más riesgo hay de corregir mal |
+| 5 | **Retirado / Entregado solo en el lugar** (nuevo, ver abajo) | APK + back | 1-2 días |
+| 6 | **Salida a producción** | — | "Falta probar", 3e, 3c, script de alias en producción, `develop` → `main`, `despliegue.md` |
+| 7 | **5d. Avisos al dueño por WhatsApp** | back | Reclamo sin resolver, pedido sin asignar hace X min, cadete pendiente de aprobación; con escalamiento (primero el panel) |
+| 8 | **5b. Avisos de la calle** | APK + back + panel | Ver 5b. Presentarlo como "avisos de la calle", no como anti-controles |
+
+### Retirado / Entregado solo en el lugar — acordado 2026-09-28
+Hoy el backend **deja finalizar sin Retirado**, la posición que manda la app al marcar se guarda
+pero **no se controla**, y no se detecta **GPS falso**. Sí existe la cola sin señal
+(`PendingActionsStore`: guarda Retirado/Finalizar con foto y posición y los manda al volver la
+conexión).
+
+Decidido:
+1. **Orden obligatorio**: no se puede marcar Entregado sin Retirado.
+2. **Radio de 150 m**: la app compara su posición con el origen (Retirado), cada parada y el
+   destino (Entregado). Más lejos → no deja y dice "Estás a 800 m del retiro". **El backend vuelve a
+   controlar** con la posición que recibe (no confiar solo en el teléfono).
+3. **GPS falso** (ubicación simulada de Android): no deja marcar y queda registrado.
+4. **Sin señal**: el GPS anda sin datos (tarda más en ubicarse: mostrar "Buscando tu ubicación…").
+   El control se hace en el teléfono y la acción va a la cola con la **hora en que se tocó el
+   botón** y su posición/precisión; el backend usa esa hora (no la de llegada) para registrar y
+   controlar.
+5. **"Estoy en el lugar"** cuando no lo deja (ej. dirección mal ubicada, como Colombia 4695): pide
+   **foto obligatoria**, marca igual y **nadie lo aprueba**. Queda en rojo "fuera de zona" en el
+   pedido y **en los registros del cadete** (cuántas veces lo usó, visible en su ficha y en
+   Métricas). Si varios cadetes lo usan en el mismo punto, la dirección estaba mal cargada (se
+   corrige con lo de 3j).
+6. **GPS impreciso** (error > ~100 m, típico adentro de un local): no bloquea, marca con la
+   advertencia "ubicación imprecisa" (también queda registrado).
+7. **Finalizado por el admin** (desde el panel): se saltea el control de distancia, pero el admin
+   **tiene que escribir el motivo** (obligatorio). Queda registrado quién, cuándo y por qué, y el
+   pedido figura como **"Finalizado por el admin"** (en el pedido, el seguimiento del panel y el
+   historial del cadete).
 
 ---
 
