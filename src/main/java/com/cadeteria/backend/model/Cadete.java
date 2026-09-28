@@ -213,6 +213,30 @@ public class Cadete {
     private Integer ultimaVersionApp;
     private Instant ultimaVersionAppEn;
 
+    /**
+     * Veces que intentó marcar Retirado/Entregado con una app de ubicación simulada (carril B,
+     * 2026-09-28). Va en el cadete y no sale de los pedidos porque el intento no se deja marcar
+     * y el pedido puede terminar en otro cadete. null = nunca.
+     */
+    private Integer intentosUbicacionSimulada;
+    private Instant ultimoIntentoUbicacionSimuladaEn;
+
+    public Integer getIntentosUbicacionSimulada() {
+        return intentosUbicacionSimulada;
+    }
+
+    public void setIntentosUbicacionSimulada(Integer intentosUbicacionSimulada) {
+        this.intentosUbicacionSimulada = intentosUbicacionSimulada;
+    }
+
+    public Instant getUltimoIntentoUbicacionSimuladaEn() {
+        return ultimoIntentoUbicacionSimuladaEn;
+    }
+
+    public void setUltimoIntentoUbicacionSimuladaEn(Instant ultimoIntentoUbicacionSimuladaEn) {
+        this.ultimoIntentoUbicacionSimuladaEn = ultimoIntentoUbicacionSimuladaEn;
+    }
+
     public String getId() {
         return id;
     }

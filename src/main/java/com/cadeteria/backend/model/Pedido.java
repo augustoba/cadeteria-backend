@@ -236,6 +236,26 @@ public class Pedido {
     /** Cuándo el admin tocó "Avisar al cliente" (WhatsApp Web, 2026-09-26) — null si todavía no avisó. */
     private Instant clienteAvisadoEn;
 
+    /*
+     * Retirado / Entregado solo en el lugar (carril B, 2026-09-28). Todo nullable: los pedidos
+     * anteriores y los que marcó una APK vieja quedan en null.
+     * fueraZona = el cadete tocó "Estoy en el lugar" estando a más del radio (con foto, nadie lo aprueba);
+     * distanciaM = a cuántos metros del punto del pedido marcó.
+     */
+    private Boolean retiroFueraZona;
+    private Integer retiroDistanciaM;
+    private Boolean entregaFueraZona;
+    private Integer entregaDistanciaM;
+    /** Alguna vez intentó marcar con una app de ubicación simulada (no lo dejó). */
+    private Boolean ubicacionSimulada;
+    /** Marcó con el GPS impreciso (error mayor al tope, típico adentro de un local): no se bloqueó. */
+    private Boolean ubicacionImprecisa;
+    /** Usuario del admin que lo finalizó a mano desde el panel, y por qué (obligatorio). */
+    @Column(length = 100)
+    private String finalizadoPorAdmin;
+    @Column(length = 500)
+    private String finalizadoAdminMotivo;
+
     /** Marca manual del admin para destacarlo en el dashboard (mejora 93) — no cambia ninguna lógica de asignación. */
     @Column(nullable = false)
     private boolean prioritario = false;
@@ -790,5 +810,69 @@ public class Pedido {
 
     public void setMontoValores(BigDecimal montoValores) {
         this.montoValores = montoValores;
+    }
+
+    public Boolean getRetiroFueraZona() {
+        return retiroFueraZona;
+    }
+
+    public void setRetiroFueraZona(Boolean retiroFueraZona) {
+        this.retiroFueraZona = retiroFueraZona;
+    }
+
+    public Integer getRetiroDistanciaM() {
+        return retiroDistanciaM;
+    }
+
+    public void setRetiroDistanciaM(Integer retiroDistanciaM) {
+        this.retiroDistanciaM = retiroDistanciaM;
+    }
+
+    public Boolean getEntregaFueraZona() {
+        return entregaFueraZona;
+    }
+
+    public void setEntregaFueraZona(Boolean entregaFueraZona) {
+        this.entregaFueraZona = entregaFueraZona;
+    }
+
+    public Integer getEntregaDistanciaM() {
+        return entregaDistanciaM;
+    }
+
+    public void setEntregaDistanciaM(Integer entregaDistanciaM) {
+        this.entregaDistanciaM = entregaDistanciaM;
+    }
+
+    public Boolean getUbicacionSimulada() {
+        return ubicacionSimulada;
+    }
+
+    public void setUbicacionSimulada(Boolean ubicacionSimulada) {
+        this.ubicacionSimulada = ubicacionSimulada;
+    }
+
+    public Boolean getUbicacionImprecisa() {
+        return ubicacionImprecisa;
+    }
+
+    public void setUbicacionImprecisa(Boolean ubicacionImprecisa) {
+        this.ubicacionImprecisa = ubicacionImprecisa;
+    }
+
+    public String getFinalizadoPorAdmin() {
+        return finalizadoPorAdmin;
+    }
+
+    public void setFinalizadoPorAdmin(String finalizadoPorAdmin) {
+        this.finalizadoPorAdmin = finalizadoPorAdmin;
+    }
+
+    public String getFinalizadoAdminMotivo() {
+        return finalizadoAdminMotivo;
+    }
+
+    public void setFinalizadoAdminMotivo(String finalizadoAdminMotivo) {
+        this.finalizadoAdminMotivo = finalizadoAdminMotivo;
     }
 }

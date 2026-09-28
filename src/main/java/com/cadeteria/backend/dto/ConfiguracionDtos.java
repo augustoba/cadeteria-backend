@@ -38,6 +38,13 @@ public final class ConfiguracionDtos {
              * "https://.../seguimiento/" (2026-09-25): la app le suma el token del pedido y arma el QR
              * que el cadete le muestra al cliente para que confirme que es el cadete asignado.
              */
-            String urlSeguimientoBase
+            String urlSeguimientoBase,
+            /**
+             * Retirado / Entregado solo en el lugar (carril B, 2026-09-28): radio alrededor del punto
+             * del pedido y error del GPS a partir del cual la ubicación cuenta como imprecisa. El
+             * backend vuelve a controlar con los mismos valores.
+             */
+            int enLugarRadioM,
+            int enLugarPrecisionMaxM
     ) {}
 }

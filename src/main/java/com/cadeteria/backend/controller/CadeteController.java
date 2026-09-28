@@ -293,7 +293,9 @@ public class CadeteController {
                 configuracionService.getBoolean("checklist_documentacion_obligatorio", false),
                 configuracionService.getBoolean("foto_retiro_obligatoria", false),
                 configuracionService.getBoolean("foto_entrega_obligatoria", true),
-                frontBaseUrl + "/seguimiento/"
+                frontBaseUrl + "/seguimiento/",
+                configuracionService.getInt("en_lugar_radio_m", 150),
+                configuracionService.getInt("en_lugar_precision_max_m", 100)
         );
     }
 
