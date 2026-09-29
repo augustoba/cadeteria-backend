@@ -453,10 +453,15 @@ Compila; no se vio en un teléfono.
 
 ---
 
-## ▶▶ NUEVO (2026-09-29): avisos de la calle 2ª etapa + menores — rama `mejoras-2026-09-29`
-Pedido del usuario. Lo hizo la IA de los carriles B y C. Rama `mejoras-2026-09-29` en los **3 repos**,
-salida de `develop` (con A, B y C) y pusheada. **No está en `develop`**: pasarla cuando el usuario lo pida.
-Commits: backend `46ff095`, panel `00e127c`, APK `55093e1` y `d38dce8`.
+## ▶▶ NUEVO (2026-09-29): avisos de la calle 2ª etapa + menores — **ya en `develop`**
+Pedido del usuario. Lo hizo la IA de los carriles B y C en la rama `mejoras-2026-09-29` (3 repos,
+salida de `develop` con A, B y C) y, a pedido del usuario, **se pasó a `develop` el 2026-09-29** en los
+3 repos (avance directo, sin conflictos: `develop` no tenía nada nuevo). Commits: backend `46ff095`,
+panel `00e127c`, APK `55093e1` y `d38dce8`.
+
+**Para la otra IA: antes de seguir, `git pull` de `develop` en los 3 repos** (`cadeteria`,
+`admin-front`, `cadete-app`) y hacer las **"Pruebas que faltan"** de abajo. La rama `mejoras-2026-09-29`
+queda igual que `develop`; no hace falta usarla.
 
 ### Qué se hizo
 **1. Avisos de la calle — "¿Sigue ahí?"**
