@@ -196,7 +196,12 @@ teléfonos; **volver a producción antes de tener cadetes reales**.
 | Qué | Dónde | En producción |
 | --- | --- | --- |
 | Datos de demo (incluye pedidos con reclamos e incidentes de ejemplo y los 3 cadetes `30111222`, `30222333`, `30333444` con clave `cadete123`) | `DEMO_ENABLED` | `false`; si la base de producción arrancó con demo, dar de baja esos cadetes |
-| Scripts de prueba local (`scripts/prueba-local/`: base nueva con demo y escenario de avisos) | solo PCs de desarrollo | no se usan en el servidor |
+| Scripts de prueba local (`scripts/prueba-local/`: base nueva con demo y escenario de avisos; cargan solos el Cloudinary de prueba `jitutkbc`) | solo PCs de desarrollo | no se usan en el servidor |
+| `cadeteria-apk/app/google-services.json` **commiteado** (2026-09-29, repo público) del proyecto Firebase de prueba `cadeteria-6a388` | repo de la APK | producción usa **otro proyecto Firebase**: reemplazar ese archivo por el de producción al compilar la APK para repartir (no hace falta commitearlo) |
+
+**Credenciales de producción (Cloudinary, Firebase, SMTP, keys, etc.): pedírselas al usuario.**
+Ninguna está en los repos (son públicos) ni se pega en chats; las de prueba que figuran acá no se
+usan en producción.
 | Códigos simulados de WhatsApp | `WHATSAPP_MODO_SIMULADO` | `false` |
 | Admin inicial por defecto | `ADMIN_USER` / `ADMIN_PASSWORD` | propios |
 | "No borrar (solo para pruebas)" de las direcciones de Google (incluye lo del Geocoder del teléfono, `android_geocoder`) | Configuración → Integraciones (`google_cache_pausar_borrado`) | **destildado**; sacar la opción o dejarla solo para superadmin (pendientes 3c) |

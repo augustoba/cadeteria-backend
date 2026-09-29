@@ -15,10 +15,17 @@
   .\scripts\prueba-local\escenario-avisos.ps1
 .EXAMPLE
   .\scripts\prueba-local\escenario-avisos.ps1 -Votar -Url http://localhost:8081
+.EXAMPLE
+  .\scripts\prueba-local\escenario-avisos.ps1 -Lat -26.8120 -Lng -65.2890
+  Juan avisa en ese punto: con el celular logueado como 30222333 o 30333444, pasar a menos de 100 m.
 #>
 param(
     [string]$Url = "http://localhost:8080",
-    [switch]$Votar
+    [switch]$Votar,
+    # Dónde se arma todo (por defecto la plaza Independencia). Para "¿Sigue ahí?" con un celular de
+    # verdad, poné un punto por donde vas a pasar (Google Maps: mantener apretado -> copia "lat, lng").
+    [double]$Lat = -26.8305,
+    [double]$Lng = -65.2038
 )
 
 $ErrorActionPreference = "Stop"
@@ -47,11 +54,11 @@ function Login([string]$Dni) {
     (Llamar POST "/api/auth/login/cadete" $null @{ username = $Dni; password = "cadete123" }).token
 }
 
-# Plaza Independencia (San Miguel de Tucumán); cada cadete a unos 100-200 m.
+# Juan avisa en el punto; Marcos y Ana quedan a unos 100-200 m.
 $cadetes = @(
-    @{ dni = "30111222"; nombre = "Juan";   lat = -26.8305; lng = -65.2038 },
-    @{ dni = "30222333"; nombre = "Marcos"; lat = -26.8315; lng = -65.2050 },
-    @{ dni = "30333444"; nombre = "Ana";    lat = -26.8295; lng = -65.2025 }
+    @{ dni = "30111222"; nombre = "Juan";   lat = $Lat;          lng = $Lng },
+    @{ dni = "30222333"; nombre = "Marcos"; lat = $Lat - 0.0010; lng = $Lng - 0.0012 },
+    @{ dni = "30333444"; nombre = "Ana";    lat = $Lat + 0.0010; lng = $Lng + 0.0013 }
 )
 
 foreach ($c in $cadetes) {
@@ -72,8 +79,9 @@ Write-Host "Tiene que verse en el Mapa del panel y en el 'Mapa de la calle' de l
 if (-not $Votar) {
     Write-Host ""
     Write-Host "Para probar '¿Sigue ahí?' por API volvé a correrlo con -Votar."
-    Write-Host "Para la APK: entrá con 30222333 o 30333444 y mandá la posición del emulador cerca:"
-    Write-Host "  adb emu geo fix $($juan.lng) $($juan.lat)"
+    Write-Host "Para la APK: entrá con 30222333 o 30333444 (Libre) y pasá a menos de 100 m del aviso."
+    Write-Host "  Celular: andá hasta ahí. Emulador: adb emu geo fix $($juan.lng) $($juan.lat)"
+    Write-Host "  Ojo: Juan no puede estar logueado en el celular (el aviso es suyo)."
     return
 }
 

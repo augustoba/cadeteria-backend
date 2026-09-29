@@ -465,6 +465,14 @@ Pedido del usuario. Rama `mapa-avisos-calle` en **backend** y **APK** (el panel 
 - `escenario-avisos.ps1 [-Votar]`: pone a los 3 cadetes Libres cerca de la plaza, Juan avisa un
   control y, con `-Votar`, corre la **prueba 2 de abajo entera** e informa cada resultado.
 - Backend: `DemoCadeteZonaSeeder` siembra un tercer cadete (hacen falta tres para "¿Sigue ahí?").
+- **Cloudinary de prueba** (`jitutkbc` / `estilospequenos`) se carga solo al arrancar si la base no
+  tiene uno. **Firebase**: `google-services.json` de la APK ahora está en el repo; la **cuenta de
+  servicio del backend NO** (clave privada, repo público): **pedírsela al usuario**, que la copia a
+  mano a `%USERPROFILE%\secretos\firebase-cadeteria.json` (sin ella no hay push con la app cerrada).
+- **Celular de verdad**: el LEEME explica misma WiFi (IP que muestra `levantar.ps1` + firewall) o
+  túnel (`despliegue.md` §6). `escenario-avisos.ps1 -Lat -Lng` crea el aviso donde vas a pasar.
+- **Para desplegar: todas las credenciales de producción se le piden al usuario** (serán otras
+  cuentas; ninguna va al repo).
 - **Ojo con la prueba 2 de abajo**: SIGUE sobre un aviso recién creado **no** mueve `venceEn`
   (dura 60 min y SIGUE lo lleva a 30 desde ahora; nunca acorta). Es lo que dice el código, no un
   error: la prueba esperaba "+30 min" por error.
