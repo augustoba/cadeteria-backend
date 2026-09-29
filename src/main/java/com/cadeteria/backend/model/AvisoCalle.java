@@ -40,6 +40,17 @@ public class AvisoCalle {
     @Column(nullable = false)
     private Instant venceEn;
 
+    /** Cuándo lo bajaron dos "ya no está" de cadetes distintos (segunda etapa, 2026-09-29); null si no. */
+    private Instant bajadoEn;
+
+    public Instant getBajadoEn() {
+        return bajadoEn;
+    }
+
+    public void setBajadoEn(Instant bajadoEn) {
+        this.bajadoEn = bajadoEn;
+    }
+
     public String getId() {
         return id;
     }

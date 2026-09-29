@@ -3,8 +3,10 @@ package com.cadeteria.backend.service;
 import com.cadeteria.backend.common.TooManyRequestsException;
 import com.cadeteria.backend.dto.AvisoCalleDtos.AvisoCalleResponse;
 import com.cadeteria.backend.model.AvisoCalle;
+import com.cadeteria.backend.model.AvisoCalleVoto;
 import com.cadeteria.backend.model.Cadete;
 import com.cadeteria.backend.repository.AvisoCalleRepository;
+import com.cadeteria.backend.repository.AvisoCalleVotoRepository;
 import com.cadeteria.backend.repository.CadeteRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,19 +37,82 @@ public class AvisoCalleService {
     /** Una posición más vieja que esto no dice dónde anda el cadete ahora. */
     static final Duration POSICION_MAX_ANTIGUEDAD = Duration.ofMinutes(10);
 
+    /** "Sigue" lo deja vivo al menos esto más desde ahora (segunda etapa, 2026-09-29). */
+    static final String CLAVE_EXTENSION_MIN = "avisos_calle_extension_min";
+    /** Con tantos "ya no está" de cadetes distintos se baja. */
+    static final String CLAVE_YA_NO_ESTA_PARA_BAJAR = "avisos_calle_ya_no_esta_para_bajar";
+
     private final AvisoCalleRepository repo;
+    private final AvisoCalleVotoRepository votoRepo;
     private final CadeteRepository cadeteRepo;
     private final ConfiguracionService configuracion;
     private final GeocodingProxyService geocoding;
     private final WebSocketPublisher publisher;
 
-    public AvisoCalleService(AvisoCalleRepository repo, CadeteRepository cadeteRepo, ConfiguracionService configuracion,
-                             GeocodingProxyService geocoding, WebSocketPublisher publisher) {
+    public AvisoCalleService(AvisoCalleRepository repo, AvisoCalleVotoRepository votoRepo, CadeteRepository cadeteRepo,
+                             ConfiguracionService configuracion, GeocodingProxyService geocoding, WebSocketPublisher publisher) {
         this.repo = repo;
+        this.votoRepo = votoRepo;
         this.cadeteRepo = cadeteRepo;
         this.configuracion = configuracion;
         this.geocoding = geocoding;
         this.publisher = publisher;
+    }
+
+    /**
+     * "¿Sigue ahí?" (segunda etapa, 2026-09-29): un cadete que pasa cerca contesta. SIGUE → vence en
+     * {@code avisos_calle_extension_min} (30) desde ahora si eso es más tarde que lo que tenía.
+     * YA_NO_ESTA → con {@code avisos_calle_ya_no_esta_para_bajar} (2) cadetes distintos se baja (vence
+     * ya). Un voto por cadete y aviso (si cambia de opinión se actualiza); el que lo avisó no vota.
+     * El cambio les llega a los cadetes cercanos y al Mapa del panel.
+     */
+    public AvisoCalle votar(String cadeteUsername, String avisoId, String voto) {
+        Cadete cadete = cadeteRepo.findByUsername(cadeteUsername)
+                .orElseThrow(() -> com.cadeteria.backend.common.ResourceNotFoundException.of("Cadete", cadeteUsername));
+        AvisoCalle aviso = repo.findById(avisoId)
+                .orElseThrow(() -> com.cadeteria.backend.common.ResourceNotFoundException.of("Aviso de la calle", avisoId));
+        Instant ahora = Instant.now();
+        if (!aviso.getVenceEn().isAfter(ahora)) {
+            throw new com.cadeteria.backend.common.ConflictException("Ese aviso ya no está activo.");
+        }
+        if (aviso.getCadete().getId().equals(cadete.getId())) {
+            throw new com.cadeteria.backend.common.BadRequestException("No podés contestar tu propio aviso.");
+        }
+        AvisoCalleVoto v = votoRepo.findByAvisoIdAndCadeteId(avisoId, cadete.getId()).orElseGet(() -> {
+            AvisoCalleVoto nuevo = new AvisoCalleVoto();
+            nuevo.setId(UUID.randomUUID().toString());
+            nuevo.setAviso(aviso);
+            nuevo.setCadete(cadete);
+            return nuevo;
+        });
+        v.setVoto(voto);
+        v.setCreadoEn(ahora);
+        votoRepo.save(v);
+
+        if (AvisoCalleVoto.SIGUE.equals(voto)) {
+            Instant extendido = ahora.plus(Duration.ofMinutes(configuracion.getInt(CLAVE_EXTENSION_MIN, 30)));
+            if (extendido.isAfter(aviso.getVenceEn())) aviso.setVenceEn(extendido);
+        } else if (votoRepo.countByAvisoIdAndVoto(avisoId, AvisoCalleVoto.YA_NO_ESTA)
+                >= configuracion.getInt(CLAVE_YA_NO_ESTA_PARA_BAJAR, 2)) {
+            aviso.setVenceEn(ahora);
+            aviso.setBajadoEn(ahora);
+        }
+        repo.save(aviso);
+
+        AvisoCalleResponse paraCadetes = AvisoCalleResponse.paraCadete(aviso);
+        for (Cadete destinatario : destinatarios(aviso, cadeteRepo.findAll(), ahora)) {
+            publisher.publicarAvisoCalle(destinatario.getId(), paraCadetes);
+        }
+        publisher.publicarAvisoCalleAdmin(AvisoCalleResponse.paraPanel(aviso));
+        return aviso;
+    }
+
+    @Transactional(readOnly = true)
+    public com.cadeteria.backend.dto.AvisoCalleDtos.ResumenAvisosCadete resumenCadete(String cadeteId) {
+        return new com.cadeteria.backend.dto.AvisoCalleDtos.ResumenAvisosCadete(
+                repo.countByCadeteId(cadeteId),
+                votoRepo.avisosDelCadeteMarcadosYaNoEsta(cadeteId),
+                repo.countByCadeteIdAndBajadoEnIsNotNull(cadeteId));
     }
 
     public AvisoCalle crear(String cadeteUsername, String tipo, double lat, double lng) {

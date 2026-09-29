@@ -6,6 +6,8 @@ import com.cadeteria.backend.model.AvisoCalle;
 import com.cadeteria.backend.model.Cadete;
 import com.cadeteria.backend.model.EstadoCadete;
 import com.cadeteria.backend.repository.AvisoCalleRepository;
+import com.cadeteria.backend.repository.AvisoCalleVotoRepository;
+import com.cadeteria.backend.model.AvisoCalleVoto;
 import com.cadeteria.backend.repository.CadeteRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,6 +30,7 @@ class AvisoCalleServiceTest {
     private static final double QUINIENTOS_M = 0.0045, MIL_QUINIENTOS_M = 0.0135;
 
     private AvisoCalleRepository repo;
+    private AvisoCalleVotoRepository votoRepo;
     private CadeteRepository cadeteRepo;
     private WebSocketPublisher publisher;
     private GeocodingProxyService geocoding;
@@ -42,7 +45,8 @@ class AvisoCalleServiceTest {
         geocoding = mock(GeocodingProxyService.class);
         ConfiguracionService config = mock(ConfiguracionService.class);
         when(config.getInt(anyString(), anyInt())).thenAnswer(i -> i.getArgument(1));
-        service = new AvisoCalleService(repo, cadeteRepo, config, geocoding, publisher);
+        votoRepo = mock(AvisoCalleVotoRepository.class);
+        service = new AvisoCalleService(repo, votoRepo, cadeteRepo, config, geocoding, publisher);
 
         avisa = cadete("c-avisa", "LIBRE", LAT, LNG, Instant.now());
         when(cadeteRepo.findByUsername("30111222")).thenReturn(Optional.of(avisa));
@@ -145,5 +149,110 @@ class AvisoCalleServiceTest {
         verify(repo).findByVenceEnAfterOrderByCreadoEnDesc(corte.capture());
         assertTrue(Math.abs(Duration.between(corte.getValue(), Instant.now()).toSeconds()) < 5,
                 "los vencidos (venceEn antes de ahora) quedan afuera");
+    }
+
+    // ---- "¿Sigue ahí?" (segunda etapa, 2026-09-29) ----
+
+    private AvisoCalle avisoActivo(Instant venceEn) {
+        AvisoCalle a = new AvisoCalle();
+        a.setId("av1");
+        a.setTipo("CONTROL");
+        a.setLat(LAT);
+        a.setLng(LNG);
+        a.setCadete(avisa);
+        a.setCreadoEn(Instant.now().minus(Duration.ofMinutes(50)));
+        a.setVenceEn(venceEn);
+        when(repo.findById("av1")).thenReturn(Optional.of(a));
+        return a;
+    }
+
+    private Cadete otro(String id, String username) {
+        Cadete c = cadete(id, "LIBRE", LAT, LNG, Instant.now());
+        when(cadeteRepo.findByUsername(username)).thenReturn(Optional.of(c));
+        return c;
+    }
+
+    @Test
+    void sigueLoExtiendeTreintaMinutosDesdeAhora() {
+        AvisoCalle a = avisoActivo(Instant.now().plus(Duration.ofMinutes(10)));
+        otro("c2", "40111222");
+        when(cadeteRepo.findAll()).thenReturn(List.of());
+        when(votoRepo.findByAvisoIdAndCadeteId("av1", "c2")).thenReturn(Optional.empty());
+
+        service.votar("40111222", "av1", AvisoCalleVoto.SIGUE);
+
+        long minutos = Duration.between(Instant.now(), a.getVenceEn()).toMinutes();
+        assertTrue(minutos >= 29 && minutos <= 30, "vence en ~30 min, no en 10: " + minutos);
+        assertNull(a.getBajadoEn());
+        verify(publisher).publicarAvisoCalleAdmin(any());
+    }
+
+    @Test
+    void sigueNoAcortaUnAvisoQueVenceMasTarde() {
+        Instant vence = Instant.now().plus(Duration.ofMinutes(50));
+        AvisoCalle a = avisoActivo(vence);
+        otro("c2", "40111222");
+        when(cadeteRepo.findAll()).thenReturn(List.of());
+        when(votoRepo.findByAvisoIdAndCadeteId("av1", "c2")).thenReturn(Optional.empty());
+
+        service.votar("40111222", "av1", AvisoCalleVoto.SIGUE);
+        assertEquals(vence, a.getVenceEn());
+    }
+
+    @Test
+    void conUnYaNoEstaSigueYConDosDeCadetesDistintosSeBaja() {
+        AvisoCalle a = avisoActivo(Instant.now().plus(Duration.ofMinutes(30)));
+        otro("c2", "40111222");
+        when(cadeteRepo.findAll()).thenReturn(List.of());
+        when(votoRepo.findByAvisoIdAndCadeteId(eq("av1"), anyString())).thenReturn(Optional.empty());
+
+        when(votoRepo.countByAvisoIdAndVoto("av1", AvisoCalleVoto.YA_NO_ESTA)).thenReturn(1L);
+        service.votar("40111222", "av1", AvisoCalleVoto.YA_NO_ESTA);
+        assertNull(a.getBajadoEn(), "con uno solo no se baja");
+
+        when(votoRepo.countByAvisoIdAndVoto("av1", AvisoCalleVoto.YA_NO_ESTA)).thenReturn(2L);
+        otro("c3", "40333444");
+        service.votar("40333444", "av1", AvisoCalleVoto.YA_NO_ESTA);
+        assertNotNull(a.getBajadoEn());
+        assertFalse(a.getVenceEn().isAfter(Instant.now()), "bajado = vence ya");
+    }
+
+    @Test
+    void elQueAvisoNoContestaYUnAvisoVencidoTampoco() {
+        avisoActivo(Instant.now().plus(Duration.ofMinutes(30)));
+        assertThrows(com.cadeteria.backend.common.BadRequestException.class,
+                () -> service.votar("30111222", "av1", AvisoCalleVoto.YA_NO_ESTA));
+
+        avisoActivo(Instant.now().minus(Duration.ofMinutes(1)));
+        otro("c2", "40111222");
+        assertThrows(com.cadeteria.backend.common.ConflictException.class,
+                () -> service.votar("40111222", "av1", AvisoCalleVoto.SIGUE));
+    }
+
+    @Test
+    void siCambiaDeOpinionSeActualizaElMismoVoto() {
+        avisoActivo(Instant.now().plus(Duration.ofMinutes(30)));
+        Cadete c2 = otro("c2", "40111222");
+        when(cadeteRepo.findAll()).thenReturn(List.of());
+        AvisoCalleVoto previo = new AvisoCalleVoto();
+        previo.setId("v1");
+        previo.setCadete(c2);
+        previo.setVoto(AvisoCalleVoto.YA_NO_ESTA);
+        when(votoRepo.findByAvisoIdAndCadeteId("av1", "c2")).thenReturn(Optional.of(previo));
+
+        service.votar("40111222", "av1", AvisoCalleVoto.SIGUE);
+        assertEquals(AvisoCalleVoto.SIGUE, previo.getVoto());
+        verify(votoRepo).save(previo);
+    }
+
+    @Test
+    void resumenParaLaFicha() {
+        when(repo.countByCadeteId("c-avisa")).thenReturn(7L);
+        when(votoRepo.avisosDelCadeteMarcadosYaNoEsta("c-avisa")).thenReturn(3L);
+        when(repo.countByCadeteIdAndBajadoEnIsNotNull("c-avisa")).thenReturn(1L);
+        var r = service.resumenCadete("c-avisa");
+        assertEquals(7, r.avisados());
+        assertEquals(3, r.marcadosYaNoEsta());
+        assertEquals(1, r.bajados());
     }
 }

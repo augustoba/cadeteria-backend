@@ -30,6 +30,17 @@ public final class AvisoCalleDtos {
             @NotNull(message = "Falta tu ubicación.") @DecimalMin("-180") @DecimalMax("180") Double lng,
             @PositiveOrZero Float precision) {}
 
+    /** "¿Sigue ahí?" (segunda etapa, 2026-09-29). */
+    public record VotoRequest(
+            @NotBlank(message = "Falta la respuesta.")
+            @Pattern(regexp = "SIGUE|YA_NO_ESTA", message = "La respuesta tiene que ser SIGUE o YA_NO_ESTA.") String voto) {}
+
+    /**
+     * Ficha del cadete: cuántos avisos mandó, a cuántos otro cadete les contestó "ya no está" y cuántos
+     * se bajaron (dos "ya no está" de cadetes distintos). Sirve para ver quién avisa cosas que no son.
+     */
+    public record ResumenAvisosCadete(long avisados, long marcadosYaNoEsta, long bajados) {}
+
     /**
      * Lo que ven los cadetes y el panel. cadeteNombre (quién avisó) va solo para el panel: a los
      * cadetes les llega null.

@@ -39,4 +39,18 @@ public class AvisoCalleController {
     public List<AvisoCalleResponse> activos() {
         return service.activos().stream().map(AvisoCalleResponse::paraPanel).toList();
     }
+
+    /** "¿Sigue ahí?" (segunda etapa, 2026-09-29): SIGUE o YA_NO_ESTA de un cadete que pasa cerca. */
+    @PostMapping("/api/cadetes/me/avisos-calle/{id}/voto")
+    public AvisoCalleResponse votar(@PathVariable String id,
+                                    @Valid @RequestBody com.cadeteria.backend.dto.AvisoCalleDtos.VotoRequest req,
+                                    Authentication auth) {
+        return AvisoCalleResponse.paraCadete(service.votar(auth.getName(), id, req.voto()));
+    }
+
+    /** Ficha del cadete: avisos que mandó y cuántos otros marcaron "ya no está". */
+    @GetMapping("/api/admin/cadetes/{id}/avisos-calle")
+    public com.cadeteria.backend.dto.AvisoCalleDtos.ResumenAvisosCadete resumenCadete(@PathVariable String id) {
+        return service.resumenCadete(id);
+    }
 }

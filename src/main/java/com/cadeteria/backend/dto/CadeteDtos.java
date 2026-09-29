@@ -103,7 +103,9 @@ public final class CadeteDtos {
             /** Última versión de APK con la que se logueó, y cuándo — null si nunca lo reportó (mejora 2026-09-17). */
             Integer ultimaVersionApp, Instant ultimaVersionAppEn,
             /** Última calle que resolvió el teléfono del cadete, y cuándo (2026-09-26) — null si nunca mandó. */
-            String calleTelefono, Instant calleTelefonoEn
+            String calleTelefono, Instant calleTelefonoEn,
+            /** Constancia de mayor de edad (2026-09-26): cuándo y quién ("postulante" o el admin que lo cargó). */
+            Instant mayorEdadDeclaradaEn, String mayorEdadDeclaradaPor
     ) {
         /** Conveniencia para los endpoints que no recalculan la calificación (una mutación puntual, no la lista). */
         public static CadeteResponse from(Cadete c) {
@@ -126,7 +128,8 @@ public final class CadeteDtos {
                     c.getMontoSemanalActual(),
                     c.getCreditoDisponible(), c.getNotasInternas(),
                     c.getUltimaVersionApp(), c.getUltimaVersionAppEn(),
-                    c.getCalleTelefono(), c.getCalleTelefonoEn());
+                    c.getCalleTelefono(), c.getCalleTelefonoEn(),
+                    c.getMayorEdadDeclaradaEn(), c.getMayorEdadDeclaradaPor());
         }
 
         /**
@@ -162,7 +165,8 @@ public final class CadeteDtos {
                     r.montoSemanalActual(),
                     r.creditoDisponible(), r.notasInternas(),
                     r.ultimaVersionApp(), r.ultimaVersionAppEn(),
-                    r.calleTelefono(), r.calleTelefonoEn());
+                    r.calleTelefono(), r.calleTelefonoEn(),
+                    r.mayorEdadDeclaradaEn(), r.mayorEdadDeclaradaPor());
         }
     }
 

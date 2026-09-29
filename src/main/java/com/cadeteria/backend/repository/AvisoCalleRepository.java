@@ -13,4 +13,9 @@ public interface AvisoCalleRepository extends JpaRepository<AvisoCalle, String> 
 
     /** Para el tope de avisos por hora de cada cadete. */
     long countByCadeteIdAndCreadoEnAfter(String cadeteId, Instant desde);
+
+    /** Para la ficha del cadete: cuántos avisó y cuántos le bajaron con "ya no está". */
+    long countByCadeteId(String cadeteId);
+
+    long countByCadeteIdAndBajadoEnIsNotNull(String cadeteId);
 }
