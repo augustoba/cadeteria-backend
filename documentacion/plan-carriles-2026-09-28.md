@@ -499,6 +499,34 @@ se mandó solo al volver la red con esa hora, la foto y 11 m; hora futura → us
 **No se pudo probar:** una app de GPS falso real en el emulador (el lado del backend sí), y un
 teléfono real.
 
+**Arreglos hechos (otra IA, 2026-09-28, rama `carril-c-avisos-calle`)** — backend `c5edc7d`, panel
+`d08279a`, APK `81f77b3`:
+1. **Mini mapa sin pines**: el `ShapeDrawable` no tiene tamaño propio (`intrinsicWidth` -1) y el
+   `Marker` de osmdroid lo dibujaba con ese tamaño. Ahora el pin es un `BitmapDrawable` (círculo de
+   color con borde blanco, 18 dp). Si no hay última ubicación conocida pide una
+   (`getCurrentLocation`), así aparece "Vos" y encuadra los 3 pines. **Compila; no se vio en el emulador.**
+2. **Editor del aviso**: título con margen (sin el `-mt-2` que se superponía) y el botón "Guardar
+   aviso" con clases de Tailwind propias (no depende de `.btn` de Configuración). Compila, no se miró.
+3. **Métricas → Marcas en el lugar**: cada marca cuenta en la fecha de su hecho (retiro → `retiradoEn`,
+   parada → su `entregadoEn`, entrega y admin → `finalizadoEn`). La consulta trae los pedidos creados,
+   retirados o finalizados en el rango. Test nuevo con el caso de la prueba (creado ayer, finalizado
+   hoy por el admin). La ficha del cadete sigue mostrando todo.
+4. **GPS falso en el detalle**: ahora va arriba del timeline como dato del pedido ("En este pedido el
+   cadete intentó marcar con…"), igual que "ubicación imprecisa".
+5. **Cola sin señal que no puede subir la foto** por algo que no es falta de señal (ej. Cloudinary sin
+   configurar): la sigue reintentando, pero a la 3ª falla avisa una vez con una notificación
+   "No se pudo mandar lo pendiente… Avisale a la administración".
+
+**Interruptor del control en el lugar (pedido del usuario, 2026-09-28):** Configuración → Pedidos,
+checkbox "Controlar que Retirado y Entregado se marquen en el lugar" (clave `en_lugar_control_activo`,
+**prendido por default**). Apagado: el backend no bloquea por distancia, falta de ubicación ni GPS falso
+(igual anota la distancia, "ubicación imprecisa" y el intento de GPS falso en el pedido y el cadete), y
+la APK no frena ni muestra "No estás en el lugar" (espera el GPS 8 s en vez de 30). **Lo que no se
+apaga: hay que marcar Retirado antes de poder entregar.** La APK lo lee de
+`/api/cadetes/me/configuracion` (`enLugarControlActivo`) al abrir el viaje. Test nuevo en el backend
+con el control apagado (orden sigue, lejos marca, GPS falso anota una sola vez).
+Tests: backend 256 OK, panel `ng build` OK, APK 33 OK (`--rerun-tasks`).
+
 ## Carril C — Avisos de la calle (la otra IA, cuando termine el B)
 
 **No empezar hasta terminar el carril B**: toca la APK (pantallas del cadete y conexión en vivo), que
@@ -625,6 +653,8 @@ capa del Mapa en el navegador en vivo, el 429 del tope. Solo tests con mocks y c
 - Tabla nueva `aviso_calle` (la crea Hibernate).
 - Claves opcionales sin pantalla: `avisos_calle_radio_m` (1000), `avisos_calle_duracion_min` (60).
 - La APK con los avisos es la misma `versionCode` 2 del carril B (no se volvió a subir).
+- Clave nueva con pantalla: `en_lugar_control_activo` (default `true`). Si en producción el control
+  frena de más a los cadetes, apagarlo desde Configuración → Pedidos: no hace falta redeploy.
 - Explicarle a los cadetes para qué es (y que queda registrado quién avisa) el día que se entregue.
 
 ---
