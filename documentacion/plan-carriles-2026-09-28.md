@@ -453,6 +453,52 @@ Compila; no se vio en un teléfono.
 
 ---
 
+## ▶ Próximo paso para la otra IA (pedido del usuario, 2026-09-28 noche)
+1. `git pull` de `develop` en los 3 repos (ya tiene A + B juntos, probados: ver "Pruebas de A + B juntos").
+2. **Arreglar los 5 puntos** de "Para arreglar (carril B, chicos)" de esa sección, en la rama del carril
+   C (`carril-c-avisos-calle`) o en una nueva que salga de ella, así queda todo junto.
+3. **Integrar el carril C y esos arreglos en `develop`** en los 3 repos: `git fetch`, mergear
+   `origin/develop` en la rama, `./mvnw test`, `npx ng build`, `./gradlew testDebugUnitTest assembleDebug`
+   (JDK 17), y recién ahí llevarlo a `develop` y pushear. Sin `--force`. (El 2026-09-28 Claude ya
+   verificó que el carril C no choca con `develop`.)
+4. Anotar en "Avance" qué se hizo y qué se probó. Para probar ubicación en el emulador usar un AVD
+   **con servicios de Google** (en la PC de Claude: `Pixel_5_Google`) y mandar la posición con
+   `adb emu geo fix <lng> <lat>` en un loop mientras se toca el botón.
+
+## Pruebas de A + B juntos (Claude, 2026-09-28 noche)
+Backend de `develop` (`cc80d60`) contra `cadeteria_prueba_claude` con la demo, panel en el navegador y
+APK en el emulador **Pixel_5_Google** (Android 30 con servicios de Google: el `Pixel_5` de siempre no
+los tiene y la app nunca obtiene ubicación ahí).
+
+**Anduvo:** orden Retirado → Entregado (API y APK: "Finalizar viaje" deshabilitado con "Primero marcá
+Retirado."); lejos → 400 / tarjeta "No estás en el lugar · Estás a 5,2 km del retiro"; "Estoy en el
+lugar" sin foto → 400, con foto → marca y queda fuera de zona (1001 m); GPS falso → 400 y **queda
+grabado** en `pedido.ubicacion_simulada` y en el cadete (la transacción no se deshace); "Buscando tu
+ubicación…"; Retirado en el lugar (15 m); **cola sin señal**: Entregado tocado sin red a las 23:53:42,
+se mandó solo al volver la red con esa hora, la foto y 11 m; hora futura → usa la de llegada; APK vieja
+(sin `tocadoEn`) no se bloquea; finalizar del admin sin motivo → 400 y botón deshabilitado, con motivo
+→ "🛠 por el admin"; tabla y detalle del panel con "⚠️ fuera de zona" / "🚫 GPS falso"; ficha del cadete
+"Marcas en el lugar"; Métricas; editor del aviso "en camino" con vista previa real; carril A: "colom
+4695" → "Colombia 4695 ✅" y el cartel gris del pin. El aviso "Llegaste a la entrega" también salió.
+
+**Para arreglar (carril B, chicos):**
+1. **Mini mapa del viaje sin pines**: no se ve ningún marcador (ni origen, ni destino, ni el cadete).
+   **Ya pasaba antes del carril B** (probado con la APK anterior). Además no encuadra la posición del
+   cadete. Sospecha: los `Marker` con `ShapeDrawable` + `LAYER_TYPE_SOFTWARE` en `MapaViaje`.
+2. **Editor del aviso** (`aviso-en-camino-editor.component.ts`): el título "Aviso 'en camino' por
+   WhatsApp" se superpone con el texto de abajo, y el botón "Guardar aviso" sale sin estilo (usa la
+   clase `btn`, que está definida solo en los estilos de `configuracion.component.ts`).
+3. **Métricas → Marcas en el lugar** cuenta por **fecha de creación del pedido**: un pedido creado
+   ayer y finalizado hoy por el admin no aparece en "hoy". Mejor por la fecha del hecho (retiro /
+   entrega / finalizado).
+4. Detalle del pedido: "🚫 Intentó marcar con GPS falso" aparece debajo de "Entregado" aunque el
+   intento fue en el Retirado (es un dato del pedido, no del paso). Menor.
+5. Con Cloudinary sin configurar, la cola sin señal con foto queda esperando para siempre sin avisar
+   nada (no pasa en producción, que tiene Cloudinary, pero conviene un aviso si falla varias veces).
+
+**No se pudo probar:** una app de GPS falso real en el emulador (el lado del backend sí), y un
+teléfono real.
+
 ## Carril C — Avisos de la calle (la otra IA, cuando termine el B)
 
 **No empezar hasta terminar el carril B**: toca la APK (pantallas del cadete y conexión en vivo), que
