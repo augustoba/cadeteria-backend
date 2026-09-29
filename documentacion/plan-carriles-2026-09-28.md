@@ -453,6 +453,80 @@ Compila; no se vio en un teléfono.
 
 ---
 
+## ▶▶ NUEVO (2026-09-29): avisos de la calle 2ª etapa + menores — rama `mejoras-2026-09-29`
+Pedido del usuario. Lo hizo la IA de los carriles B y C. Rama `mejoras-2026-09-29` en los **3 repos**,
+salida de `develop` (con A, B y C) y pusheada. **No está en `develop`**: pasarla cuando el usuario lo pida.
+Commits: backend `46ff095`, panel `00e127c`, APK `55093e1` y `d38dce8`.
+
+### Qué se hizo
+**1. Avisos de la calle — "¿Sigue ahí?"**
+- Backend: tabla nueva `aviso_calle_voto` (un voto por cadete y aviso, se actualiza si cambia de
+  opinión) y columna nueva `aviso_calle.bajado_en`. `POST /api/cadetes/me/avisos-calle/{id}/voto`
+  con `{"voto": "SIGUE" | "YA_NO_ESTA"}`:
+  - **SIGUE**: el aviso vence en `avisos_calle_extension_min` (30) desde ahora, si eso es más tarde
+    que lo que tenía (nunca lo acorta).
+  - **YA_NO_ESTA**: con `avisos_calle_ya_no_esta_para_bajar` (2) cadetes **distintos** se baja
+    (`venceEn` = ahora, `bajadoEn` = ahora).
+  - El que avisó no puede contestar su propio aviso (400). Un aviso vencido → 409.
+  - Después de cada voto el aviso actualizado se manda por los mismos canales (`/queue/cadete/{id}/calle`
+    a los cercanos y `/topic/admin/avisos-calle`): el Mapa lo saca solo si quedó vencido.
+- APK: cuando el servicio de ubicación ve que el cadete pasó a **menos de 100 m** de un aviso activo
+  de **otro** cadete (con GPS de error ≤ 100 m), sale una notificación "¿Sigue ahí?" con dos botones,
+  **Sigue** / **Ya no está**, que contestan sin abrir la app (`push/VotoAvisoCalleReceiver`). Una sola
+  vez por aviso. Nunca por los propios. Sin señal, la respuesta se pierde (no se encola).
+- APK: los avisos en vivo ahora los escucha `CadeteApp` (`data/local/AvisosCalleStore`), no la
+  pantalla de Inicio: notifican aunque Inicio no esté abierto, y solo la primera vez (los cambios
+  por votos actualizan la lista sin volver a sonar).
+- Panel → ficha del cadete → Desempeño: tarjeta **"Avisos de la calle"** con los avisos que mandó, a
+  cuántos otro cadete contestó "ya no está" y cuántos se bajaron (`GET /api/admin/cadetes/{id}/avisos-calle`).
+  Si la mitad o más se bajaron, aparece un aviso en rojo.
+
+**2. Menores (punto 5 de la lista de pendientes)**
+- **Kanban** del dashboard: mismos colores que la tabla (reclamo por tipo, parpadea hasta "Visto",
+  sin asignar hace rato en violeta), el texto del reclamo con **Visto** / **Cerrar**, y "⏰ Sin asignar
+  hace N min".
+- **Ficha del cadete → Datos personales**: "Mayor de 18 años" con la fecha y quién lo declaró (ya se
+  guardaba, no se mostraba). `CadeteResponse` suma `mayorEdadDeclaradaEn` y `mayorEdadDeclaradaPor`.
+- **Bundle del panel**: STOMP y SockJS se cargan recién la primera vez que algo se suscribe al tiempo
+  real (antes iban en el arranque). Bundle inicial **517,8 → 446,2 kB**, ya no sale la advertencia de
+  500 kB. Se aprovechó para arreglar que cancelar una suscripción antes de conectar la dejaba activa.
+- **APK versionado**: el APK para repartir ahora vive en `cadete-app/distribucion/cadete-app-debug.apk`
+  y se copia **a mano** (ver `distribucion/LEEME.md`). `app/build/` ya no va al repo: compilar no deja
+  cambios. **Ojo: el APK que hay ahí es viejo** (el mismo que estaba antes, `versionCode` 1, sin B ni
+  C). Antes de repartir hay que compilar y copiarlo.
+
+### Qué se probó
+- Backend `./mvnw test`: **262 OK** (6 nuevos de votos y resumen en `AvisoCalleServiceTest`).
+- APK `./gradlew testDebugUnitTest assembleDebug` (JDK 17): **35 OK** (2 nuevos en `PreguntaSigueAhiTest`);
+  compilar ya no deja el repo modificado.
+- Panel `ng build` OK (446 kB inicial, sin advertencias de tamaño).
+- **Navegador** (backend de la rama en el 8081 con `CORS_ORIGINS` incluyendo el 4201, panel en el
+  4201): login, Mapa → STOMP y SockJS se bajan recién ahí, `/ws/info` 200 y `GET /api/admin/avisos-calle` 200.
+
+### Pruebas que faltan (para la otra IA, en este orden)
+En la base de prueba `cadeteria_prueba_claude` con la demo, y la APK en el **Pixel_5_Google**:
+1. **Tiempo real del panel** con la carga diferida: con el dashboard abierto, que un pedido nuevo o un
+   cambio de estado aparezca solo (sin recargar), el chat, el Mapa en vivo de cadetes y los sonidos.
+   Es el cambio más riesgoso de esta tanda.
+2. **"¿Sigue ahí?" por API**: cadete A crea un aviso (`POST /api/cadetes/me/avisos-calle`); cadete B
+   contesta SIGUE → `venceEn` pasa a ~ahora + 30 min; A intenta contestar su propio aviso → 400;
+   B contesta YA_NO_ESTA (cambia su voto) y C YA_NO_ESTA → `bajadoEn` con fecha y el aviso desaparece
+   del Mapa del panel en vivo y de `GET /api/cadetes/me/avisos-calle`. Contestar uno vencido → 409.
+3. **"¿Sigue ahí?" en la APK**: con un aviso de otro cadete activo, mandar la posición del emulador a
+   menos de 100 m (`adb emu geo fix <lng> <lat>` en loop, el servicio de ubicación tiene que estar
+   corriendo: cadete Libre u Ocupado). Tiene que salir la notificación con **Sigue** / **Ya no está**;
+   tocar un botón la cierra y el voto llega (mirar la base o el panel). No tiene que volver a preguntar
+   por el mismo aviso, ni preguntar por uno propio.
+4. **Aviso en vivo con Inicio cerrado**: con la app en otra pantalla (ej. el viaje) o minimizada, que
+   el aviso de otro cadete igual suene, y que un voto posterior sobre ese aviso **no** vuelva a sonar.
+5. **Ficha del cadete**: la tarjeta "Avisos de la calle" con los números de la prueba 2, y en Datos
+   personales "Mayor de 18 años" (un cadete dado de alta desde `/registro` y otro viejo sin constancia).
+6. **Kanban**: un pedido con reclamo abierto (parpadea, botón Visto lo deja fijo, Cerrar lo saca) y
+   uno sin asignar hace más de `minutos_pedido_urgente_reintentar` (violeta y "⏰ Sin asignar hace N min").
+7. **APK en `distribucion/`**: compilar con JDK 17 y confirmar que `git status` queda limpio.
+
+---
+
 ## ▶ Próximo paso para la otra IA (pedido del usuario, 2026-09-28 noche)
 1. `git pull` de `develop` en los 3 repos (ya tiene A + B juntos, probados: ver "Pruebas de A + B juntos").
 2. **Arreglar los 5 puntos** de "Para arreglar (carril B, chicos)" de esa sección, en la rama del carril
