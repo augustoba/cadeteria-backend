@@ -453,6 +453,18 @@ Compila; no se vio en un teléfono.
 
 ---
 
+## ▶ Próximo paso para la otra IA (pedido del usuario, 2026-09-28 noche)
+1. `git pull` de `develop` en los 3 repos (ya tiene A + B juntos, probados: ver "Pruebas de A + B juntos").
+2. **Arreglar los 5 puntos** de "Para arreglar (carril B, chicos)" de esa sección, en la rama del carril
+   C (`carril-c-avisos-calle`) o en una nueva que salga de ella, así queda todo junto.
+3. **Integrar el carril C y esos arreglos en `develop`** en los 3 repos: `git fetch`, mergear
+   `origin/develop` en la rama, `./mvnw test`, `npx ng build`, `./gradlew testDebugUnitTest assembleDebug`
+   (JDK 17), y recién ahí llevarlo a `develop` y pushear. Sin `--force`. (El 2026-09-28 Claude ya
+   verificó que el carril C no choca con `develop`.)
+4. Anotar en "Avance" qué se hizo y qué se probó. Para probar ubicación en el emulador usar un AVD
+   **con servicios de Google** (en la PC de Claude: `Pixel_5_Google`) y mandar la posición con
+   `adb emu geo fix <lng> <lat>` en un loop mientras se toca el botón.
+
 ## Pruebas de A + B juntos (Claude, 2026-09-28 noche)
 Backend de `develop` (`cc80d60`) contra `cadeteria_prueba_claude` con la demo, panel en el navegador y
 APK en el emulador **Pixel_5_Google** (Android 30 con servicios de Google: el `Pixel_5` de siempre no
