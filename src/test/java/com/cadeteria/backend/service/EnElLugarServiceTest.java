@@ -45,4 +45,21 @@ class EnElLugarServiceTest {
         assertEquals(1, r.vecesFinalizadoPorAdmin());
         assertEquals(2, r.intentosUbicacionSimulada());
     }
+
+    @Test
+    void enMetricasCadaMarcaCuentaEnLaFechaDeSuHecho() {
+        java.time.Instant hoy = java.time.Instant.parse("2026-09-28T03:00:00Z");
+        java.time.Instant manana = hoy.plus(java.time.Duration.ofDays(1));
+        Pedido p = new Pedido();
+        p.setCreadoEn(hoy.minus(java.time.Duration.ofHours(20)));      // ayer
+        p.setRetiradoEn(hoy.minus(java.time.Duration.ofHours(19)));    // ayer
+        p.setRetiroFueraZona(true);
+        p.setFinalizadoEn(hoy.plus(java.time.Duration.ofHours(10)));   // hoy
+        p.setFinalizadoPorAdmin("admin");
+
+        assertEquals(List.of("FINALIZADO_POR_ADMIN"), EnElLugarService.registro(p, hoy, manana).tipos(),
+                "el retiro fuera de zona fue ayer; el cierre del admin, hoy");
+        assertEquals(List.of("RETIRO_FUERA_ZONA", "FINALIZADO_POR_ADMIN"), EnElLugarService.registro(p).tipos(),
+                "en la ficha (sin rango) van las dos");
+    }
 }

@@ -45,6 +45,8 @@ public final class ConfiguracionDtos {
              * backend vuelve a controlar con los mismos valores.
              */
             int enLugarRadioM,
-            int enLugarPrecisionMaxM
+            int enLugarPrecisionMaxM,
+            /** Interruptor de Configuración: apagado, la app no frena por distancia ni GPS (solo exige el orden). */
+            boolean enLugarControlActivo
     ) {}
 }

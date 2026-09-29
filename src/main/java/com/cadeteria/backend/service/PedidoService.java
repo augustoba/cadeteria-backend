@@ -1420,6 +1420,16 @@ public class PedidoService {
     static final String CLAVE_RADIO_M = "en_lugar_radio_m";
     /** Error del GPS a partir del cual la ubicación se considera imprecisa (no bloquea, queda anotado). */
     static final String CLAVE_PRECISION_MAX_M = "en_lugar_precision_max_m";
+    /**
+     * Interruptor en Configuración (pedido del usuario, 2026-09-28: "por las dudas falle en producción y
+     * bloquee a los cadetes"). Apagado, Retirado/parada/Entregado no se bloquean por distancia, falta de
+     * ubicación ni GPS falso (todo eso igual queda anotado). El orden Retirado → Entregado sigue siempre.
+     */
+    public static final String CLAVE_CONTROL_ACTIVO = "en_lugar_control_activo";
+
+    private boolean controlActivo() {
+        return configuracionService.getBoolean(CLAVE_CONTROL_ACTIVO, true);
+    }
     /** Tolerancia para relojes de celular adelantados al mandar la hora del toque. */
     private static final Duration TOLERANCIA_RELOJ = Duration.ofMinutes(2);
 
@@ -1449,10 +1459,17 @@ public class PedidoService {
                     : (int) Math.round(GeocodingService.distanciaKm(marca.lat(), marca.lng(), puntoLat, puntoLng) * 1000);
             return new ControlLugar(distancia, false, false, hora);
         }
-        registrarSiEsSimulada(pedido, cadete, marca);
+        // (El GPS falso ya se miró antes, con registrarSiEsSimulada, en cada método que llega acá.)
         boolean enElLugar = Boolean.TRUE.equals(marca.enElLugar());
         if (puntoLat == null || puntoLng == null) {
             return new ControlLugar(null, false, false, hora); // el pedido no tiene el punto ubicado: nada que medir
+        }
+        if (!controlActivo()) {
+            // Control apagado desde Configuración: no se bloquea nada, solo se anota a qué distancia marcó.
+            Integer distancia = marca.lat() == null || marca.lng() == null ? null
+                    : (int) Math.round(GeocodingService.distanciaKm(marca.lat(), marca.lng(), puntoLat, puntoLng) * 1000);
+            boolean imprecisa = marca.precision() != null && marca.precision() > configuracionService.getInt(CLAVE_PRECISION_MAX_M, 100);
+            return new ControlLugar(distancia, false, imprecisa, hora);
         }
         if (marca.lat() == null || marca.lng() == null) {
             if (!enElLugar) {
@@ -1488,6 +1505,7 @@ public class PedidoService {
         cadete.setIntentosUbicacionSimulada((cadete.getIntentosUbicacionSimulada() == null ? 0 : cadete.getIntentosUbicacionSimulada()) + 1);
         cadete.setUltimoIntentoUbicacionSimuladaEn(Instant.now());
         cadeteRepo.save(cadete);
+        if (!controlActivo()) return; // control apagado: queda anotado pero no se bloquea
         throw new UbicacionSimuladaException(
                 "Tu celular está usando una ubicación simulada. Desactivá la app de GPS falso para poder marcar.");
     }

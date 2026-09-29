@@ -295,7 +295,8 @@ public class CadeteController {
                 configuracionService.getBoolean("foto_entrega_obligatoria", true),
                 frontBaseUrl + "/seguimiento/",
                 configuracionService.getInt("en_lugar_radio_m", 150),
-                configuracionService.getInt("en_lugar_precision_max_m", 100)
+                configuracionService.getInt("en_lugar_precision_max_m", 100),
+                configuracionService.getBoolean("en_lugar_control_activo", true)
         );
     }
 

@@ -43,6 +43,7 @@ class PedidoServiceEnElLugarTest {
     private static final double OCHOCIENTOS_M = 0.0072;
 
     private PedidoService service;
+    private ConfiguracionService config;
     private Pedido pedido;
     private Cadete cadete;
 
@@ -51,7 +52,7 @@ class PedidoServiceEnElLugarTest {
         PedidoRepository repo = mock(PedidoRepository.class);
         CadeteRepository cadeteRepo = mock(CadeteRepository.class);
         EstadoPedidoRepository estadoRepo = mock(EstadoPedidoRepository.class);
-        ConfiguracionService config = mock(ConfiguracionService.class);
+        config = mock(ConfiguracionService.class);
         service = new PedidoService(
                 repo, cadeteRepo, estadoRepo, mock(ResultadoOfertaRepository.class), mock(OfertaPedidoRepository.class),
                 mock(EstadoCadeteRepository.class), config,
@@ -268,6 +269,28 @@ class PedidoServiceEnElLugarTest {
         assertEquals("FINALIZADO", p.getEstado().getId());
         assertEquals("admin", p.getFinalizadoPorAdmin());
         assertEquals("El cadete se quedó sin batería", p.getFinalizadoAdminMotivo());
+    }
+
+    @Test
+    void conElControlApagadoNoBloqueaPeroAnotaYElOrdenSigue() {
+        when(config.getBoolean(PedidoService.CLAVE_CONTROL_ACTIVO, true)).thenReturn(false);
+
+        // Entregar sin Retirado sigue sin poder.
+        assertThrows(BadRequestException.class,
+                () -> service.finalizar("p1", "30111222", entrega(DESTINO_LAT, DESTINO_LNG, null, Instant.now())));
+
+        // Lejos y sin "Estoy en el lugar": marca igual, con la distancia anotada y sin "fuera de zona".
+        Pedido p = retirar(retiro(ORIGEN_LAT + OCHOCIENTOS_M, ORIGEN_LNG, 10f, null, null, null, Instant.now()));
+        assertNotNull(p.getRetiradoEn());
+        assertNull(p.getRetiroFueraZona());
+        assertTrue(p.getRetiroDistanciaM() > 700);
+
+        // GPS falso: no bloquea, pero queda registrado una sola vez.
+        FinalizarRequest falso = new FinalizarRequest("Lucía Pérez", "https://img/e.jpg", null, DESTINO_LAT, DESTINO_LNG,
+                null, 5f, null, null, Instant.now(), null, true);
+        assertEquals("FINALIZADO", service.finalizar("p1", "30111222", falso).getEstado().getId());
+        assertEquals(Boolean.TRUE, pedido.getUbicacionSimulada());
+        assertEquals(1, cadete.getIntentosUbicacionSimulada());
     }
 
     @Test

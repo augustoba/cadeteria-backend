@@ -53,7 +53,9 @@ public class EnElLugarService {
         Map<String, List<RegistroPedido>> porCadete = new LinkedHashMap<>();
         for (Pedido p : pedidoRepo.conRegistrosEnElLugar(null, desde, hasta)) {
             if (p.getCadeteAsignado() == null) continue;
-            porCadete.computeIfAbsent(p.getCadeteAsignado().getId(), k -> new ArrayList<>()).add(registro(p));
+            RegistroPedido r = registro(p, desde, hasta);
+            if (r.tipos().isEmpty()) continue;
+            porCadete.computeIfAbsent(p.getCadeteAsignado().getId(), k -> new ArrayList<>()).add(r);
         }
         List<ResumenCadete> resultado = new ArrayList<>();
         for (Cadete c : cadeteRepo.findAll()) {
@@ -78,19 +80,39 @@ public class EnElLugarService {
     }
 
     static RegistroPedido registro(Pedido p) {
+        return registro(p, null, null);
+    }
+
+    /**
+     * Con rango (Métricas), cada marca cuenta en la fecha de su hecho, no en la de creación del pedido
+     * (pruebas del 2026-09-28: un pedido de ayer finalizado hoy por el admin no aparecía en "hoy"):
+     * retiro → retiradoEn; parada → su entregadoEn; entrega, admin e imprecisa → finalizadoEn (o el
+     * retiro si todavía no terminó); GPS falso → la última de esas fechas (el pedido no guarda cuándo).
+     */
+    static RegistroPedido registro(Pedido p, Instant desde, Instant hasta) {
+        Instant ultimoHecho = p.getFinalizadoEn() != null ? p.getFinalizadoEn()
+                : p.getRetiradoEn() != null ? p.getRetiradoEn() : p.getCreadoEn();
         List<String> tipos = new ArrayList<>();
-        if (Boolean.TRUE.equals(p.getRetiroFueraZona())) tipos.add("RETIRO_FUERA_ZONA");
+        if (Boolean.TRUE.equals(p.getRetiroFueraZona()) && enRango(p.getRetiradoEn(), desde, hasta)) tipos.add("RETIRO_FUERA_ZONA");
         for (PedidoParada parada : p.getParadas()) {
-            if (Boolean.TRUE.equals(parada.getFueraZona())) tipos.add("PARADA_FUERA_ZONA");
+            if (Boolean.TRUE.equals(parada.getFueraZona()) && enRango(parada.getEntregadoEn(), desde, hasta)) {
+                tipos.add("PARADA_FUERA_ZONA");
+            }
         }
-        if (Boolean.TRUE.equals(p.getEntregaFueraZona())) tipos.add("ENTREGA_FUERA_ZONA");
-        if (Boolean.TRUE.equals(p.getUbicacionSimulada())) tipos.add("UBICACION_SIMULADA");
-        if (Boolean.TRUE.equals(p.getUbicacionImprecisa())) tipos.add("UBICACION_IMPRECISA");
-        if (p.getFinalizadoPorAdmin() != null) tipos.add("FINALIZADO_POR_ADMIN");
+        if (Boolean.TRUE.equals(p.getEntregaFueraZona()) && enRango(p.getFinalizadoEn(), desde, hasta)) tipos.add("ENTREGA_FUERA_ZONA");
+        if (Boolean.TRUE.equals(p.getUbicacionSimulada()) && enRango(ultimoHecho, desde, hasta)) tipos.add("UBICACION_SIMULADA");
+        if (Boolean.TRUE.equals(p.getUbicacionImprecisa()) && enRango(ultimoHecho, desde, hasta)) tipos.add("UBICACION_IMPRECISA");
+        if (p.getFinalizadoPorAdmin() != null && enRango(p.getFinalizadoEn(), desde, hasta)) tipos.add("FINALIZADO_POR_ADMIN");
         Cadete c = p.getCadeteAsignado();
         return new RegistroPedido(p.getId(), p.getNumero(), p.getCreadoEn(), c == null ? null : c.getId(),
                 c == null ? null : nombre(c), tipos, p.getRetiroDistanciaM(), p.getEntregaDistanciaM(),
                 p.getFinalizadoPorAdmin(), p.getFinalizadoAdminMotivo());
+    }
+
+    /** Sin rango (ficha: todo el historial) vale siempre; con rango, la fecha tiene que caer adentro. */
+    private static boolean enRango(Instant cuando, Instant desde, Instant hasta) {
+        if (desde == null || hasta == null) return true;
+        return cuando != null && !cuando.isBefore(desde) && cuando.isBefore(hasta);
     }
 
     private static String nombre(Cadete c) {

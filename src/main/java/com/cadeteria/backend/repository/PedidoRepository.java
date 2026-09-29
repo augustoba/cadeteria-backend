@@ -66,9 +66,13 @@ public interface PedidoRepository extends JpaRepository<Pedido, String> {
     /**
      * Pedidos con algo que anotar del control "en el lugar" (carril B, 2026-09-28): fuera de zona (retiro,
      * entrega o alguna parada), GPS falso, GPS impreciso o finalizado por el admin. cadeteId null = todos.
+     * Entra si el pedido se creó, se retiró o se finalizó en el rango: cada marca se cuenta después por
+     * la fecha de su propio hecho (EnElLugarService.registro).
      */
     @Query("select p from Pedido p where (:cadeteId is null or p.cadeteAsignado.id = :cadeteId)"
-            + " and p.creadoEn >= :desde and p.creadoEn < :hasta"
+            + " and ((p.creadoEn >= :desde and p.creadoEn < :hasta)"
+            + " or (p.retiradoEn >= :desde and p.retiradoEn < :hasta)"
+            + " or (p.finalizadoEn >= :desde and p.finalizadoEn < :hasta))"
             + " and (p.retiroFueraZona = true or p.entregaFueraZona = true or p.ubicacionSimulada = true"
             + " or p.ubicacionImprecisa = true or p.finalizadoPorAdmin is not null"
             + " or exists (select pp.id from PedidoParada pp where pp.pedido = p and pp.fueraZona = true))"
