@@ -360,6 +360,10 @@ Aprendido instalando en dos celulares (Moto G32 incluido) el 2026-09-26. La app 
    suspensión".
 6. Ubicación del teléfono prendida (si está apagada la app avisa sola).
 7. Login: **usuario = DNI** (solo números) y la contraseña que le da el admin.
+8. **Explicarlo en la charla (2026-09-29): mientras tenga la sesión abierta, la app comparte su
+   ubicación en cualquier estado, también Desconectado** (sirve para aprender las calles; el panel
+   lo ve en gris en el Mapa). Para cortarla: ☰ → **Salir**. No hay aviso dentro de la app: se
+   explica en persona.
 
 ### "App not installed" / "La app no se instaló"
 
