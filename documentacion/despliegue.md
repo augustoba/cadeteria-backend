@@ -177,6 +177,16 @@ teléfonos; **volver a producción antes de tener cadetes reales**.
       seguimiento no sale y el reclamo igual se cierra solo.
 - [ ] **Plantillas de SMS / vencimiento del link de seguimiento** (default 2 horas después de
       terminado el pedido): revisar los textos y las horas.
+- [ ] **Control en el lugar (2026-09-28)**: Configuración → Pedidos, "Controlar que Retirado y
+      Entregado se marquen en el lugar" (`en_lugar_control_activo`, default **prendido**). Si en la
+      calle frena de más a los cadetes, apagarlo desde ahí (no hace falta redeploy): igual queda
+      anotada la distancia y el GPS falso.
+- [ ] **Avisos de la calle (2026-09-28/29)**, claves sin pantalla (si no están, valen los defaults):
+      `avisos_calle_radio_m` (**1000**, a quién le llega el aviso), `avisos_calle_duracion_min`
+      (**60**), `avisos_calle_extension_min` (**30**, cuánto lo estira un "Sigue") y
+      `avisos_calle_ya_no_esta_para_bajar` (**2** cadetes distintos). Tablas nuevas `aviso_calle` y
+      `aviso_calle_voto` y columna `aviso_calle.bajado_en`: las crea Hibernate. Explicarles a los
+      cadetes para qué es y que queda registrado quién avisa.
 - [ ] Revisar **Salud del sistema** (al final de Configuración): todo en 🟢 o 🟡 a propósito.
 
 ---
@@ -185,7 +195,8 @@ teléfonos; **volver a producción antes de tener cadetes reales**.
 
 | Qué | Dónde | En producción |
 | --- | --- | --- |
-| Datos de demo (incluye pedidos con reclamos e incidentes de ejemplo) | `DEMO_ENABLED` | `false` |
+| Datos de demo (incluye pedidos con reclamos e incidentes de ejemplo y los 3 cadetes `30111222`, `30222333`, `30333444` con clave `cadete123`) | `DEMO_ENABLED` | `false`; si la base de producción arrancó con demo, dar de baja esos cadetes |
+| Scripts de prueba local (`scripts/prueba-local/`: base nueva con demo y escenario de avisos) | solo PCs de desarrollo | no se usan en el servidor |
 | Códigos simulados de WhatsApp | `WHATSAPP_MODO_SIMULADO` | `false` |
 | Admin inicial por defecto | `ADMIN_USER` / `ADMIN_PASSWORD` | propios |
 | "No borrar (solo para pruebas)" de las direcciones de Google (incluye lo del Geocoder del teléfono, `android_geocoder`) | Configuración → Integraciones (`google_cache_pausar_borrado`) | **destildado**; sacar la opción o dejarla solo para superadmin (pendientes 3c) |

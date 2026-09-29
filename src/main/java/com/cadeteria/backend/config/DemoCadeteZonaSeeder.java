@@ -83,7 +83,10 @@ public class DemoCadeteZonaSeeder implements CommandLineRunner {
                 moto, "Negra", "A123BCD", "Honda", "Wave", 2021, "LIBRE");
         crearCadete("30222333", "Marcos", "Gómez", "30222333", "3813020002", "mgomez@demo.cadeteria.local",
                 bici, "Roja", null, null, null, null, "DESCONECTADO");
-        log.info("Demo: 2 cadetes sembrados (usuario = DNI 30111222 o 30222333, contraseña '{}').", DEMO_PASSWORD);
+        // Tercero (2026-09-29): "¿Sigue ahí?" necesita uno que avise y dos distintos que contesten.
+        crearCadete("30333444", "Ana", "Díaz", "30333444", "3813030003", "adiaz@demo.cadeteria.local",
+                moto, "Blanca", "B456CDE", "Yamaha", "Crypton", 2022, "DESCONECTADO");
+        log.info("Demo: 3 cadetes sembrados (usuario = DNI 30111222, 30222333 o 30333444, contraseña '{}').", DEMO_PASSWORD);
     }
 
     private void crearCadete(String username, String nombre, String apellido, String dni, String telefono,

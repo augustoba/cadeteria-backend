@@ -453,6 +453,49 @@ Compila; no se vio en un teléfono.
 
 ---
 
+## ▶▶▶ NUEVO (2026-09-29, Claude): prueba local en cualquier PC + "Mapa de la calle" en la APK
+Pedido del usuario. Rama `mapa-avisos-calle` en **backend** y **APK** (el panel no se tocó).
+
+**1. Levantar todo en otra PC sin cargar nada a mano** — `cadeteria-backend/scripts/prueba-local/`
+(ver su `LEEME.md`):
+- `levantar.ps1 -Limpia`: crea la base `cadeteria_prueba` de cero, compila y arranca el backend con
+  la carga demo y WhatsApp simulado. Usuarios: panel `admin`/`cambiar123`; cadetes `30111222`,
+  `30222333` y **`30333444` (nuevo, Ana Díaz)**, clave `cadete123`. No copia la base de ninguna
+  PC (tiene teléfonos y claves y el repo está en GitHub): la carga demo arma la base igual en todas.
+- `escenario-avisos.ps1 [-Votar]`: pone a los 3 cadetes Libres cerca de la plaza, Juan avisa un
+  control y, con `-Votar`, corre la **prueba 2 de abajo entera** e informa cada resultado.
+- Backend: `DemoCadeteZonaSeeder` siembra un tercer cadete (hacen falta tres para "¿Sigue ahí?").
+- **Ojo con la prueba 2 de abajo**: SIGUE sobre un aviso recién creado **no** mueve `venceEn`
+  (dura 60 min y SIGUE lo lleva a 30 desde ahora; nunca acorta). Es lo que dice el código, no un
+  error: la prueba esperaba "+30 min" por error.
+
+**2. "Mapa de la calle" en la APK** — ☰ (arriba a la izquierda) → **Mapa de la calle**:
+- Mapa de toda la ciudad con los avisos activos (ícono por tipo 🚓 🚧 💥 ✊). Tocar uno muestra
+  "🚓 Control · Laprida 100 · hace 1 min". Quedan ahí hasta que vencen o los bajan.
+- Pide la lista al abrir, cada 1 min y con ↻; suma los que llegan en vivo. Sin conexión muestra los
+  que ya tenía. Punto azul "Vos" y centra ahí la primera vez.
+- Backend: `GET /api/cadetes/me/avisos-calle` **sin `lat`/`lng`** devuelve todos los activos
+  (con lat/lng sigue igual: los de 1 km).
+- Las notificaciones y "¿Sigue ahí?" siguen igual.
+- El **mini mapa del viaje** también muestra los avisos cercanos (no cambian el encuadre).
+- Archivos: `ui/mapacalle/` (nuevo), `ui/common/PinesMapa.kt` (nuevo; `pinDrawable` salió de
+  `ViajeScreen`), menú en `AppScaffold` y la ruta en `CadeteNavGraph`/`Routes`.
+
+**Qué se probó**
+- `levantar.ps1 -Limpia` y `escenario-avisos.ps1 -Votar` de verdad (base `cadeteria_prueba_script`,
+  8082 y 8080): 3 cadetes sembrados, 400, 409, el aviso se baja y deja de estar entre los activos.
+- Backend `./mvnw test` **262 OK**. APK `testDebugUnitTest assembleDebug` **37 OK** (2 nuevos en
+  `MapaCalleAvisosTest`).
+- Emulador `Pixel_5_Google`: ☰ muestra "Mapa de la calle"; el mapa muestra los 2 avisos (uno a más
+  de 1 km) y tocar el ícono abre el globo con tipo, calle y hace cuánto.
+
+**Qué no se probó**
+- El punto "Vos": el emulador no tenía **ninguna** ubicación (`dumpsys location`: null, ni con
+  `geo fix` en loop). El código es el mismo del mini mapa del viaje.
+- Los avisos en el mini mapa del viaje (hace falta un viaje aceptado) y un teléfono real.
+
+---
+
 ## ▶▶ NUEVO (2026-09-29): avisos de la calle 2ª etapa + menores — **ya en `develop`**
 Pedido del usuario. Lo hizo la IA de los carriles B y C en la rama `mejoras-2026-09-29` (3 repos,
 salida de `develop` con A, B y C) y, a pedido del usuario, **se pasó a `develop` el 2026-09-29** en los
@@ -514,7 +557,8 @@ En la base de prueba `cadeteria_prueba_claude` con la demo, y la APK en el **Pix
    cambio de estado aparezca solo (sin recargar), el chat, el Mapa en vivo de cadetes y los sonidos.
    Es el cambio más riesgoso de esta tanda.
 2. **"¿Sigue ahí?" por API**: cadete A crea un aviso (`POST /api/cadetes/me/avisos-calle`); cadete B
-   contesta SIGUE → `venceEn` pasa a ~ahora + 30 min; A intenta contestar su propio aviso → 400;
+   contesta SIGUE → `venceEn` pasa a ~ahora + 30 min (**no**: en un aviso nuevo no cambia, ver arriba;
+   `scripts/prueba-local/escenario-avisos.ps1 -Votar` hace esta prueba entera); A intenta contestar su propio aviso → 400;
    B contesta YA_NO_ESTA (cambia su voto) y C YA_NO_ESTA → `bajadoEn` con fecha y el aviso desaparece
    del Mapa del panel en vivo y de `GET /api/cadetes/me/avisos-calle`. Contestar uno vencido → 409.
 3. **"¿Sigue ahí?" en la APK**: con un aviso de otro cadete activo, mandar la posición del emulador a

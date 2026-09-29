@@ -2,6 +2,7 @@ package com.cadeteria.backend.controller;
 
 import com.cadeteria.backend.dto.AvisoCalleDtos.AvisoCalleRequest;
 import com.cadeteria.backend.dto.AvisoCalleDtos.AvisoCalleResponse;
+import com.cadeteria.backend.model.AvisoCalle;
 import com.cadeteria.backend.service.AvisoCalleService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -29,10 +30,14 @@ public class AvisoCalleController {
         return AvisoCalleResponse.paraCadete(service.crear(auth.getName(), req.tipo(), req.lat(), req.lng()));
     }
 
-    /** Activos cerca de donde está el cadete ("Avisos cerca tuyo" al abrir la app o al pasar a Libre). */
+    /**
+     * Activos cerca de donde está el cadete ("Avisos cerca tuyo" al abrir la app o al pasar a Libre).
+     * Sin lat/lng, todos los activos: el "Mapa de la calle" de la app (2026-09-29) muestra la ciudad.
+     */
     @GetMapping("/api/cadetes/me/avisos-calle")
-    public List<AvisoCalleResponse> cerca(@RequestParam double lat, @RequestParam double lng) {
-        return service.activosCerca(lat, lng).stream().map(AvisoCalleResponse::paraCadete).toList();
+    public List<AvisoCalleResponse> cerca(@RequestParam(required = false) Double lat, @RequestParam(required = false) Double lng) {
+        List<AvisoCalle> avisos = lat == null || lng == null ? service.activos() : service.activosCerca(lat, lng);
+        return avisos.stream().map(AvisoCalleResponse::paraCadete).toList();
     }
 
     @GetMapping("/api/admin/avisos-calle")
