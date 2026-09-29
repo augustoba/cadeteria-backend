@@ -453,6 +453,36 @@ Compila; no se vio en un teléfono.
 
 ---
 
+## ▶▶▶▶ NUEVO (2026-09-29 noche, Claude): GPS con la sesión abierta + carteles con "Entendido"
+Pedido del usuario. **GPS**: rama `gps-con-sesion` (APK + doc), **ya en `develop`**. **Carteles**:
+rama `carteles-app` en backend, APK y panel.
+
+**GPS con la sesión abierta (APK).** La ubicación se manda en cualquier estado, **también
+Desconectado** (sirve para aprender calles); corta solo "Salir" o la sesión invalidada. El panel ya
+mostraba a los desconectados en gris en el Mapa. Se les explica a los cadetes en una charla
+(`despliegue.md` §7), no hay aviso en la app. No probado con GPS real (el emulador no tiene).
+
+**Recordatorios al entrar, configurables.**
+- Panel → Configuración → App de cadetes: prender/apagar, título (60) y hasta 6 renglones de 150,
+  con subir/bajar/quitar, "Volver a los de siempre" y **vista previa** tipo celular.
+- Backend: claves `recordatorios_entrar_activo`, `recordatorios_entrar_titulo`,
+  `recordatorio_entrar_1..6` (una por renglón: `configuracion.valor` admite 500). Sin ninguna valen
+  los 3 de siempre. Valida largos al guardar (400). Van a la app en `/api/cadetes/me/configuracion`.
+  `POST /api/cadetes/me/recordatorios/entendido` guarda qué decía el cartel (tabla
+  `recordatorio_confirmacion`); `GET /api/admin/cadetes/{id}/recordatorios` → tarjeta en la ficha.
+- APK: cartel común `ui/common/CartelEntendido.kt` (se desliza si es largo, "Entendido" siempre
+  visible, no se cierra tocando afuera). Una vez por login.
+
+**Avisos generales como cartel.**
+- APK: ya no es el banner que se iba a los 8 s. Cartel con "Entendido", de a uno ("Aviso (3 sin
+  leer)"), del más viejo al más nuevo. **Leído = tocó "Entendido"** (antes se marcaba al llegar).
+  Sigue la notificación y el historial. Los recordatorios de demora del sistema siguen como banner.
+- Backend: los pendientes que se muestran son solo de los **últimos 3 días** y posteriores al alta del
+  cadete (si no, a uno nuevo le caían 20 avisos viejos juntos).
+- Panel: contador 0/1000 al escribir el aviso y "tocaron Entendido X/Y".
+
+---
+
 ## ▶▶▶ NUEVO (2026-09-29, Claude): prueba local en cualquier PC + "Mapa de la calle" en la APK
 Pedido del usuario. Rama `mapa-avisos-calle` en **backend** y **APK** (el panel no se tocó).
 

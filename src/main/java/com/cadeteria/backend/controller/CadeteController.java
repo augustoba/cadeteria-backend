@@ -279,6 +279,7 @@ public class CadeteController {
         int frecuencia = configuracionService.getInt("frecuencia_ubicacion_seg", 45);
         int versionMinima = configuracionService.getInt("version_minima_app", 1);
         boolean firmaObligatoria = configuracionService.getBoolean("firma_receptor_obligatoria", false);
+        var recordatorios = com.cadeteria.backend.service.RecordatoriosAppService.desde(valores);
         return new CadeteConfigResponse(
                 frecuencia,
                 valores.getOrDefault("cloudinary_cloud_name", ""),
@@ -296,7 +297,10 @@ public class CadeteController {
                 frontBaseUrl + "/seguimiento/",
                 configuracionService.getInt("en_lugar_radio_m", 150),
                 configuracionService.getInt("en_lugar_precision_max_m", 100),
-                configuracionService.getBoolean("en_lugar_control_activo", true)
+                configuracionService.getBoolean("en_lugar_control_activo", true),
+                recordatorios.activo(),
+                recordatorios.titulo(),
+                recordatorios.textos()
         );
     }
 

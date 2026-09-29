@@ -457,12 +457,22 @@ public class CadeteService {
      * DESCONECTADO nunca se enteraba, ni siquiera al reconectarse después. Se llama al
      * abrir la app / reconectar.
      */
+    /** Un aviso general más viejo que esto ya no sale como cartel (queda en el historial). */
+    static final java.time.Duration AVISO_PENDIENTE_MAX_ANTIGUEDAD = java.time.Duration.ofDays(3);
+
     @Transactional(readOnly = true)
     public List<AvisoGeneralResponse> avisosPendientesDe(String cadeteUsername) {
         Cadete cadete = getByUsername(cadeteUsername);
         java.util.Set<String> yaVistos = new java.util.HashSet<>(avisoLecturaRepo.avisoIdsVistosPor(cadete.getId()));
+        // Desde el 2026-09-29 "leído" es tocar "Entendido" en la app (antes se marcaba al llegar): sin
+        // este corte, un cadete nuevo o que volvió de vacaciones recibía de golpe avisos viejos que ya no
+        // sirven ("hoy cerramos temprano"). Esos quedan en el historial.
+        java.time.Instant desde = java.time.Instant.now().minus(AVISO_PENDIENTE_MAX_ANTIGUEDAD);
+        if (cadete.getCreatedAt() != null && cadete.getCreatedAt().isAfter(desde)) desde = cadete.getCreatedAt();
+        java.time.Instant corte = desde;
         return avisoRepo.findTop20ByOrderByEnviadoEnDesc().stream()
                 .filter(a -> !yaVistos.contains(a.getId()))
+                .filter(a -> !a.getEnviadoEn().isBefore(corte))
                 .map(a -> AvisoGeneralResponse.from(a, avisoLecturaRepo.countByAvisoId(a.getId())))
                 .toList();
     }

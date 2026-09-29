@@ -187,6 +187,14 @@ teléfonos; **volver a producción antes de tener cadetes reales**.
       `avisos_calle_ya_no_esta_para_bajar` (**2** cadetes distintos). Tablas nuevas `aviso_calle` y
       `aviso_calle_voto` y columna `aviso_calle.bajado_en`: las crea Hibernate. Explicarles a los
       cadetes para qué es y que queda registrado quién avisa.
+- [ ] **Recordatorios al entrar a la app (2026-09-29)**: Configuración → App de cadetes → "Cartel de
+      recordatorios al entrar". Revisar título y renglones (hasta 6 de 150 caracteres; sin tocar valen
+      los 3 de siempre). Claves `recordatorios_entrar_activo`, `recordatorios_entrar_titulo` y
+      `recordatorio_entrar_1` … `_6`. Tabla nueva `recordatorio_confirmacion` (cada "Entendido", la
+      crea Hibernate); se ve en la ficha del cadete.
+- [ ] **Avisos generales (2026-09-29)**: en la app salen como cartel y cuentan como leídos recién al
+      tocar "Entendido". A un cadete que estaba desconectado le salen al abrir la app solo si tienen
+      menos de **3 días** y son posteriores a su alta (los demás quedan en su historial).
 - [ ] Revisar **Salud del sistema** (al final de Configuración): todo en 🟢 o 🟡 a propósito.
 
 ---

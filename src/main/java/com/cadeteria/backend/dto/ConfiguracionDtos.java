@@ -47,6 +47,10 @@ public final class ConfiguracionDtos {
             int enLugarRadioM,
             int enLugarPrecisionMaxM,
             /** Interruptor de Configuración: apagado, la app no frena por distancia ni GPS (solo exige el orden). */
-            boolean enLugarControlActivo
+            boolean enLugarControlActivo,
+            /** Cartel "Antes de arrancar" (2026-09-29): se edita en Configuración; sin textos o apagado no sale. */
+            boolean recordatoriosActivo,
+            String recordatoriosTitulo,
+            java.util.List<String> recordatoriosTextos
     ) {}
 }

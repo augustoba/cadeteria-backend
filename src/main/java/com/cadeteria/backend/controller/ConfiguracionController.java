@@ -50,6 +50,7 @@ public class ConfiguracionController {
                 }
             }
         }
+        com.cadeteria.backend.service.RecordatoriosAppService.validar(req.clave(), req.valor());
         service.set(req.clave(), req.valor());
         return new ConfiguracionResponse(visibles());
     }
