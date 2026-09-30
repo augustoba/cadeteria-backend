@@ -27,7 +27,7 @@ public class AvisoCalleController {
     @PostMapping("/api/cadetes/me/avisos-calle")
     @ResponseStatus(HttpStatus.CREATED)
     public AvisoCalleResponse crear(@Valid @RequestBody AvisoCalleRequest req, Authentication auth) {
-        return AvisoCalleResponse.paraCadete(service.crear(auth.getName(), req.tipo(), req.lat(), req.lng()));
+        return AvisoCalleResponse.paraCadete(service.crear(auth.getName(), req.tipo(), req.lat(), req.lng(), req.calle(), req.altura()), auth.getName());
     }
 
     /**
@@ -35,9 +35,10 @@ public class AvisoCalleController {
      * Sin lat/lng, todos los activos: el "Mapa de la calle" de la app (2026-09-29) muestra la ciudad.
      */
     @GetMapping("/api/cadetes/me/avisos-calle")
-    public List<AvisoCalleResponse> cerca(@RequestParam(required = false) Double lat, @RequestParam(required = false) Double lng) {
+    public List<AvisoCalleResponse> cerca(@RequestParam(required = false) Double lat, @RequestParam(required = false) Double lng,
+                                         Authentication auth) {
         List<AvisoCalle> avisos = lat == null || lng == null ? service.activos() : service.activosCerca(lat, lng);
-        return avisos.stream().map(AvisoCalleResponse::paraCadete).toList();
+        return avisos.stream().map(a -> AvisoCalleResponse.paraCadete(a, auth.getName())).toList();
     }
 
     @GetMapping("/api/admin/avisos-calle")
@@ -50,7 +51,7 @@ public class AvisoCalleController {
     public AvisoCalleResponse votar(@PathVariable String id,
                                     @Valid @RequestBody com.cadeteria.backend.dto.AvisoCalleDtos.VotoRequest req,
                                     Authentication auth) {
-        return AvisoCalleResponse.paraCadete(service.votar(auth.getName(), id, req.voto()));
+        return AvisoCalleResponse.paraCadete(service.votar(auth.getName(), id, req.voto()), auth.getName());
     }
 
     /** Ficha del cadete: avisos que mandó y cuántos otros marcaron "ya no está". */

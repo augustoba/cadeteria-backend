@@ -30,6 +30,7 @@ class RetencionDatosServiceTest {
     private PedidoRepository pedidoRepo;
     private ConfiguracionService configuracionService;
     private CloudinaryService cloudinaryService;
+    private ChatMensajeRepository chatRepo;
     private RetencionDatosService service;
 
     @BeforeEach
@@ -37,7 +38,8 @@ class RetencionDatosServiceTest {
         pedidoRepo = mock(PedidoRepository.class);
         configuracionService = mock(ConfiguracionService.class);
         cloudinaryService = mock(CloudinaryService.class);
-        service = new RetencionDatosService(mock(WhatsappMensajeRepository.class), mock(ChatMensajeRepository.class),
+        chatRepo = mock(ChatMensajeRepository.class);
+        service = new RetencionDatosService(mock(WhatsappMensajeRepository.class), chatRepo,
                 pedidoRepo, configuracionService, cloudinaryService);
     }
 
@@ -80,6 +82,41 @@ class RetencionDatosServiceTest {
 
         verify(cloudinaryService, never()).borrarSiCorresponde(any());
         verify(pedidoRepo, never()).saveAll(any());
+    }
+
+    @Test
+    void lasFotosYAudiosViejosDelChatSeBorranDeCloudinaryPeroElMensajeQueda() {
+        // 2026-09-29: los archivos del chat son lo que llena el plan gratis de Cloudinary; el texto no pesa.
+        when(configuracionService.getInt(eq(RetencionDatosService.CLAVE_ARCHIVOS_CHAT_DIAS), anyInt())).thenReturn(30);
+        com.cadeteria.backend.model.ChatMensaje foto = new com.cadeteria.backend.model.ChatMensaje();
+        foto.setImagenUrl("https://res.cloudinary.com/demo/image/upload/v1/chat.jpg");
+        com.cadeteria.backend.model.ChatMensaje audio = new com.cadeteria.backend.model.ChatMensaje();
+        audio.setAudioUrl("https://res.cloudinary.com/demo/video/upload/v1/nota.m4a");
+        when(chatRepo.findConArchivosEnviadosAntesDe(any())).thenReturn(List.of(foto, audio));
+
+        service.purgarMensajesViejos();
+
+        verify(cloudinaryService).borrarSiCorresponde("https://res.cloudinary.com/demo/image/upload/v1/chat.jpg");
+        verify(cloudinaryService).borrarSiCorresponde("https://res.cloudinary.com/demo/video/upload/v1/nota.m4a");
+        assertNull(foto.getImagenUrl());
+        assertNull(audio.getAudioUrl());
+        org.junit.jupiter.api.Assertions.assertTrue(foto.getTexto().contains("Foto borrada"));
+        org.junit.jupiter.api.Assertions.assertTrue(audio.getTexto().contains("Audio borrado"));
+        verify(chatRepo).saveAll(List.of(foto, audio));
+        verify(chatRepo, never()).deleteAll(any());
+    }
+
+    @Test
+    void alBorrarMensajesViejosDelChatTambienBorraSusArchivos() {
+        when(configuracionService.getInt(eq("retencion_chat_dias"), anyInt())).thenReturn(90);
+        com.cadeteria.backend.model.ChatMensaje foto = new com.cadeteria.backend.model.ChatMensaje();
+        foto.setImagenUrl("https://res.cloudinary.com/demo/image/upload/v1/vieja.jpg");
+        when(chatRepo.findByEnviadoEnBefore(any())).thenReturn(List.of(foto));
+
+        service.purgarMensajesViejos();
+
+        verify(cloudinaryService).borrarSiCorresponde("https://res.cloudinary.com/demo/image/upload/v1/vieja.jpg");
+        verify(chatRepo).deleteAll(List.of(foto));
     }
 
     private Pedido pedidoTerminado() {

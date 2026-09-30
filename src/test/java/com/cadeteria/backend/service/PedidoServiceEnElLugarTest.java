@@ -66,6 +66,8 @@ class PedidoServiceEnElLugarTest {
         when(config.getString(anyString(), anyString())).thenAnswer(i -> i.getArgument(1));
         when(config.getInt(anyString(), anyInt())).thenAnswer(i -> i.getArgument(1));
         when(config.getBoolean(anyString(), anyBoolean())).thenAnswer(i -> i.getArgument(1));
+        // La espera entre Retirado y Finalizar tiene sus propios tests (abajo): acá se apaga.
+        when(config.getInt(PedidoService.CLAVE_MINUTOS_MINIMOS_ENTREGA, 10)).thenReturn(0);
         for (String id : new String[]{"EN_CURSO", "FINALIZADO", "LIBRE", "OCUPADO"}) {
             EstadoPedido e = new EstadoPedido();
             e.setId(id);
@@ -291,6 +293,55 @@ class PedidoServiceEnElLugarTest {
         assertEquals("FINALIZADO", service.finalizar("p1", "30111222", falso).getEstado().getId());
         assertEquals(Boolean.TRUE, pedido.getUbicacionSimulada());
         assertEquals(1, cadete.getIntentosUbicacionSimulada());
+    }
+
+    /** Minutos mínimos entre Retirado y Finalizar (2026-09-29, configurable, default 10). */
+    private void conEsperaDe(int minutos) {
+        when(config.getInt(PedidoService.CLAVE_MINUTOS_MINIMOS_ENTREGA, 10)).thenReturn(minutos);
+    }
+
+    @Test
+    void antesDeLaEsperaNoDejaFinalizarYDiceCuantoFalta() {
+        conEsperaDe(10);
+        retirar(retiro(ORIGEN_LAT, ORIGEN_LNG, 10f, null, null, null, Instant.now().minus(Duration.ofMinutes(3))));
+        BadRequestException e = assertThrows(BadRequestException.class,
+                () -> service.finalizar("p1", "30111222", entrega(DESTINO_LAT, DESTINO_LNG, null, Instant.now())));
+        assertTrue(e.getMessage().contains("10 minutos"), e.getMessage());
+        assertTrue(e.getMessage().contains("7 min"), e.getMessage());
+        assertEquals("EN_CURSO", pedido.getEstado().getId());
+    }
+
+    @Test
+    void pasadaLaEsperaFinaliza() {
+        conEsperaDe(10);
+        retirar(retiro(ORIGEN_LAT, ORIGEN_LNG, 10f, null, null, null, Instant.now().minus(Duration.ofMinutes(11))));
+        assertEquals("FINALIZADO",
+                service.finalizar("p1", "30111222", entrega(DESTINO_LAT, DESTINO_LNG, null, Instant.now())).getEstado().getId());
+    }
+
+    @Test
+    void laColaSinSenalSeMideConLaHoraDelToque() {
+        // Retiró hace 15 min y tocó Finalizar sin señal hace 8 (7 min después): llega ahora, pero no vale.
+        conEsperaDe(10);
+        retirar(retiro(ORIGEN_LAT, ORIGEN_LNG, 10f, null, null, null, Instant.now().minus(Duration.ofMinutes(15))));
+        assertThrows(BadRequestException.class, () -> service.finalizar("p1", "30111222",
+                entrega(DESTINO_LAT, DESTINO_LNG, null, Instant.now().minus(Duration.ofMinutes(8)))));
+    }
+
+    @Test
+    void enCeroLaEsperaEstaApagada() {
+        conEsperaDe(0);
+        retirar(retiro(ORIGEN_LAT, ORIGEN_LNG, 10f, null, null, null, Instant.now()));
+        assertEquals("FINALIZADO",
+                service.finalizar("p1", "30111222", entrega(DESTINO_LAT, DESTINO_LNG, null, Instant.now())).getEstado().getId());
+    }
+
+    @Test
+    void elAdminNoEspera() {
+        conEsperaDe(10);
+        retirar(retiro(ORIGEN_LAT, ORIGEN_LNG, 10f, null, null, null, Instant.now()));
+        assertEquals("FINALIZADO", service.finalizarComoAdmin("p1",
+                new FinalizarAdminRequest(null, null, "Lo cerró la central"), "admin").getEstado().getId());
     }
 
     @Test

@@ -37,7 +37,8 @@ public class AuthController {
 
     @PostMapping("/login/cadete")
     public ResponseEntity<TokenResponse> loginCadete(@Valid @RequestBody LoginRequest req) {
-        JwtService.TokenData data = authService.loginCadete(req.username(), req.password(), req.versionApp());
+        JwtService.TokenData data = authService.loginCadete(req.username(), req.password(), req.versionApp(),
+                req.celularId(), req.celularModelo());
         return ResponseEntity.ok(TokenResponse.bearer(data.token(), data.tipo(), data.expiresAt()));
     }
 

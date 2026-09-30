@@ -214,6 +214,19 @@ public class Cadete {
     private Instant ultimaVersionAppEn;
 
     /**
+     * Un celular por cadete (2026-09-29, ver CelularCadeteService): identificador que genera la app en ese
+     * celular (no el IMEI, que Android no deja leer), su marca y modelo, y desde cuándo está vinculado.
+     * Null = sin vincular: el próximo login lo vincula.
+     */
+    private String celularId;
+    private String celularModelo;
+    private Instant celularVinculadoEn;
+    /** Intentos de entrar desde otro celular: cuántos, cuándo el último y con qué modelo. */
+    private Integer intentosOtroCelular;
+    private Instant ultimoIntentoOtroCelularEn;
+    private String ultimoIntentoOtroCelularModelo;
+
+    /**
      * Veces que intentó marcar Retirado/Entregado con una app de ubicación simulada (carril B,
      * 2026-09-28). Va en el cadete y no sale de los pedidos porque el intento no se deja marcar
      * y el pedido puede terminar en otro cadete. null = nunca.
@@ -689,5 +702,53 @@ public class Cadete {
 
     public void setUltimaVersionAppEn(Instant ultimaVersionAppEn) {
         this.ultimaVersionAppEn = ultimaVersionAppEn;
+    }
+
+    public String getCelularId() {
+        return celularId;
+    }
+
+    public void setCelularId(String celularId) {
+        this.celularId = celularId;
+    }
+
+    public String getCelularModelo() {
+        return celularModelo;
+    }
+
+    public void setCelularModelo(String celularModelo) {
+        this.celularModelo = celularModelo;
+    }
+
+    public Instant getCelularVinculadoEn() {
+        return celularVinculadoEn;
+    }
+
+    public void setCelularVinculadoEn(Instant celularVinculadoEn) {
+        this.celularVinculadoEn = celularVinculadoEn;
+    }
+
+    public int getIntentosOtroCelular() {
+        return intentosOtroCelular == null ? 0 : intentosOtroCelular;
+    }
+
+    public void setIntentosOtroCelular(Integer intentosOtroCelular) {
+        this.intentosOtroCelular = intentosOtroCelular;
+    }
+
+    public Instant getUltimoIntentoOtroCelularEn() {
+        return ultimoIntentoOtroCelularEn;
+    }
+
+    public void setUltimoIntentoOtroCelularEn(Instant ultimoIntentoOtroCelularEn) {
+        this.ultimoIntentoOtroCelularEn = ultimoIntentoOtroCelularEn;
+    }
+
+    public String getUltimoIntentoOtroCelularModelo() {
+        return ultimoIntentoOtroCelularModelo;
+    }
+
+    public void setUltimoIntentoOtroCelularModelo(String ultimoIntentoOtroCelularModelo) {
+        this.ultimoIntentoOtroCelularModelo = ultimoIntentoOtroCelularModelo;
     }
 }

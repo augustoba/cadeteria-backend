@@ -53,6 +53,7 @@ public class RetencionDatosService {
     public void purgarMensajesViejos() {
         purgarWhatsapp();
         purgarChat();
+        purgarArchivosChat();
         purgarImagenesPedidos();
     }
 
@@ -82,8 +83,45 @@ public class RetencionDatosService {
         Instant corte = Instant.now().minus(dias, ChronoUnit.DAYS);
         List<ChatMensaje> viejos = chatRepo.findByEnviadoEnBefore(corte);
         if (viejos.isEmpty()) return;
+        // Antes solo se borraba la fila y la foto o el audio quedaban en Cloudinary para siempre (2026-09-29).
+        viejos.forEach(m -> {
+            cloudinaryService.borrarSiCorresponde(m.getImagenUrl());
+            cloudinaryService.borrarSiCorresponde(m.getAudioUrl());
+        });
         chatRepo.deleteAll(viejos);
         log.info("Retención: borrados {} mensajes de chat interno más viejos que {} días.", viejos.size(), dias);
+    }
+
+    /** Días que duran las fotos y audios del chat (2026-09-29); el texto sigue según retencion_chat_dias. 0 = nunca. */
+    static final String CLAVE_ARCHIVOS_CHAT_DIAS = "retencion_chat_archivos_dias";
+
+    /**
+     * Fotos y notas de voz del chat más viejas que {@link #CLAVE_ARCHIVOS_CHAT_DIAS} (30 por defecto): se
+     * borran de Cloudinary —son lo que llena el plan gratis— y el mensaje queda con un texto que lo explica,
+     * así la conversación no pierde el hilo.
+     */
+    private void purgarArchivosChat() {
+        int dias = configuracionService.getInt(CLAVE_ARCHIVOS_CHAT_DIAS, 30);
+        if (dias <= 0) return;
+        List<ChatMensaje> conArchivos = chatRepo.findConArchivosEnviadosAntesDe(Instant.now().minus(dias, ChronoUnit.DAYS));
+        if (conArchivos.isEmpty()) return;
+        for (ChatMensaje m : conArchivos) {
+            String nota = null;
+            if (m.getImagenUrl() != null) {
+                cloudinaryService.borrarSiCorresponde(m.getImagenUrl());
+                m.setImagenUrl(null);
+                nota = "📷 Foto borrada (tenía más de " + dias + " días)";
+            }
+            if (m.getAudioUrl() != null) {
+                cloudinaryService.borrarSiCorresponde(m.getAudioUrl());
+                m.setAudioUrl(null);
+                nota = "🎤 Audio borrado (tenía más de " + dias + " días)";
+            }
+            if (m.getTexto() == null || m.getTexto().isBlank()) m.setTexto(nota);
+            else m.setTexto(m.getTexto() + "\n" + nota);
+        }
+        chatRepo.saveAll(conArchivos);
+        log.info("Retención: borradas las fotos/audios de {} mensajes de chat de más de {} días.", conArchivos.size(), dias);
     }
 
     /**

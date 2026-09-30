@@ -51,6 +51,8 @@ public final class ConfiguracionDtos {
             /** Cartel "Antes de arrancar" (2026-09-29): se edita en Configuración; sin textos o apagado no sale. */
             boolean recordatoriosActivo,
             String recordatoriosTitulo,
-            java.util.List<String> recordatoriosTextos
+            java.util.List<String> recordatoriosTextos,
+            /** Minutos mínimos entre Retirado y Finalizar (2026-09-29); 0 = sin espera. El backend vuelve a controlar. */
+            int minutosMinimosRetiroEntrega
     ) {}
 }

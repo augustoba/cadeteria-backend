@@ -42,6 +42,17 @@ public class AvisoCalleService {
     /** Con tantos "ya no está" de cadetes distintos se baja. */
     static final String CLAVE_YA_NO_ESTA_PARA_BAJAR = "avisos_calle_ya_no_esta_para_bajar";
 
+    private static final java.time.ZoneId ZONA = java.time.ZoneId.of("America/Argentina/Buenos_Aires");
+
+    /**
+     * Ningún aviso pasa de la medianoche (pedido del usuario, 2026-09-29): al terminar el día ya no hay
+     * cadetes trabajando por ahí y al otro día no sirve. Vale al crearlo y cuando "Sigue" lo extiende.
+     */
+    static Instant hastaFinDelDia(Instant vence, Instant ahora) {
+        Instant medianoche = ahora.atZone(ZONA).toLocalDate().plusDays(1).atStartOfDay(ZONA).toInstant();
+        return vence.isAfter(medianoche) ? medianoche : vence;
+    }
+
     private final AvisoCalleRepository repo;
     private final AvisoCalleVotoRepository votoRepo;
     private final CadeteRepository cadeteRepo;
@@ -90,7 +101,7 @@ public class AvisoCalleService {
         votoRepo.save(v);
 
         if (AvisoCalleVoto.SIGUE.equals(voto)) {
-            Instant extendido = ahora.plus(Duration.ofMinutes(configuracion.getInt(CLAVE_EXTENSION_MIN, 30)));
+            Instant extendido = hastaFinDelDia(ahora.plus(Duration.ofMinutes(configuracion.getInt(CLAVE_EXTENSION_MIN, 30))), ahora);
             if (extendido.isAfter(aviso.getVenceEn())) aviso.setVenceEn(extendido);
         } else if (votoRepo.countByAvisoIdAndVoto(avisoId, AvisoCalleVoto.YA_NO_ESTA)
                 >= configuracion.getInt(CLAVE_YA_NO_ESTA_PARA_BAJAR, 2)) {
@@ -116,6 +127,12 @@ public class AvisoCalleService {
     }
 
     public AvisoCalle crear(String cadeteUsername, String tipo, double lat, double lng) {
+        return crear(cadeteUsername, tipo, lat, lng, null, null);
+    }
+
+    /** Con la calle del Geocoder del teléfono, si la mandó: tiene prioridad sobre el mapa (ver {@link #calleDe}). */
+    public AvisoCalle crear(String cadeteUsername, String tipo, double lat, double lng, String calleTelefono,
+                            Integer alturaTelefono) {
         Cadete cadete = cadeteRepo.findByUsername(cadeteUsername)
                 .orElseThrow(() -> com.cadeteria.backend.common.ResourceNotFoundException.of("Cadete", cadeteUsername));
         Instant ahora = Instant.now();
@@ -128,10 +145,10 @@ public class AvisoCalleService {
         aviso.setTipo(tipo);
         aviso.setLat(lat);
         aviso.setLng(lng);
-        aviso.setCalle(calleDe(lat, lng));
+        aviso.setCalle(calleDe(lat, lng, calleTelefono, alturaTelefono));
         aviso.setCadete(cadete);
         aviso.setCreadoEn(ahora);
-        aviso.setVenceEn(ahora.plus(Duration.ofMinutes(configuracion.getInt(CLAVE_DURACION_MIN, 60))));
+        aviso.setVenceEn(hastaFinDelDia(ahora.plus(Duration.ofMinutes(configuracion.getInt(CLAVE_DURACION_MIN, 60))), ahora));
         repo.save(aviso);
 
         AvisoCalleResponse paraCadetes = AvisoCalleResponse.paraCadete(aviso);
@@ -174,7 +191,13 @@ public class AvisoCalleService {
      * "cerca de tu ubicación"). Usa {@code reverseParaConsulta} (carril A): primero la base propia y no
      * alimenta la cache de direcciones.
      */
-    String calleDe(double lat, double lng) {
+    String calleDe(double lat, double lng, String calleTelefono, Integer alturaTelefono) {
+        // Primero la del teléfono (2026-09-29): es la misma que muestra el panel para el cadete. El mapa
+        // (OpenStreetMap) se equivoca justo en algunas zonas: en Colombia 4695 decía "Camino del Perú 1600".
+        if (calleTelefono != null && !calleTelefono.isBlank()) {
+            String calle = calleTelefono.trim();
+            return alturaTelefono == null || alturaTelefono <= 0 ? calle : calle + " " + (alturaTelefono / 100) * 100;
+        }
         try {
             GeocodingProxyService.GeoAddress r = geocoding.reverseParaConsulta(lat, lng);
             if (r == null || r.street() == null || r.street().isBlank()) return null;

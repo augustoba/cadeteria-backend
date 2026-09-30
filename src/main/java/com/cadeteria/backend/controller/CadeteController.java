@@ -300,7 +300,8 @@ public class CadeteController {
                 configuracionService.getBoolean("en_lugar_control_activo", true),
                 recordatorios.activo(),
                 recordatorios.titulo(),
-                recordatorios.textos()
+                recordatorios.textos(),
+                configuracionService.getInt(com.cadeteria.backend.service.PedidoService.CLAVE_MINUTOS_MINIMOS_ENTREGA, 10)
         );
     }
 

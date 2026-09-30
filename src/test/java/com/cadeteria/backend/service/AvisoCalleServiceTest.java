@@ -98,8 +98,9 @@ class AvisoCalleServiceTest {
 
         assertSame(avisa, a.getCadete());
         assertEquals("Av. Mate de Luna 2400", a.getCalle());
-        long minutos = Duration.between(a.getCreadoEn(), a.getVenceEn()).toMinutes();
-        assertEquals(60, minutos);
+        // 60 minutos, salvo que la medianoche llegue antes (entre las 23 y las 24 el test no depende de la hora).
+        assertEquals(AvisoCalleService.hastaFinDelDia(a.getCreadoEn().plus(Duration.ofMinutes(60)), a.getCreadoEn()),
+                a.getVenceEn());
         assertFalse(a.getCreadoEn().isBefore(antes));
 
         ArgumentCaptor<AvisoCalleResponse> panel = ArgumentCaptor.forClass(AvisoCalleResponse.class);
@@ -109,12 +110,64 @@ class AvisoCalleServiceTest {
     }
 
     @Test
+    void alQuePideLeDiceCualesSonSuyos() {
+        // Bug 2026-09-29: la app lo recordaba en memoria y, al reiniciarse, preguntaba "¿Sigue ahí?" por los propios.
+        AvisoCalle a = new AvisoCalle();
+        a.setTipo("CALLE_CORTADA");
+        avisa.setUsername("30111222");
+        a.setCadete(avisa);
+        assertEquals(Boolean.TRUE, AvisoCalleResponse.paraCadete(a, "30111222").mio());
+        assertEquals(Boolean.FALSE, AvisoCalleResponse.paraCadete(a, "30999999").mio());
+        assertNull(AvisoCalleResponse.paraCadete(a, "30111222").cadeteId(), "igual no se dice quién avisó");
+    }
+
+    @Test
     void aLosCadetesNoLesDiceQuienAviso() {
         AvisoCalle a = new AvisoCalle();
         a.setTipo("PIQUETE");
         a.setCadete(avisa);
         assertNull(AvisoCalleResponse.paraCadete(a).cadeteNombre());
         assertNull(AvisoCalleResponse.paraCadete(a).cadeteId());
+    }
+
+    /** 2026-09-29 23:40 en Argentina (UTC-3) = 2026-09-30 02:40 UTC; la medianoche es 03:00 UTC. */
+    private static final Instant ONCE_Y_CUARENTA = Instant.parse("2026-09-30T02:40:00Z");
+    private static final Instant MEDIANOCHE = Instant.parse("2026-09-30T03:00:00Z");
+
+    @Test
+    void ningunAvisoPasaDeLaMedianoche() {
+        // Pedido del usuario (2026-09-29): al terminar el día nadie anda por ahí; al otro día no sirven.
+        assertEquals(MEDIANOCHE, AvisoCalleService.hastaFinDelDia(ONCE_Y_CUARENTA.plus(Duration.ofMinutes(60)), ONCE_Y_CUARENTA));
+        assertEquals(MEDIANOCHE, AvisoCalleService.hastaFinDelDia(ONCE_Y_CUARENTA.plus(Duration.ofMinutes(30)), ONCE_Y_CUARENTA));
+    }
+
+    @Test
+    void dentroDelDiaNoSeToca() {
+        Instant tarde = Instant.parse("2026-09-29T18:00:00Z"); // 15:00 en Argentina
+        Instant vence = tarde.plus(Duration.ofMinutes(60));
+        assertEquals(vence, AvisoCalleService.hastaFinDelDia(vence, tarde));
+    }
+
+    @Test
+    void conLaCalleDelTelefonoNoSeUsaElMapa() {
+        // 2026-09-29: en Colombia 4695 OpenStreetMap decía "Camino del Perú 1600" y el panel (que usa la
+        // calle del teléfono) "Colombia al 4600". El aviso ahora dice lo mismo que el panel.
+        when(cadeteRepo.findAll()).thenReturn(List.of(avisa));
+        AvisoCalle a = service.crear("30111222", "CONTROL", LAT, LNG, "Colombia", 4695);
+        assertEquals("Colombia 4600", a.getCalle());
+        verify(geocoding, never()).reverseParaConsulta(anyDouble(), anyDouble());
+    }
+
+    @Test
+    void laCalleDelTelefonoSinAlturaVaSola() {
+        when(cadeteRepo.findAll()).thenReturn(List.of(avisa));
+        assertEquals("Colombia", service.crear("30111222", "CONTROL", LAT, LNG, "  Colombia ", null).getCalle());
+    }
+
+    @Test
+    void sinCalleDelTelefonoSeUsaElMapa() {
+        when(cadeteRepo.findAll()).thenReturn(List.of(avisa));
+        assertEquals("Av. Mate de Luna 2400", service.crear("30111222", "CONTROL", LAT, LNG, " ", null).getCalle());
     }
 
     @Test

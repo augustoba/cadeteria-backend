@@ -47,4 +47,15 @@ class CloudinaryServiceTest {
 
         assertTrue(service.isHabilitado());
     }
+
+    @Test
+    void losAudiosSeBorranComoVideo() {
+        // 2026-09-29: las notas de voz (audio/mp4) Cloudinary las guarda como "video"; con /image/destroy no se borraban.
+        org.junit.jupiter.api.Assertions.assertEquals("video",
+                CloudinaryService.tipoRecurso("https://res.cloudinary.com/jitutkbc/video/upload/v1/nota.m4a"));
+        org.junit.jupiter.api.Assertions.assertEquals("image",
+                CloudinaryService.tipoRecurso("https://res.cloudinary.com/jitutkbc/image/upload/f_auto/v1/foto.jpg"));
+        org.junit.jupiter.api.Assertions.assertEquals("raw",
+                CloudinaryService.tipoRecurso("https://res.cloudinary.com/jitutkbc/raw/upload/v1/archivo.bin"));
+    }
 }

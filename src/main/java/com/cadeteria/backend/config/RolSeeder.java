@@ -46,6 +46,8 @@ public class RolSeeder implements CommandLineRunner {
             new String[]{"usuarios", "Administrar usuarios del panel", "Datos sensibles"},
             new String[]{"whatsapp", "Panel de WhatsApp (chips, mensajes)", "Datos sensibles"},
             new String[]{"roles", "Administrar roles y permisos", "Datos sensibles"},
+            // 2026-09-29: un celular por cadete; habilitar uno nuevo desvincula el anterior.
+            new String[]{"celular_cadete", "Habilitar nuevo celular de un cadete", "Cadetes"},
             // 2026-09-26: lo técnico que puede tirar el servicio (servidores, Cloudinary, borrado de lo
             // de Google, frecuencias) y borrar API keys. Solo el rol superadmin; un admin no puede
             // dárselo a nadie (RolService / AdminUsuarioService).

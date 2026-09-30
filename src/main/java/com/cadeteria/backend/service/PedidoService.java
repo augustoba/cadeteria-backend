@@ -1383,6 +1383,9 @@ public class PedidoService {
                 ? controlarEnLugar(pedido, cadete, req, pedido.getDestinoLat(), pedido.getDestinoLng(),
                         "destino", !sinFoto || perdido, pedido.getRetiradoEn())
                 : new ControlLugar(null, false, false, Instant.now());
+        if (exigirComprobante) {
+            exigirEsperaDesdeElRetiro(pedido, control.hora());
+        }
         if (exigirComprobante && perdido && (sinFoto || sinFirma)) {
             dejarComentarioArchivoPerdido(pedido, cadete, "entrega");
         }
@@ -1416,6 +1419,23 @@ public class PedidoService {
     }
 
     static final String PRIMERO_RETIRADO = "Primero marcá Retirado.";
+
+    /**
+     * Minutos mínimos entre Retirado y Finalizar (pedido del usuario, 2026-09-29), editable en
+     * Configuración; 0 = sin espera. Se mide con la hora del toque, así lo encolado sin señal también
+     * la respeta. El admin que finaliza desde el panel no espera.
+     */
+    public static final String CLAVE_MINUTOS_MINIMOS_ENTREGA = "minutos_minimos_retiro_entrega";
+
+    private void exigirEsperaDesdeElRetiro(Pedido pedido, Instant horaEntrega) {
+        int minimos = configuracionService.getInt(CLAVE_MINUTOS_MINIMOS_ENTREGA, 10);
+        if (minimos <= 0 || pedido.getRetiradoEn() == null) return;
+        Duration falta = Duration.between(horaEntrega, pedido.getRetiradoEn().plus(Duration.ofMinutes(minimos)));
+        if (falta.isNegative() || falta.isZero()) return;
+        long minutos = (falta.getSeconds() + 59) / 60;
+        throw new BadRequestException("Todavía no pasaron " + minimos + " minutos desde el retiro: podés finalizar en "
+                + minutos + " min.");
+    }
     /** Radio alrededor del punto del pedido dentro del cual se puede marcar (sin pantalla para editarlo). */
     static final String CLAVE_RADIO_M = "en_lugar_radio_m";
     /** Error del GPS a partir del cual la ubicación se considera imprecisa (no bloquea, queda anotado). */

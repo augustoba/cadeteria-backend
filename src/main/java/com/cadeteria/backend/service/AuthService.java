@@ -29,11 +29,13 @@ public class AuthService {
     private final ConfiguracionService configuracionService;
     private final AccesoLogRepository accesoLogRepo;
     private final RolService rolService;
+    private final CelularCadeteService celularCadeteService;
 
     public AuthService(AdminRepository admins, CadeteRepository cadetes,
                         PasswordEncoder passwordEncoder, JwtService jwtService,
                         ConfiguracionService configuracionService, AccesoLogRepository accesoLogRepo,
-                        RolService rolService) {
+                        RolService rolService, CelularCadeteService celularCadeteService) {
+        this.celularCadeteService = celularCadeteService;
         this.admins = admins;
         this.cadetes = cadetes;
         this.passwordEncoder = passwordEncoder;
@@ -99,13 +101,14 @@ public class AuthService {
      * bloqueo temporal por intentos fallidos que el admin (ronda 6, punto 49).
      */
     public JwtService.TokenData loginCadete(String username, String rawPassword) {
-        return loginCadete(username, rawPassword, null);
+        return loginCadete(username, rawPassword, null, null, null);
     }
 
     // noRollbackFor (2026-09-26): el intento fallido se tiene que guardar aunque el login tire error — antes
     // la excepción deshacía la transacción, el contador nunca subía y el bloqueo por intentos no se activaba.
     @Transactional(noRollbackFor = {BadCredentialsException.class, TooManyRequestsException.class, ForbiddenException.class})
-    public JwtService.TokenData loginCadete(String username, String rawPassword, Integer versionApp) {
+    public JwtService.TokenData loginCadete(String username, String rawPassword, Integer versionApp,
+                                            String celularId, String celularModelo) {
         Cadete cadete = cadetes.findByUsername(username == null ? "" : username.trim())
                 .filter(Cadete::isActivo)
                 .orElse(null);
@@ -127,6 +130,8 @@ public class AuthService {
         if ("SEMANAL".equals(cadete.getModalidadPago()) && !cadete.isHabilitadoPago()) {
             throw new ForbiddenException("No podés ingresar: falta pagar la cuota semanal. Comunicate con la cadetería.");
         }
+        // Un celular por cadete (2026-09-29): desde otro celular no entra (ForbiddenException, queda anotado).
+        celularCadeteService.controlarAlLoguear(cadete, celularId, celularModelo);
         cadete.setIntentosFallidos(0);
         cadete.setBloqueadoHasta(null);
         if (versionApp != null) {

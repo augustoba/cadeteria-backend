@@ -75,13 +75,23 @@ public class CloudinaryService {
             body.add("signature", firma);
 
             restClient.post()
-                    .uri("https://api.cloudinary.com/v1_1/" + cloudName + "/image/destroy")
+                    .uri("https://api.cloudinary.com/v1_1/" + cloudName + "/" + tipoRecurso(url) + "/destroy")
                     .body(body)
                     .retrieve()
                     .toBodilessEntity();
         } catch (Exception e) {
             log.warn("No se pudo borrar de Cloudinary la URL {}: {}", url, e.getMessage());
         }
+    }
+
+    /**
+     * "image", "video" o "raw", según la URL (2026-09-29): las notas de voz del chat (audio/mp4) Cloudinary
+     * las guarda como "video", y con /image/destroy no se borraban nunca.
+     */
+    static String tipoRecurso(String url) {
+        if (url.contains("/video/upload/")) return "video";
+        if (url.contains("/raw/upload/")) return "raw";
+        return "image";
     }
 
     /** "https://res.cloudinary.com/{cloud}/image/upload/v123456/carpeta/nombre.jpg" -> "carpeta/nombre". */

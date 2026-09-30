@@ -61,6 +61,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/seguridad/**").hasAuthority("PERM_seguridad")
                         .requestMatchers("/api/admin/usuarios/**").hasAuthority("PERM_usuarios")
                         .requestMatchers("/api/admin/whatsapp/**").hasAuthority("PERM_whatsapp")
+                        // Ver el celular vinculado es de cualquier admin; habilitar uno nuevo exige su permiso (2026-09-29).
+                        .requestMatchers(HttpMethod.POST, "/api/admin/cadetes/*/celular/**").hasAuthority("PERM_celular_cadete")
                         // Ver roles (para el selector de "Usuarios") es de cualquier admin; crear/editar/borrar exige el permiso "roles".
                         .requestMatchers(HttpMethod.POST, "/api/admin/roles/**").hasAuthority("PERM_roles")
                         .requestMatchers(HttpMethod.PUT, "/api/admin/roles/**").hasAuthority("PERM_roles")
