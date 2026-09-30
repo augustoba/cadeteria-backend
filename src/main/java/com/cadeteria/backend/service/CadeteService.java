@@ -348,6 +348,12 @@ public class CadeteService {
     }
 
     /** Lo usa SolicitudCadeteService.aprobar justo después de crear el cadete con contraseña temporal. */
+    /**
+     * Cuánto dura la contraseña temporal del cadete: 24 h desde el 2026-09-29 (antes 10 min). Con el link del
+     * mail tiene que bajar e instalar la app antes de entrar, y 10 minutos no alcanzaban.
+     */
+    public static final java.time.Duration VIGENCIA_PASSWORD_TEMPORAL = java.time.Duration.ofHours(24);
+
     public void marcarPasswordTemporal(String cadeteId, java.time.Instant expira) {
         Cadete c = get(cadeteId);
         c.setDebeCambiarPassword(true);
@@ -366,7 +372,7 @@ public class CadeteService {
         c.setPasswordHash(passwordEncoder.encode(passwordTemporal));
         c.setSessionToken(UUID.randomUUID().toString());
         c.setDebeCambiarPassword(true);
-        c.setPasswordTemporalExpira(java.time.Instant.now().plusSeconds(10 * 60L));
+        c.setPasswordTemporalExpira(java.time.Instant.now().plus(VIGENCIA_PASSWORD_TEMPORAL));
         repo.save(c);
         return passwordTemporal;
     }

@@ -81,6 +81,21 @@ public class CelularCadeteService {
     }
 
     @Transactional(readOnly = true)
+    public Cadete buscarPorUsuario(String username) {
+        return cadeteRepo.findByUsername(username).orElseThrow(() -> ResourceNotFoundException.of("Cadete", username));
+    }
+
+    /** Lo que la app dice que le falta ("NOTIFICACIONES,BATERIA"; vacío = nada), para la ficha (2026-09-29). */
+    @Transactional
+    public void informarPermisos(String username, String faltantes) {
+        Cadete cadete = buscarPorUsuario(username);
+        String limpio = faltantes == null ? "" : recortar(faltantes.trim(), 200);
+        cadete.setPermisosFaltantes(limpio);
+        cadete.setPermisosInformadosEn(Instant.now());
+        cadeteRepo.save(cadete);
+    }
+
+    @Transactional(readOnly = true)
     public Cadete buscar(String cadeteId) {
         return cadeteRepo.findById(cadeteId).orElseThrow(() -> ResourceNotFoundException.of("Cadete", cadeteId));
     }

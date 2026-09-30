@@ -1,6 +1,6 @@
 # Pendientes
 
-Última actualización: 2026-09-28.
+Última actualización: 2026-09-29 (noche).
 
 > El backlog largo (las 11 rondas de propuestas) vive en `MEJORAS-PROPUESTAS.md`, en la raíz
 > del proyecto. **Ese archivo está fuera de cualquier repo git**, así que no viaja con el
@@ -9,6 +9,42 @@
 Todo el trabajo nuevo va en la rama **`develop`** de los 3 repos (`cadeteria`, `admin-front`,
 `cadete-app`). Lo del 2026-09-24 al 26 ya está en `develop` (pusheado el 2026-09-26), salvo la
 rama `aviso-whatsapp-web` (backend + panel, aviso "en camino"), sin pushear al 2026-09-28.
+
+## Sesión 2026-09-29 (Claude): lo que se hizo y lo que falta probar — seguir desde acá
+
+Todo está commiteado y pusheado en `develop` de los 3 repos. Se probó con la prueba local
+(`scripts/prueba-local/LEEME.md`, base `cadeteria_prueba`, celular Moto por WiFi en
+`http://192.168.100.19:8080`). Tests en verde al cierre: backend 293, APK todos, panel compila.
+
+**Ojo al retomar:** el backend que quedó corriendo en la PC es **anterior** a la mayoría de estos
+cambios (el usuario no quiso reiniciarlo en el medio). Antes de probar: parar el Java del 8080
+(`taskkill` del PID; parar la tarea no lo mata) y volver a levantar con
+`scripts\prueba-local\levantar.ps1` **sin** `-Limpia`. La APK del celular ya es la última.
+
+### Hecho (y lo que hay que probar de cada uno)
+
+| # | Qué | Dónde | Probar |
+| --- | --- | --- | --- |
+| 1 | **Bug: volver a marcar sin señal.** Retirado/parada/Finalizar guardados sin señal ahora se leen de la cola al abrir el viaje (antes vivían en la memoria de la pantalla y al volver desde Inicio se podía marcar de nuevo). La tarjeta de Inicio dice "📶 Guardado sin señal". Lo que el servidor rechaza para siempre (4xx) sale de la cola y se avisa, para que el viaje no quede trabado | APK | Modo avión → Retirado → Inicio → volver a entrar: no deja marcar otra vez. Idem Finalizar |
+| 2 | **Espera entre Retirado y Finalizar** (`minutos_minimos_retiro_entrega`, 10 por defecto, 0 = apagado, en Configuración). Finalizar gris con cuenta regresiva; el backend controla con la hora del toque (la cola sin señal también); el admin no espera | back + APK + panel | Retirado y tocar Finalizar antes de 10 min (tiembla y vibra); cambiar el valor en Configuración |
+| 3 | **Avisos de la calle**: usan la calle del Geocoder del teléfono (OpenStreetMap decía "Camino del Perú" en Colombia 4695); nunca pasan de la medianoche; el backend le dice al cadete cuáles son suyos (`mio`) y la app guarda los propios y los ya preguntados (antes se perdían al reiniciarse y preguntaba "¿Sigue ahí?" por los propios, cuyo voto el backend rechaza) | back + APK | Avisar un control: tiene que decir la misma calle que el panel. No debe preguntar "¿Sigue ahí?" por los propios |
+| 4 | **Login de la APK**: logo de Cadem centrado; al ingresar, el logo respira, gira el anillo naranja/blanco y pasan una moto y una bici | APK | Cerrar sesión y entrar |
+| 5 | **Chat de la APK**: no se cierra más al enviar (el mensaje llegaba dos veces, por la respuesta y por WebSocket: `Key ... was already used`); foto completa y derecha (antes `TakePicturePreview`: miniatura de 255 px girada); cartel "Subiendo foto / Enviando audio". Panel: el visor de fotos ocupa la pantalla | APK + panel | Mandar texto, audio y foto |
+| 6 | **Un celular por cadete** (`celular_unico_activo`, prendido). El primer login vincula el celular (ANDROID_ID + modelo; el IMEI no se puede leer); desde otro no entra y queda anotado. Ficha → Datos personales → Celular: "Habilitar nuevo celular" (permiso nuevo `celular_cadete`) borra el viejo y le cierra la sesión | back + APK + panel | Entrar con el mismo usuario desde otro celular o emulador; habilitar nuevo desde la ficha. Dar el permiso `celular_cadete` al rol admin si hace falta (solo lo recibe solo el superadmin) |
+| 7 | **Retención del chat**: fotos y audios se borran de Cloudinary a los `retencion_chat_archivos_dias` (30); el mensaje queda con "📷 Foto borrada". Al borrar mensajes viejos (`retencion_chat_dias`) también se borran sus archivos. Los audios se borran como `video` (antes nunca se borraban) | back + panel | Solo con las claves de Cloudinary (ver pendientes abajo) |
+| 8 | **Movimiento y vibración en la APK**: rebote + "clic" en los botones principales; vibraciones distintas para éxito, error y rechazar; tilde animado al aceptar y al entregar (con la plata sumándose); "✓ Retirado" con pop; Aceptar late y tiembla en los últimos 10 s; campos del login tiemblan con clave mal; transiciones entre pantallas y del estado Libre/Ocupado; mensajes del chat entran deslizando. Ajustes → "Vibrar al tocar" | APK | Recorrer un viaje entero |
+| 9 | **Permisos obligatorios**: pantalla "Permisos necesarios" que bloquea la app hasta tener ubicación precisa, notificaciones, micrófono y batería sin restricciones (la cámara no hace falta: se usa la app de cámara del celular). La app informa lo que le falta y se ve en la ficha | back + APK + panel | Sacar un permiso desde Ajustes y volver a abrir la app |
+| 10 | **APK por link de un solo uso**: Configuración → App de cadetes → Subir APK (se guarda en el disco del backend, `APK_DIR`, por defecto `./datos/apk`; una sola, la nueva reemplaza a la anterior). El link (mail de alta, ficha → "Generar link de descarga", o "Tu versión es vieja") es personal, vence a las 24 h y abre una página con botón "Descargar" (así Gmail/antivirus no lo gastan); desde la primera descarga quedan 15 min para reintentar. "Obligar a actualizar" sube la versión mínima y a las APK viejas les aparece "⬇ Descargar la nueva versión" | back + APK + panel | Subir la APK, generar link desde la ficha y bajarla desde el celular. **En local el link sale con `FRONT_BASE_URL` = `localhost:4200`**: para probar desde el celular, levantar con `FRONT_BASE_URL=http://192.168.100.19:4200` y `ng serve --host 0.0.0.0` |
+| 11 | **Contraseña temporal del cadete: 24 h** (antes 10 min; `CadeteService.VIGENCIA_PASSWORD_TEMPORAL`). La de los usuarios del panel sigue en 10 min | back + panel | Aprobar una solicitud y ver el mail |
+
+### Pendiente / decisiones abiertas
+
+- **Claves de Cloudinary** (`api-key`/`api-secret`): sin ellas no se borra nada de verdad (ni fotos de pedidos ni del chat), solo el link en la base. Pedírselas al usuario; van como variables del backend, nunca al repo.
+- **Huella digital**: no se puede leer ni comparar (Android solo dice "coincidió alguna huella del celular"). Opciones propuestas, sin decidir: detectar que se agregó una huella nueva después de vincular el celular, y/o selfie al ponerse Libre.
+- **Avisos de la calle con un solo celular**: hacen falta 2 "ya no está" de cadetes distintos y el autor no vota. Propuesto (sin decidir): bajarlo a 1 o que el autor pueda bajar el suyo.
+- **Calles mapeadas**: en esta PC las bases no tienen las cuadras aprendidas (6 y 2). Falta que el usuario diga dónde quedó el import de las calles que mapeó.
+- **APK de `cadete-app/distribucion/`**: sigue siendo la vieja; al repartir, compilar y copiar (o subirla desde Configuración, que ahora es el camino).
+- **Correo**: el mail de alta (con el link) solo sale con `app.mail.host` configurado.
 
 ## Plan de salida (acordado con el cliente el 2026-09-25)
 

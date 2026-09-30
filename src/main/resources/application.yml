@@ -18,6 +18,11 @@ spring:
       hibernate:
         format_sql: false
         globally_quoted_identifiers: true
+  # La APK de los cadetes se sube desde Configuración (2026-09-29): pesa ~25 MB (el default es 1 MB).
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
 
 server:
   port: ${SERVER_PORT:8080}
@@ -38,6 +43,10 @@ springdoc:
     path: /swagger-ui.html
 
 app:
+  # Carpeta donde queda la APK que se sube desde Configuración (2026-09-29). En producción, una que
+  # sobreviva a los redeploys (volumen del contenedor o disco del servidor).
+  apk:
+    dir: ${APK_DIR:./datos/apk}
   jwt:
     # En produccion: definir JWT_SECRET (>= 32 chars). El default es solo para desarrollo local.
     secret: ${JWT_SECRET:dev-secret-cadeteria-cambiar-en-produccion-1234567890}

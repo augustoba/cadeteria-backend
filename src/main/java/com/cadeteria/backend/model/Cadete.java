@@ -225,6 +225,12 @@ public class Cadete {
     private Integer intentosOtroCelular;
     private Instant ultimoIntentoOtroCelularEn;
     private String ultimoIntentoOtroCelularModelo;
+    /**
+     * Permisos que le faltan a la app según el propio celular (2026-09-29): "NOTIFICACIONES,BATERIA"; vacío =
+     * tiene todos. La app no deja trabajar sin ellos, pero así se ve en la ficha quién los sacó.
+     */
+    private String permisosFaltantes;
+    private Instant permisosInformadosEn;
 
     /**
      * Veces que intentó marcar Retirado/Entregado con una app de ubicación simulada (carril B,
@@ -750,5 +756,21 @@ public class Cadete {
 
     public void setUltimoIntentoOtroCelularModelo(String ultimoIntentoOtroCelularModelo) {
         this.ultimoIntentoOtroCelularModelo = ultimoIntentoOtroCelularModelo;
+    }
+
+    public String getPermisosFaltantes() {
+        return permisosFaltantes;
+    }
+
+    public void setPermisosFaltantes(String permisosFaltantes) {
+        this.permisosFaltantes = permisosFaltantes;
+    }
+
+    public Instant getPermisosInformadosEn() {
+        return permisosInformadosEn;
+    }
+
+    public void setPermisosInformadosEn(Instant permisosInformadosEn) {
+        this.permisosInformadosEn = permisosInformadosEn;
     }
 }

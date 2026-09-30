@@ -79,11 +79,14 @@ public class SolicitudCadeteService {
     private final CadeteRepository cadeteRepo;
     private final CadeteService cadeteService;
     private final EmailService emailService;
+    /** Link de un solo uso para bajar la app, en el mail de alta (2026-09-29). */
+    private final ApkService apkService;
     private final AppProperties props;
 
     public SolicitudCadeteService(SolicitudCadeteRepository repo, TipoVehiculoRepository tipoVehiculoRepo,
                                    CadeteRepository cadeteRepo, CadeteService cadeteService,
-                                   EmailService emailService, AppProperties props) {
+                                   EmailService emailService, AppProperties props, ApkService apkService) {
+        this.apkService = apkService;
         this.repo = repo;
         this.tipoVehiculoRepo = tipoVehiculoRepo;
         this.cadeteRepo = cadeteRepo;
@@ -253,7 +256,7 @@ public class SolicitudCadeteService {
         // La constancia es la del formulario (cuándo lo tildó), no la del momento de aprobar.
         cadete.setMayorEdadDeclaradaEn(s.getMayorEdadDeclaradaEn());
         cadeteRepo.save(cadete);
-        cadeteService.marcarPasswordTemporal(cadete.getId(), Instant.now().plus(10, ChronoUnit.MINUTES));
+        cadeteService.marcarPasswordTemporal(cadete.getId(), Instant.now().plus(CadeteService.VIGENCIA_PASSWORD_TEMPORAL));
 
         s.setEstado("APROBADA");
         s.setCadeteCreadoId(cadete.getId());
@@ -264,7 +267,8 @@ public class SolicitudCadeteService {
                         "Te dimos de alta como cadete. Estos son tus datos para entrar a la app:\n\n" +
                         "Usuario: " + username.trim() + "\n" +
                         "Contraseña temporal: " + passwordTemporal + "\n\n" +
-                        "Tenés 10 minutos para entrar con esta contraseña — si se vence, pedile a la cadetería que te la reenvíe.");
+                        "Tenés 24 horas para entrar con esta contraseña — si se vence, pedile a la cadetería que te la reenvíe." +
+                        textoDescarga(cadete.getId()));
         return new AprobacionResultado(cadete, passwordTemporal);
     }
 
@@ -329,7 +333,8 @@ public class SolicitudCadeteService {
                         "Te volvimos a dar de alta como cadete. Estos son tus datos para entrar a la app:\n\n" +
                         "Usuario: " + c.getUsername() + "\n" +
                         "Contraseña temporal: " + passwordTemporal + "\n\n" +
-                        "Tenés 10 minutos para entrar con esta contraseña — si se vence, pedile a la cadetería que te la reenvíe.");
+                        "Tenés 24 horas para entrar con esta contraseña — si se vence, pedile a la cadetería que te la reenvíe." +
+                        textoDescarga(c.getId()));
         return new AprobacionResultado(c, passwordTemporal);
     }
 
@@ -400,6 +405,17 @@ public class SolicitudCadeteService {
                 && s.getEmail() != null && !s.getEmail().isBlank();
         if (mail) enviarMailCorreccion(s);
         return new LinkReenviado(s, urlDe(s), mail);
+    }
+
+    /**
+     * El link para bajar la app (2026-09-29): personal, de un solo uso y vence a las 24 h. Vacío si todavía
+     * no se subió la APK en Configuración (el mail sale igual, como antes).
+     */
+    private String textoDescarga(String cadeteId) {
+        ApkService.Link link = apkService.crearLink(cadeteId);
+        if (link == null) return "";
+        return "\n\nPara bajar la app entrá a este link desde tu celular (es personal, sirve una sola vez y vence en 24 horas):\n"
+                + link.url() + "\n\nInstalala y entrá con el usuario y la contraseña de arriba.";
     }
 
     private void enviarMailCorreccion(SolicitudCadete s) {

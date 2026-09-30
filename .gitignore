@@ -37,3 +37,6 @@ bin/
 
 ### Worktrees aislados (superpowers) ###
 .worktrees/
+
+# APK de los cadetes subida desde Configuración (app.apk.dir, 2026-09-29)
+/datos/

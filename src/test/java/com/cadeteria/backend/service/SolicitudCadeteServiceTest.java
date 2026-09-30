@@ -52,7 +52,8 @@ class SolicitudCadeteServiceTest {
         cadeteService = mock(CadeteService.class);
         emailService = mock(EmailService.class);
         AppProperties props = new AppProperties();
-        service = new SolicitudCadeteService(repo, tipoVehiculoRepo, cadeteRepo, cadeteService, emailService, props);
+        service = new SolicitudCadeteService(repo, tipoVehiculoRepo, cadeteRepo, cadeteService, emailService, props,
+                mock(ApkService.class));
         when(repo.save(any())).thenAnswer(i -> i.getArgument(0));
         TipoVehiculo moto = new TipoVehiculo();
         moto.setId("MOTO");
