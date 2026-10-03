@@ -123,6 +123,26 @@ public class AdminUsuarioService {
     }
 
     /**
+     * El usuario logueado elige su contraseña (2026-10-03): hasta acá la temporal que le daba otro
+     * admin quedaba como definitiva. Cambia también el {@code sessionToken}, así que la sesión
+     * abierta deja de valer y el panel vuelve al login para entrar con la nueva.
+     */
+    public void cambiarMiPassword(String username, String actual, String nueva) {
+        Admin admin = repo.findByUsername(username).orElseThrow(() -> ResourceNotFoundException.of("Usuario", username));
+        if (!passwordEncoder.matches(actual, admin.getPasswordHash())) {
+            throw new BadRequestException("La contraseña actual no es correcta.");
+        }
+        if (passwordEncoder.matches(nueva, admin.getPasswordHash())) {
+            throw new BadRequestException("La contraseña nueva tiene que ser distinta de la actual.");
+        }
+        admin.setPasswordHash(passwordEncoder.encode(nueva));
+        admin.setSessionToken(UUID.randomUUID().toString());
+        admin.setDebeCambiarPassword(false);
+        admin.setPasswordTemporalExpira(null);
+        repo.save(admin);
+    }
+
+    /**
      * Superadmin (2026-09-26): un rol con el permiso "sistema" solo lo asigna otro superadmin, y a un
      * superadmin solo lo toca otro superadmin (rol, bloqueo, contraseña). Si no, un admin podría darse
      * el acceso técnico o dejar afuera al dueño de la plataforma.

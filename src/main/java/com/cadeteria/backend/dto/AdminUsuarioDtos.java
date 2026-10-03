@@ -22,4 +22,10 @@ public final class AdminUsuarioDtos {
     public record CambiarRolRequest(@NotBlank String rol) {}
 
     public record ResetearPasswordResponse(String passwordTemporal) {}
+
+    /** El usuario del panel cambia su propia contraseña (2026-10-03), igual que el cadete en la app. */
+    public record CambiarMiPasswordRequest(
+            @NotBlank(message = "Falta la contraseña actual.") String actual,
+            @NotBlank(message = "Falta la contraseña nueva.")
+            @Size(min = Validaciones.PASSWORD_MIN, max = Validaciones.PASSWORD_MAX, message = Validaciones.MSJ_PASSWORD) String nueva) {}
 }
