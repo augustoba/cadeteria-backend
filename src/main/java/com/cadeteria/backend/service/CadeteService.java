@@ -245,8 +245,28 @@ public class CadeteService {
     }
 
     /** Abre/cierra la sesión "online" (CadeteSesionService) cuando el cambio cruza el límite de DESCONECTADO. */
+    /** La app (desde la versión 3) manda su número de versión en cada pedido al servidor. */
+    public static final String HEADER_VERSION_APP = "X-App-Version";
+    static final String MSJ_VERSION_VIEJA =
+            "Tu versión de la app es vieja. Cerrá sesión y volvé a entrar para descargar la nueva.";
+
     public Cadete actualizarEstado(String username, String estadoId) {
+        return actualizarEstado(username, estadoId, null);
+    }
+
+    /**
+     * {@code versionApp}: la del header {@link #HEADER_VERSION_APP}, null si la app no lo manda.
+     * 2026-10-03: la versión mínima ({@code version_minima_app}) solo se miraba al iniciar sesión, y
+     * un cadete con la sesión abierta seguía semanas con la app vieja. Ahora tampoco puede pasar a
+     * Libre ni a Ocupado; Desconectado y lo que tenga en curso (Retirado, Finalizar) no se tocan.
+     */
+    public Cadete actualizarEstado(String username, String estadoId, Integer versionApp) {
         Cadete c = getByUsername(username);
+        if (versionApp != null) c.setUltimaVersionApp(versionApp);
+        if (!"DESCONECTADO".equals(estadoId)
+                && versionVieja(versionApp, c.getUltimaVersionApp(), configuracionService.getInt("version_minima_app", 1))) {
+            throw new BadRequestException(MSJ_VERSION_VIEJA);
+        }
         String anterior = c.getEstado().getId();
         EstadoCadete estado = estadoCadeteRepo.findById(estadoId)
                 .orElseThrow(() -> ResourceNotFoundException.of("Estado de cadete", estadoId));
@@ -264,6 +284,15 @@ public class CadeteService {
         if (pasaADesconectado) sesionService.cerrar(guardado);
         if (saleDeDesconectado) sesionService.abrir(guardado);
         return guardado;
+    }
+
+    /**
+     * La versión que cuenta es la que manda la app en el pedido; las apps anteriores a la 3 no la
+     * mandan, y ahí vale la del último inicio de sesión. Sin ninguna de las dos se toma como 0.
+     */
+    static boolean versionVieja(Integer versionDelPedido, Integer versionDelUltimoLogin, int versionMinima) {
+        Integer version = versionDelPedido != null ? versionDelPedido : versionDelUltimoLogin;
+        return (version == null ? 0 : version) < versionMinima;
     }
 
     /**

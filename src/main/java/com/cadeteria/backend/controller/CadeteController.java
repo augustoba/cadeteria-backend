@@ -172,8 +172,10 @@ public class CadeteController {
     // --- Self (app de cadetes) ---
 
     @PatchMapping("/api/cadetes/me/estado")
-    public CadeteResponse actualizarEstado(Authentication auth, @Valid @RequestBody EstadoRequest req) {
-        return CadeteResponse.from(service.actualizarEstado(auth.getName(), req.estadoId()));
+    public CadeteResponse actualizarEstado(Authentication auth, @Valid @RequestBody EstadoRequest req,
+            @org.springframework.web.bind.annotation.RequestHeader(value = CadeteService.HEADER_VERSION_APP, required = false)
+            Integer versionApp) {
+        return CadeteResponse.from(service.actualizarEstado(auth.getName(), req.estadoId(), versionApp));
     }
 
     @PatchMapping("/api/cadetes/me/ubicacion")
