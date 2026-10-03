@@ -17,6 +17,9 @@ public interface CuadraCoordsRepository extends JpaRepository<CuadraCoords, Stri
      */
     List<CuadraCoords> findByCalleCanonicaAndCuadra(String calleCanonica, int cuadra);
 
+    /** Todas las cuadras conocidas de una calle (para estimar una altura entre dos cuadras aprendidas, 2026-10-03). */
+    List<CuadraCoords> findByCalleCanonica(String calleCanonica);
+
     /** Para el GUARDADO, donde la localidad ya la devolvió el geocoder junto con el resultado. */
     Optional<CuadraCoords> findByCalleCanonicaAndLocalidadAndCuadra(String calleCanonica, String localidad, int cuadra);
 

@@ -76,6 +76,72 @@ class DireccionCacheServiceTest {
     }
 
     @Test
+    void lasOpcionesTraenTodasLasLocalidadesYSoloConfirmanSiHayUna() {
+        when(aliasRepository.findByVarianteNorm("belgrano")).thenReturn(Optional.of(alias("belgrano", "belgrano")));
+        CuadraCoords capital = coords("belgrano", SMT, 500, -26.82, -65.21, 3);
+        CuadraCoords yerbaBuena = coords("belgrano", "Yerba Buena", 500, -26.81, -65.30, 1);
+        when(coordsRepository.findByCalleCanonicaAndCuadra("belgrano", 500)).thenReturn(List.of(capital, yerbaBuena));
+
+        assertEquals(List.of(SMT, "Yerba Buena"),
+                service.buscarOpciones("Belgrano", 520).stream().map(DireccionCacheService.ResultadoCache::localidad).toList());
+        assertEquals(3, capital.getConfirmaciones());
+
+        when(coordsRepository.findByCalleCanonicaAndCuadra("belgrano", 500)).thenReturn(List.of(capital));
+        assertEquals(1, service.buscarOpciones("Belgrano", 520).size());
+        assertEquals(4, capital.getConfirmaciones());
+    }
+
+    @Test
+    void estimaUnaCuadraQueFaltaConLasVecinasDeLaMismaLocalidad() {
+        when(coordsRepository.findByCalleCanonica("suipacha")).thenReturn(List.of(
+                coords("suipacha", SMT, 600, -26.8200, -65.2140, 1),
+                coords("suipacha", SMT, 800, -26.8180, -65.2140, 1),
+                coords("suipacha", "Lules", 100, -26.9300, -65.3400, 1)));
+
+        List<DireccionCacheService.ResultadoCache> r = service.estimar("suipacha", 750);
+
+        // Solo San Miguel: la de Lules queda a más de tres cuadras. A la altura 750, entre el 650 y el 850.
+        assertEquals(1, r.size());
+        assertEquals(SMT, r.get(0).localidad());
+        assertEquals(true, r.get(0).approximate());
+        assertEquals(-26.8190, r.get(0).lat(), 0.00001);
+    }
+
+    @Test
+    void conUnaSolaCuadraVecinaUsaEsePuntoYSinNingunaCercaNoEstima() {
+        when(coordsRepository.findByCalleCanonica("suipacha")).thenReturn(List.of(coords("suipacha", SMT, 600, -26.8200, -65.2140, 1)));
+
+        assertEquals(-26.8200, service.estimar("suipacha", 750).get(0).lat(), 0.00001);
+        assertEquals(List.of(), service.estimar("suipacha", 2500));
+    }
+
+    @Test
+    void lasParecidasDevuelvenSoloLasDelMejorPuntaje() {
+        when(aliasRepository.findAll()).thenReturn(List.of(
+                alias("belgrano", "belgrano"), alias("general belgrano", "belgrano"),
+                alias("bolivar", "bolivar"), alias("batalla de suipacha", "batalla de suipacha")));
+
+        assertEquals(List.of("belgrano"), service.callesParecidas("belgarno"));
+        assertEquals(List.of("bolivar"), service.callesParecidas("Bolibar"));
+        assertEquals(List.of(), service.callesParecidas("xyzw"));
+    }
+
+    @Test
+    void elNombreAnteriorLlevaALaCalleDeHoy() {
+        var nombresAnteriores = mock(com.cadeteria.backend.repository.CalleNombreAnteriorRepository.class);
+        service = new DireccionCacheService(aliasRepository, coordsRepository, configuracion, nombresAnteriores);
+        var fila = new com.cadeteria.backend.model.CalleNombreAnterior();
+        fila.setNombreNorm("rivadavia");
+        fila.setCalleCanonica("virgen de la merced");
+        when(nombresAnteriores.findByNombreNorm("rivadavia")).thenReturn(List.of(fila));
+        when(aliasRepository.findByVarianteNorm(anyString())).thenReturn(Optional.empty());
+
+        // "Rivadavia" no cambia al expandir abreviaturas: un solo nombre a buscar (antes rompía por repetido).
+        assertEquals(List.of("virgen de la merced"), service.callesConNombreAnterior("Rivadavia"));
+        assertEquals(List.of(), service.callesConNombreAnterior("Gral. Paz"));
+    }
+
+    @Test
     void mirarUnaCuadraNoLeSumaConfirmaciones() {
         CuadraCoords coords = coords("batalla de suipacha", SMT, 700, -26.81, -65.21, 4);
         when(coordsRepository.findByCalleCanonicaAndCuadra("batalla de suipacha", 700)).thenReturn(List.of(coords));

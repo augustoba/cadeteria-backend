@@ -30,6 +30,7 @@ public final class ConfiguracionSistema {
             DireccionCacheService.CONFIG_GOOGLE_LINK_VENCE,
             "frecuencia_ubicacion_seg", MapeoCallesCadetesService.CONFIG_INTERVALO_SEG,
             "aprender_gps_precision_max_m", "aprender_geocoder_precision_max_m", "reverse_respaldo_max_dia",
+            GeocodingProxyService.CONFIG_BUSQUEDA_EXTERNA,
             "version_minima_app", "retencion_imagenes_pedido_dias",
             "rate_limit_publico_max", "rate_limit_publico_ventana_seg",
             "vapid_public_key", "vapid_private_key",

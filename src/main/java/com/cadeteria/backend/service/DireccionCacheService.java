@@ -1,9 +1,12 @@
 package com.cadeteria.backend.service;
 
+import com.cadeteria.backend.model.CalleNombreAnterior;
 import com.cadeteria.backend.model.CuadraCoords;
 import com.cadeteria.backend.model.DireccionAlias;
+import com.cadeteria.backend.repository.CalleNombreAnteriorRepository;
 import com.cadeteria.backend.repository.CuadraCoordsRepository;
 import com.cadeteria.backend.repository.DireccionAliasRepository;
+import com.cadeteria.backend.util.CallesParecidas;
 import com.cadeteria.backend.util.DireccionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,12 +16,16 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Cache de "texto de calle + altura -> coordenadas", compartida por todo lo que geocodifica
@@ -75,12 +82,22 @@ public class DireccionCacheService {
     private final DireccionAliasRepository aliasRepository;
     private final CuadraCoordsRepository coordsRepository;
     private final ConfiguracionService configuracionService;
+    private final CalleNombreAnteriorRepository nombreAnteriorRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public DireccionCacheService(DireccionAliasRepository aliasRepository, CuadraCoordsRepository coordsRepository,
-                                 ConfiguracionService configuracionService) {
+                                 ConfiguracionService configuracionService,
+                                 CalleNombreAnteriorRepository nombreAnteriorRepository) {
         this.aliasRepository = aliasRepository;
         this.coordsRepository = coordsRepository;
         this.configuracionService = configuracionService;
+        this.nombreAnteriorRepository = nombreAnteriorRepository;
+    }
+
+    /** Sin la tabla de nombres anteriores (tests de la cache que no la usan). */
+    public DireccionCacheService(DireccionAliasRepository aliasRepository, CuadraCoordsRepository coordsRepository,
+                                 ConfiguracionService configuracionService) {
+        this(aliasRepository, coordsRepository, configuracionService, null);
     }
 
     /**
@@ -105,6 +122,26 @@ public class DireccionCacheService {
         return c == null ? null : confirmarYMapear(c);
     }
 
+    /**
+     * Lo que la base propia sabe de esa calle y altura en TODAS las localidades (2026-10-03). Con una
+     * sola es lo mismo que {@link #buscar} (suma la confirmación); con varias ("Belgrano 500" está en
+     * San Miguel y en Yerba Buena) las devuelve todas para que elija quien carga, en vez de tratarlo
+     * como "no la conozco" y salir a preguntar afuera. Vacía = no hay nada.
+     */
+    @Transactional
+    public List<ResultadoCache> buscarOpciones(String calleTexto, int numero) {
+        String canonica = canonicaDeAlias(calleTexto);
+        return canonica == null ? List.of() : opcionesPorCanonica(canonica, numero);
+    }
+
+    /** Igual que {@link #buscarOpciones} con la calle canónica ya resuelta. */
+    @Transactional
+    public List<ResultadoCache> opcionesPorCanonica(String calleCanonica, int numero) {
+        List<CuadraCoords> filas = filasUtiles(calleCanonica, numero);
+        if (filas.size() == 1) return List.of(confirmarYMapear(filas.get(0)));
+        return filas.stream().map(DireccionCacheService::mapear).toList();
+    }
+
     /** La fila que respondería {@link #buscar}, sin sumarle una confirmación (para ver de qué fuente es). */
     public CuadraCoords filaDe(String calleTexto, int numero) {
         String canonica = canonicaDeAlias(calleTexto);
@@ -126,11 +163,59 @@ public class DireccionCacheService {
     }
 
     private CuadraCoords unicaFila(String calleCanonica, int numero) {
-        List<CuadraCoords> candidatos = coordsRepository.findByCalleCanonicaAndCuadra(calleCanonica, DireccionUtils.cuadra(numero))
+        List<CuadraCoords> candidatos = filasUtiles(calleCanonica, numero);
+        return candidatos.size() == 1 ? candidatos.get(0) : null;
+    }
+
+    private List<CuadraCoords> filasUtiles(String calleCanonica, int numero) {
+        return coordsRepository.findByCalleCanonicaAndCuadra(calleCanonica, DireccionUtils.cuadra(numero))
                 // Las aproximadas (guardadas antes del 2026-09-24) no sirven como respuesta y
                 // hacían parecer ambigua una cuadra con una sola ubicación buena.
                 .stream().filter(c -> !c.isApproximate() && !vencida(c)).toList();
-        return candidatos.size() == 1 ? candidatos.get(0) : null;
+    }
+
+    private static ResultadoCache mapear(CuadraCoords c) {
+        return new ResultadoCache(c.getCalleCanonica(), c.getLocalidad(), c.getCuadra(), c.getLat(), c.getLng(), c.isApproximate());
+    }
+
+    /** Hasta cuántas cuadras de distancia sirve una cuadra conocida para estimar otra de la misma calle. */
+    private static final int CUADRAS_MAX_PARA_ESTIMAR = 3;
+
+    /**
+     * Calle conocida pero sin esa cuadra (2026-10-03): la estima con las cuadras vecinas de la misma
+     * calle y localidad — a mitad de camino si se conocen la de antes y la de después, o la más
+     * cercana si no. Siempre {@code approximate}: el buscador la muestra "sin altura exacta" y quien
+     * carga corrige el pin (y ahí sí se aprende). Antes esto lo daban solo los buscadores de afuera.
+     */
+    @Transactional(readOnly = true)
+    public List<ResultadoCache> estimar(String calleCanonica, int numero) {
+        int cuadra = DireccionUtils.cuadra(numero);
+        Map<String, List<CuadraCoords>> porLocalidad = coordsRepository.findByCalleCanonica(calleCanonica).stream()
+                .filter(c -> !c.isApproximate() && !vencida(c))
+                .collect(Collectors.groupingBy(CuadraCoords::getLocalidad, LinkedHashMap::new, Collectors.toList()));
+        List<ResultadoCache> out = new ArrayList<>();
+        for (Map.Entry<String, List<CuadraCoords>> e : porLocalidad.entrySet()) {
+            CuadraCoords antes = null, despues = null;
+            for (CuadraCoords c : e.getValue()) {
+                if (c.getCuadra() < cuadra && (antes == null || c.getCuadra() > antes.getCuadra())) antes = c;
+                if (c.getCuadra() > cuadra && (despues == null || c.getCuadra() < despues.getCuadra())) despues = c;
+            }
+            int max = CUADRAS_MAX_PARA_ESTIMAR * 100;
+            boolean sirveAntes = antes != null && cuadra - antes.getCuadra() <= max;
+            boolean sirveDespues = despues != null && despues.getCuadra() - cuadra <= max;
+            if (sirveAntes && sirveDespues) {
+                // Proporcional a la altura pedida entre las dos cuadras conocidas.
+                double t = (numero - antes.getCuadra() - 50) / (double) (despues.getCuadra() - antes.getCuadra());
+                t = Math.max(0, Math.min(1, t));
+                out.add(new ResultadoCache(calleCanonica, e.getKey(), cuadra,
+                        antes.getLat() + (despues.getLat() - antes.getLat()) * t,
+                        antes.getLng() + (despues.getLng() - antes.getLng()) * t, true));
+            } else if (sirveAntes || sirveDespues) {
+                CuadraCoords c = sirveAntes ? antes : despues;
+                out.add(new ResultadoCache(calleCanonica, e.getKey(), cuadra, c.getLat(), c.getLng(), true));
+            }
+        }
+        return out;
     }
 
     /** Mínimo de letras para completar una calle por el comienzo: con "sa" saldrían todas las "San…". */
@@ -174,11 +259,72 @@ public class DireccionCacheService {
         return List.copyOf(canonicas);
     }
 
+    /** Cada cuánto se vuelve a leer la lista de calles para buscar por parecido (se aprende una calle nueva cada tanto). */
+    private static final Duration VIGENCIA_LISTA_DE_CALLES = Duration.ofMinutes(2);
+    private static final int MAX_CALLES_PARECIDAS = 5;
+
+    private record CalleConocida(String varianteNorm, String canonica) {}
+
+    private volatile List<CalleConocida> callesConocidas = List.of();
+    private volatile Instant callesConocidasHasta = Instant.EPOCH;
+
+    private List<CalleConocida> callesConocidas() {
+        if (Instant.now().isAfter(callesConocidasHasta)) {
+            callesConocidas = aliasRepository.findAll().stream()
+                    .map(a -> new CalleConocida(a.getVarianteNorm(), a.getCalleCanonica())).toList();
+            callesConocidasHasta = Instant.now().plus(VIGENCIA_LISTA_DE_CALLES);
+        }
+        return callesConocidas;
+    }
+
+    /**
+     * Calles conocidas que se parecen a lo tipeado (2026-10-03): errores de dedo ("belgarno"), de oído
+     * ("bolibar", "irigoyen") y palabras sueltas ("mate luna") — ver {@link CallesParecidas}. Devuelve
+     * solo las del mejor puntaje: una si el parecido es claro, varias si hay empate (se ofrecen para
+     * elegir, no se adivina). Vacía si lo tipeado ya es una calle conocida o no se parece a ninguna.
+     */
+    public List<String> callesParecidas(String calleTexto) {
+        String norm = DireccionUtils.normalizar(DireccionUtils.expandirAbreviaturas(calleTexto));
+        if (norm.replace(" ", "").length() < MIN_LETRAS_PREFIJO) return List.of();
+        double mejor = Double.MAX_VALUE;
+        Set<String> canonicas = new LinkedHashSet<>();
+        for (CalleConocida c : callesConocidas()) {
+            double p = CallesParecidas.puntaje(norm, c.varianteNorm());
+            if (p == CallesParecidas.NO || p > mejor) continue;
+            if (p < mejor) {
+                mejor = p;
+                canonicas.clear();
+            }
+            canonicas.add(c.canonica());
+        }
+        return canonicas.stream().limit(MAX_CALLES_PARECIDAS).toList();
+    }
+
+    /** Calles que antes se llamaban como lo tipeado ("rivadavia" -> "virgen de la merced"), ver {@link CalleNombreAnterior}. */
+    public List<String> callesConNombreAnterior(String calleTexto) {
+        if (nombreAnteriorRepository == null) return List.of();
+        Set<String> canonicas = new LinkedHashSet<>();
+        // Tal cual y con las abreviaturas expandidas ("gral roca" / "general roca"); casi siempre es el mismo texto.
+        Set<String> nombres = new LinkedHashSet<>(List.of(DireccionUtils.normalizar(calleTexto)));
+        nombres.add(DireccionUtils.normalizar(DireccionUtils.expandirAbreviaturas(calleTexto)));
+        for (String nombre : nombres) {
+            for (CalleNombreAnterior n : nombreAnteriorRepository.findByNombreNorm(nombre)) {
+                // El Excel se carga con el nombre de hoy; si ese nombre es alias de otro, vale la canónica.
+                canonicas.add(canonicalizar(n.getCalleCanonica()));
+            }
+        }
+        return List.copyOf(canonicas);
+    }
+
     /** Lo que respondería {@link #buscarPorCanonica}, sin sumarle una confirmación: ofrecerla no la confirma. */
     public ResultadoCache mirarPorCanonica(String calleCanonica, int numero) {
         CuadraCoords c = unicaFila(calleCanonica, numero);
-        return c == null ? null
-                : new ResultadoCache(c.getCalleCanonica(), c.getLocalidad(), c.getCuadra(), c.getLat(), c.getLng(), c.isApproximate());
+        return c == null ? null : mapear(c);
+    }
+
+    /** Igual, en todas las localidades donde esa calle tenga la cuadra aprendida. */
+    public List<ResultadoCache> mirarOpciones(String calleCanonica, int numero) {
+        return filasUtiles(calleCanonica, numero).stream().map(DireccionCacheService::mapear).toList();
     }
 
     /**

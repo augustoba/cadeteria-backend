@@ -41,13 +41,16 @@ class GeocodingProxyServicePinYBuscadorTest {
     private static final double LAT_400M = LAT + 0.0036;
 
     private DireccionCacheService cache;
+    private ConfiguracionService config;
     private GeocodingProxyService service;
 
     @BeforeEach
     void setUp() {
         cache = mock(DireccionCacheService.class);
-        ConfiguracionService config = mock(ConfiguracionService.class);
+        config = mock(ConfiguracionService.class);
         when(config.getInt(eq(GeocodingProxyService.CONFIG_GPS_PRECISION_MAX), anyInt())).thenReturn(50);
+        // Como en producción si nadie la tocó: la búsqueda externa está prendida.
+        when(config.getBoolean(eq(GeocodingProxyService.CONFIG_BUSQUEDA_EXTERNA), anyBoolean())).thenReturn(true);
         service = spy(new GeocodingProxyService(new AppProperties(), mock(ApiKeyPoolService.class), cache, config));
     }
 
@@ -166,8 +169,8 @@ class GeocodingProxyServicePinYBuscadorTest {
     @Test
     void colomCompletaAColombiaYSaleDeLaCache() {
         when(cache.callesQueEmpiezanCon("colom")).thenReturn(List.of("colombia"));
-        when(cache.buscarPorCanonica("colombia", 4600))
-                .thenReturn(new DireccionCacheService.ResultadoCache("colombia", SMT, 4600, LAT, LNG, false));
+        when(cache.opcionesPorCanonica("colombia", 4600))
+                .thenReturn(List.of(new DireccionCacheService.ResultadoCache("colombia", SMT, 4600, LAT, LNG, false)));
 
         List<GeoAddress> r = service.buscar("colom 4600");
 
@@ -189,10 +192,10 @@ class GeocodingProxyServicePinYBuscadorTest {
     @Test
     void conVariasCallesPosiblesOfreceLasQueTienenEsaCuadraSinAdivinar() {
         when(cache.callesQueEmpiezanCon("sant")).thenReturn(List.of("santiago", "santa fe", "santa cruz"));
-        when(cache.buscarPorCanonica("santiago", 800))
-                .thenReturn(new DireccionCacheService.ResultadoCache("santiago", SMT, 800, LAT, LNG, false));
-        when(cache.buscarPorCanonica("santa fe", 800))
-                .thenReturn(new DireccionCacheService.ResultadoCache("santa fe", SMT, 800, LAT_60M, LNG, false));
+        when(cache.mirarOpciones("santiago", 800))
+                .thenReturn(List.of(new DireccionCacheService.ResultadoCache("santiago", SMT, 800, LAT, LNG, false)));
+        when(cache.mirarOpciones("santa fe", 800))
+                .thenReturn(List.of(new DireccionCacheService.ResultadoCache("santa fe", SMT, 800, LAT_60M, LNG, false)));
 
         List<GeoAddress> r = service.buscar("sant 800");
 
@@ -217,8 +220,8 @@ class GeocodingProxyServicePinYBuscadorTest {
     void suipachaTambienOfreceLaCuadraAprendidaComoBatallaDeSuipacha() {
         when(cache.conoceCalle("suipacha")).thenReturn(true);
         when(cache.callesQueContienen("suipacha")).thenReturn(List.of("batalla de suipacha"));
-        when(cache.mirarPorCanonica("batalla de suipacha", 750))
-                .thenReturn(new DireccionCacheService.ResultadoCache("batalla de suipacha", SMT, 700, LAT, LNG, false));
+        when(cache.mirarOpciones("batalla de suipacha", 750))
+                .thenReturn(List.of(new DireccionCacheService.ResultadoCache("batalla de suipacha", SMT, 700, LAT, LNG, false)));
         doReturn(List.of(geo("Suipacha", 750, true))).when(service).buscarAfuera(anyString(), anyString(), any());
 
         List<GeoAddress> r = service.buscar("suipacha 750");
@@ -235,6 +238,82 @@ class GeocodingProxyServicePinYBuscadorTest {
         doReturn(List.of(geo("Suipacha", 750, true))).when(service).buscarAfuera(anyString(), anyString(), any());
 
         assertEquals(1, service.buscar("suipacha 750").size());
+    }
+
+    // ---- 2026-10-03: la base propia sin los buscadores de afuera ----
+
+    @Test
+    void laMismaCalleYCuadraEnDosLocalidadesOfreceLasDos() {
+        when(cache.buscarOpciones("belgrano", 500)).thenReturn(List.of(
+                new DireccionCacheService.ResultadoCache("belgrano", SMT, 500, LAT, LNG, false),
+                new DireccionCacheService.ResultadoCache("belgrano", "Yerba Buena", 500, LAT_400M, LNG, false)));
+
+        List<GeoAddress> r = service.buscar("belgrano 500");
+
+        assertEquals(List.of("Belgrano 500, " + SMT, "Belgrano 500, Yerba Buena"), r.stream().map(GeoAddress::label).toList());
+        verify(service, never()).buscarAfuera(anyString(), anyString(), any());
+    }
+
+    @Test
+    void belgarnoMalEscritoEncuentraBelgrano() {
+        when(cache.callesParecidas("belgarno")).thenReturn(List.of("belgrano"));
+        when(cache.opcionesPorCanonica("belgrano", 750))
+                .thenReturn(List.of(new DireccionCacheService.ResultadoCache("belgrano", SMT, 700, LAT, LNG, false)));
+
+        List<GeoAddress> r = service.buscar("belgarno 750");
+
+        assertEquals(List.of("Belgrano 750, " + SMT), r.stream().map(GeoAddress::label).toList());
+        verify(service, never()).buscarAfuera(anyString(), anyString(), any());
+    }
+
+    @Test
+    void siHayCallesQueEmpiezanAsiNoSeBuscaPorParecido() {
+        when(cache.callesQueEmpiezanCon("colom")).thenReturn(List.of("colombia"));
+        doReturn(List.of()).when(service).buscarAfuera(anyString(), anyString(), any());
+
+        service.buscar("colom 4600");
+
+        verify(cache, never()).callesParecidas(anyString());
+    }
+
+    @Test
+    void elNombreAnteriorOfreceLaCalleDeHoySinDejarDeBuscarLaOtra() {
+        when(cache.conoceCalle("rivadavia")).thenReturn(true);
+        when(cache.canonicalizar("rivadavia")).thenReturn("rivadavia");
+        when(cache.callesConNombreAnterior("rivadavia")).thenReturn(List.of("virgen de la merced"));
+        when(cache.mirarOpciones("virgen de la merced", 500))
+                .thenReturn(List.of(new DireccionCacheService.ResultadoCache("virgen de la merced", SMT, 500, LAT, LNG, false)));
+        doReturn(List.of(geo("Rivadavia", 500, false))).when(service).buscarAfuera(anyString(), anyString(), any());
+
+        List<GeoAddress> r = service.buscar("rivadavia 500");
+
+        assertEquals(List.of("Virgen de la Merced 500, " + SMT, "Rivadavia 500, " + SMT), r.stream().map(GeoAddress::label).toList());
+    }
+
+    @Test
+    void conLaCalleConocidaYSinEsaCuadraLaEstimaConLasVecinas() {
+        when(cache.conoceCalle("suipacha")).thenReturn(true);
+        when(cache.canonicalizar("suipacha")).thenReturn("suipacha");
+        when(cache.estimar("suipacha", 750))
+                .thenReturn(List.of(new DireccionCacheService.ResultadoCache("suipacha", SMT, 700, LAT, LNG, true)));
+        doReturn(List.of()).when(service).buscarAfuera(anyString(), anyString(), any());
+
+        List<GeoAddress> r = service.buscar("suipacha 750");
+
+        assertEquals(1, r.size());
+        assertEquals("Suipacha 750, " + SMT, r.get(0).label());
+        // "Sin altura exacta": el panel pide corregir el pin, y recién ahí se aprende.
+        assertEquals(true, r.get(0).approximate());
+    }
+
+    @Test
+    void conLaBusquedaExternaApagadaNoSaleAPreguntarAfuera() {
+        when(config.getBoolean(eq(GeocodingProxyService.CONFIG_BUSQUEDA_EXTERNA), anyBoolean())).thenReturn(false);
+
+        assertEquals(List.of(), service.buscar("calle que nadie conoce 123"));
+        assertEquals(List.of(), service.buscarAmpliado("calle que nadie conoce 123"));
+
+        verify(service, never()).buscarAfuera(anyString(), anyString(), any());
     }
 
     /** Sin altura exacta, así el reverse no alimenta la cache y solo se ve lo que guarda el pin. */

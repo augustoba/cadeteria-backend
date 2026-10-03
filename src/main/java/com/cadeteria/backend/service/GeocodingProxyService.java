@@ -80,6 +80,13 @@ public class GeocodingProxyService {
     public static final String CONFIG_GPS_PRECISION_MAX = "aprender_gps_precision_max_m";
     /** Precisión máxima (metros) del GPS para aprender la calle que resolvió el teléfono mientras anda. */
     public static final String CONFIG_GEOCODER_PRECISION_MAX = "aprender_geocoder_precision_max_m";
+    /**
+     * Si el buscador sale a preguntar a los servicios gratuitos de afuera (Nominatim, Geoapify,
+     * LocationIQ) cuando la base propia no tiene la dirección (2026-10-03). Apagado, busca solo en
+     * la base propia y lo que falte se carga pegando el link de Google Maps. El "qué calle hay acá"
+     * (reverse) no depende de esto.
+     */
+    public static final String CONFIG_BUSQUEDA_EXTERNA = "busqueda_externa_activa";
     /** Tope diario de reverse geocoding de respaldo (LocationIQ/Geoapify) cuando Nominatim no da la altura. 0 = apagado. */
     public static final String CONFIG_REVERSE_RESPALDO_MAX_DIA = "reverse_respaldo_max_dia";
     /** El GPS del cadete tiene que caer a menos de esto del pin del pedido (si no, marcó en otro lado). */
@@ -129,31 +136,49 @@ public class GeocodingProxyService {
         String streetPart = tieneNumero ? m.group(1).trim() : q;
         Integer numero = tieneNumero ? Integer.parseInt(m.group(2)) : null;
 
+        // La calle conocida de la que se sacan las cuadras vecinas si esta cuadra no está aprendida.
+        boolean calleConocida = direccionCache.conoceCalle(streetPart);
+        String canonicaConocida = calleConocida ? direccionCache.canonicalizar(streetPart) : null;
+
         if (numero != null) {
-            GeoAddress cacheado = desdeCache(direccionCache.buscar(streetPart, numero), numero);
-            if (cacheado != null) return List.of(cacheado);
+            // 2026-10-03: en todas las localidades donde esté ("Belgrano 500" en San Miguel y en Yerba
+            // Buena se ofrecen las dos); antes con más de una se trataba como desconocida.
+            List<GeoAddress> propias = desdeCache(direccionCache.buscarOpciones(streetPart, numero), numero);
+            if (!propias.isEmpty()) {
+                // Y si ese nombre es el anterior de otra calle ("rivadavia" -> Virgen de la Merced), también esa.
+                List<GeoAddress> todas = new ArrayList<>(propias);
+                for (String canonica : direccionCache.callesConNombreAnterior(streetPart)) {
+                    todas.addAll(desdeCache(direccionCache.mirarOpciones(canonica, numero), numero));
+                }
+                return todas;
+            }
         }
+        // Cuadras estimadas con las vecinas ("sin altura exacta"): van al final, si no aparece nada mejor.
+        List<GeoAddress> estimadasPropias = new ArrayList<>();
 
         // 3h (2026-09-28): "colom 4600" no es ninguna calle, pero la cache conoce "colombia". Con una
         // sola calle que empiece así se completa el nombre — también antes de preguntar afuera, que
         // con "colom" no encuentran nada. Con varias ("sant" -> Santiago, Santa Fe...) no se adivina:
-        // se ofrecen las que ya tienen esa cuadra aprendida.
-        if (!direccionCache.conoceCalle(streetPart)) {
+        // se ofrecen las que ya tienen esa cuadra aprendida. 2026-10-03: si ninguna empieza así, las
+        // que se le parecen ("belgarno", "bolibar", "mate luna"), con la misma regla.
+        if (!calleConocida) {
             List<String> candidatas = direccionCache.callesQueEmpiezanCon(streetPart);
+            if (candidatas.isEmpty()) candidatas = direccionCache.callesParecidas(streetPart);
             if (candidatas.size() == 1) {
+                canonicaConocida = candidatas.get(0);
                 streetPart = DireccionUtils.nombreParaMostrar(candidatas.get(0));
                 q = numero != null ? streetPart + " " + numero : streetPart;
                 if (numero != null) {
-                    GeoAddress cacheado = desdeCache(direccionCache.buscarPorCanonica(candidatas.get(0), numero), numero);
-                    if (cacheado != null) return List.of(cacheado);
+                    List<GeoAddress> propias = desdeCache(direccionCache.opcionesPorCanonica(candidatas.get(0), numero), numero);
+                    if (!propias.isEmpty()) return propias;
                 }
             } else if (candidatas.size() > 1 && numero != null) {
                 List<GeoAddress> opciones = new ArrayList<>();
                 for (String canonica : candidatas) {
-                    GeoAddress op = desdeCache(direccionCache.buscarPorCanonica(canonica, numero), numero);
-                    if (op != null) opciones.add(op);
+                    opciones.addAll(desdeCache(direccionCache.mirarOpciones(canonica, numero), numero));
                 }
                 if (!opciones.isEmpty()) return opciones;
+                for (String canonica : candidatas) estimadasPropias.addAll(estimadas(canonica, numero));
             }
         }
 
@@ -161,12 +186,23 @@ public class GeocodingProxyService {
         // Suipacha". Las calles conocidas que llevan lo tipeado en el nombre y ya tienen esa cuadra
         // se ofrecen primero, con su nombre completo; no reemplazan a los buscadores porque puede
         // ser otra calle ("peru" no es "camino del peru") y el que elige es quien carga.
+        // Y las que antes se llamaban así ("rivadavia" -> Virgen de la Merced): también se ofrecen,
+        // sin dejar de buscar la Rivadavia de otra localidad.
         List<GeoAddress> parecidas = new ArrayList<>();
         if (numero != null) {
-            for (String canonica : direccionCache.callesQueContienen(streetPart)) {
-                GeoAddress op = desdeCache(direccionCache.mirarPorCanonica(canonica, numero), numero);
-                if (op != null) parecidas.add(op);
+            java.util.Set<String> otras = new java.util.LinkedHashSet<>(direccionCache.callesConNombreAnterior(streetPart));
+            otras.addAll(direccionCache.callesQueContienen(streetPart));
+            for (String canonica : otras) {
+                List<GeoAddress> exactas = desdeCache(direccionCache.mirarOpciones(canonica, numero), numero);
+                parecidas.addAll(exactas.isEmpty() ? estimadas(canonica, numero) : exactas);
             }
+        }
+        // La calle es conocida pero no esa cuadra: se estima con las vecinas.
+        if (canonicaConocida != null && numero != null) estimadasPropias.addAll(estimadas(canonicaConocida, numero));
+
+        if (!busquedaExternaActiva()) {
+            parecidas.addAll(estimadasPropias);
+            return parecidas;
         }
 
         List<GeoAddress> out = buscarAfuera(q, streetPart, numero);
@@ -175,8 +211,9 @@ public class GeocodingProxyService {
             direccionCache.guardar(streetPart, numero, mejor.street(), mejor.locality(),
                     mejor.lat(), mejor.lng(), mejor.approximate(), mejor.proveedor());
         }
-        if (parecidas.isEmpty()) return out;
         parecidas.addAll(out);
+        // La estimación propia va al final, y solo si afuera tampoco dieron con la altura exacta.
+        if (out.stream().allMatch(GeoAddress::approximate)) parecidas.addAll(estimadasPropias);
         return parecidas;
     }
 
@@ -201,12 +238,32 @@ public class GeocodingProxyService {
      */
     private GeoAddress desdeCache(DireccionCacheService.ResultadoCache cacheado, int numero) {
         if (cacheado == null || cacheado.approximate()) return null;
+        return comoResultado(cacheado, numero);
+    }
+
+    private List<GeoAddress> desdeCache(List<DireccionCacheService.ResultadoCache> cacheados, int numero) {
+        if (cacheados == null) return List.of();
+        return cacheados.stream().map(c -> desdeCache(c, numero)).filter(java.util.Objects::nonNull).toList();
+    }
+
+    /** Cuadras estimadas con las vecinas de la base propia: se ofrecen como "sin altura exacta". */
+    private List<GeoAddress> estimadas(String canonica, int numero) {
+        List<DireccionCacheService.ResultadoCache> estimadas = direccionCache.estimar(canonica, numero);
+        return estimadas == null ? List.of() : estimadas.stream().map(c -> comoResultado(c, numero)).toList();
+    }
+
+    private static GeoAddress comoResultado(DireccionCacheService.ResultadoCache cacheado, int numero) {
         String calle = DireccionUtils.nombreParaMostrar(cacheado.calleCanonica());
         String base = calle + " " + numero;
         String label = cacheado.localidad() != null && !cacheado.localidad().isBlank()
                 ? base + ", " + cacheado.localidad() : base;
         return new GeoAddress(label, calle, numero, cacheado.localidad(),
-                cacheado.lat(), cacheado.lng(), false, PROVEEDOR_CACHE);
+                cacheado.lat(), cacheado.lng(), cacheado.approximate(), PROVEEDOR_CACHE);
+    }
+
+    /** Ver {@link #CONFIG_BUSQUEDA_EXTERNA}. Prendida por defecto: es como venía funcionando. */
+    private boolean busquedaExternaActiva() {
+        return configuracionService.getBoolean(CONFIG_BUSQUEDA_EXTERNA, true);
     }
 
     /**
@@ -236,6 +293,9 @@ public class GeocodingProxyService {
             }
             return out;
         }
+
+        // Con la búsqueda externa apagada no hay segundo intento gratuito: queda el link o ubicarla a mano.
+        if (!busquedaExternaActiva()) return List.of();
 
         List<GeoAddress> resultados = new ArrayList<>();
         resultados.addAll(queryNominatim(q, numero));
