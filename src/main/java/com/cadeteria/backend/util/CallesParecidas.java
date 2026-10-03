@@ -27,6 +27,8 @@ public final class CallesParecidas {
     private static final Set<String> GENERICAS = Set.of(
             "av", "avda", "avenida", "calle", "gral", "general", "dr", "doctor", "pte", "pres", "presidente",
             "cnel", "coronel", "tte", "teniente", "ing", "ingeniero", "sgto", "sargento",
+            // La gente busca el pasaje por el nombre solo, igual que la avenida (2026-10-03).
+            "pasaje", "pje", "psje", "bulevar", "boulevard", "bv", "blvd",
             "de", "del", "la", "las", "los", "el", "y", "e");
 
     /**
@@ -36,6 +38,14 @@ public final class CallesParecidas {
     public static String clave(String nombreNorm) {
         List<String> palabras = palabras(nombreNorm);
         return String.join(" ", palabras);
+    }
+
+    /**
+     * Las palabras que distinguen a la calle, "de oído": "avenida bartolome mitre" -> [bartolome, mitre].
+     * Dos nombres con las mismas palabras son la misma forma de decir una calle ("av mitre", "mitre").
+     */
+    public static List<String> palabrasClave(String nombreNorm) {
+        return palabras(nombreNorm);
     }
 
     private static List<String> palabras(String nombreNorm) {

@@ -63,16 +63,27 @@ class DireccionCacheServiceTest {
     }
 
     @Test
-    void callesQueContienenLoTipeadoComoPalabraEnteraSinLaPropia() {
+    void callesPorPalabrasEnLosDosSentidosSinContarAvenidaNiPasaje() {
+        when(aliasRepository.findAll()).thenReturn(List.of(
+                alias("avenida mitre", "avenida mitre"), alias("avenida bartolome mitre", "avenida bartolome mitre"),
+                alias("bartolome mitre", "bartolome mitre"), alias("pasaje belisario lopez", "pasaje belisario lopez"),
+                alias("lopez manan", "lopez manan"), alias("suipacha", "suipacha"),
+                alias("batalla de suipacha", "batalla de suipacha"), alias("marcos paz", "marcos paz")));
+        when(aliasRepository.findByVarianteNorm(anyString())).thenReturn(Optional.empty());
         when(aliasRepository.findByVarianteNorm("suipacha")).thenReturn(Optional.of(alias("suipacha", "suipacha")));
-        when(aliasRepository.findTop50ByVarianteNormContaining("suipacha")).thenReturn(List.of(
-                alias("suipacha", "suipacha"),
-                alias("batalla de suipacha", "batalla de suipacha"),
-                alias("suipachas", "suipachas")));
 
-        assertEquals(List.of("batalla de suipacha"), service.callesQueContienen("Suipacha"));
-        // Con menos de 4 letras no se busca: saldría media ciudad.
-        assertEquals(List.of(), service.callesQueContienen("san"));
+        // Lo tipeado dentro del nombre; primero la que tiene exactamente esas palabras.
+        assertEquals(List.of("avenida mitre", "avenida bartolome mitre", "bartolome mitre"), service.callesPorPalabras("mitre"));
+        // El nombre dentro de lo tipeado: la Avenida Mitre también es "av bartolome mitre".
+        assertEquals(List.of("avenida bartolome mitre", "bartolome mitre", "avenida mitre"), service.callesPorPalabras("Av. Bartolomé Mitre"));
+        // El pasaje se busca por el nombre, y "lopez" trae a todas las que lo llevan.
+        assertEquals(List.of("pasaje belisario lopez", "lopez manan"), service.callesPorPalabras("lopez"));
+        assertEquals(List.of("pasaje belisario lopez"), service.callesPorPalabras("psje belisario lopez"));
+        // Sin la calle a la que ya apunta lo tipeado.
+        assertEquals(List.of("batalla de suipacha"), service.callesPorPalabras("Suipacha"));
+        // Una palabra corta sola no alcanza: "paz" está en demasiados nombres.
+        assertEquals(List.of(), service.callesPorPalabras("paz"));
+        assertEquals(List.of(), service.callesPorPalabras("avenida"));
     }
 
     @Test
@@ -130,15 +141,23 @@ class DireccionCacheServiceTest {
     void elNombreAnteriorLlevaALaCalleDeHoy() {
         var nombresAnteriores = mock(com.cadeteria.backend.repository.CalleNombreAnteriorRepository.class);
         service = new DireccionCacheService(aliasRepository, coordsRepository, configuracion, nombresAnteriores);
-        var fila = new com.cadeteria.backend.model.CalleNombreAnterior();
-        fila.setNombreNorm("rivadavia");
-        fila.setCalleCanonica("virgen de la merced");
-        when(nombresAnteriores.findByNombreNorm("rivadavia")).thenReturn(List.of(fila));
+        when(nombresAnteriores.findAll()).thenReturn(List.of(
+                nombreAnterior("rivadavia", "virgen de la merced"),
+                nombreAnterior("avenida general roca", "avenida nestor kirchner")));
         when(aliasRepository.findByVarianteNorm(anyString())).thenReturn(Optional.empty());
 
-        // "Rivadavia" no cambia al expandir abreviaturas: un solo nombre a buscar (antes rompía por repetido).
         assertEquals(List.of("virgen de la merced"), service.callesConNombreAnterior("Rivadavia"));
+        // Como la escriba: sin "avenida", sin "general", abreviada.
+        assertEquals(List.of("avenida nestor kirchner"), service.callesConNombreAnterior("roca"));
+        assertEquals(List.of("avenida nestor kirchner"), service.callesConNombreAnterior("Av. Gral. Roca"));
         assertEquals(List.of(), service.callesConNombreAnterior("Gral. Paz"));
+    }
+
+    private static com.cadeteria.backend.model.CalleNombreAnterior nombreAnterior(String nombre, String calleDeHoy) {
+        var fila = new com.cadeteria.backend.model.CalleNombreAnterior();
+        fila.setNombreNorm(nombre);
+        fila.setCalleCanonica(calleDeHoy);
+        return fila;
     }
 
     @Test

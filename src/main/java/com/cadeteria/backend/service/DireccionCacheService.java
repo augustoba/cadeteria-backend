@@ -238,32 +238,52 @@ public class DireccionCacheService {
         return List.copyOf(canonicas);
     }
 
+    /** Hasta cuántas calles se ofrecen por coincidencia de palabras: "san martin" no tiene que traer media provincia. */
+    private static final int MAX_CALLES_POR_PALABRAS = 12;
+
     /**
-     * Otras calles conocidas (canónicas) que llevan lo tipeado dentro del nombre, como palabras
-     * enteras (2026-10-03): el teléfono a veces llama "Batalla de Suipacha" a la calle que todos
-     * escriben "Suipacha", cada nombre abrió su fila y buscando "suipacha 750" no se veía la cuadra
-     * aprendida con el otro. No incluye la calle a la que ya apunta lo tipeado.
+     * Otras calles conocidas (canónicas) que se dicen con las mismas palabras que lo tipeado, en los
+     * dos sentidos (2026-10-03). La gente no escribe "avenida" ni "pasaje", y a veces escribe el
+     * nombre entero y a veces solo el apellido:
+     * <ul>
+     *   <li>lo tipeado está dentro del nombre: "mitre" -> Avenida Mitre, Avenida Bartolomé Mitre;
+     *       "suipacha" -> Batalla de Suipacha; "lopez" -> Pasaje Belisario López;</li>
+     *   <li>el nombre está dentro de lo tipeado: "av bartolome mitre" -> Avenida Mitre.</li>
+     * </ul>
+     * Compara palabras enteras y "de oído" (ver {@link CallesParecidas#palabrasClave}), sin contar
+     * avenida/pasaje/general/de. Primero las que tienen exactamente las mismas palabras. No incluye
+     * la calle a la que ya apunta lo tipeado, y no adivina alias: se ofrecen para elegir.
      */
-    public List<String> callesQueContienen(String calleTexto) {
-        String norm = DireccionUtils.normalizar(calleTexto);
-        if (norm.replace(" ", "").length() < MIN_LETRAS_PREFIJO) return List.of();
+    public List<String> callesPorPalabras(String calleTexto) {
+        Set<String> tipeadas = new HashSet<>(CallesParecidas.palabrasClave(
+                DireccionUtils.normalizar(DireccionUtils.expandirAbreviaturas(calleTexto))));
+        if (tipeadas.isEmpty()) return List.of();
+        // Una sola palabra corta ("paz", "san") está en demasiados nombres.
+        if (tipeadas.size() == 1 && tipeadas.iterator().next().length() < MIN_LETRAS_PREFIJO) return List.of();
         String propia = canonicaDeAlias(calleTexto);
-        Set<String> canonicas = new LinkedHashSet<>();
-        for (DireccionAlias a : aliasRepository.findTop50ByVarianteNormContaining(norm)) {
-            if (a.getCalleCanonica().equals(propia)) continue;
-            // "peru" no es "perugia": tiene que estar como palabra entera.
-            if (!(" " + a.getVarianteNorm() + " ").contains(" " + norm + " ")) continue;
-            canonicas.add(a.getCalleCanonica());
-            if (canonicas.size() >= MAX_CALLES_PREFIJO) break;
+        Set<String> iguales = new LinkedHashSet<>(), contienen = new LinkedHashSet<>(), contenidas = new LinkedHashSet<>();
+        for (CalleConocida c : callesConocidas()) {
+            if (c.canonica().equals(propia) || c.palabras().isEmpty()) continue;
+            if (c.palabras().equals(tipeadas)) iguales.add(c.canonica());
+            else if (c.palabras().containsAll(tipeadas)) contienen.add(c.canonica());
+            else if (tipeadas.containsAll(c.palabras()) && !soloPalabraCorta(c.palabras())) contenidas.add(c.canonica());
         }
-        return List.copyOf(canonicas);
+        Set<String> canonicas = new LinkedHashSet<>(iguales);
+        canonicas.addAll(contienen);
+        canonicas.addAll(contenidas);
+        return canonicas.stream().limit(MAX_CALLES_POR_PALABRAS).toList();
+    }
+
+    private static boolean soloPalabraCorta(Set<String> palabras) {
+        return palabras.size() == 1 && palabras.iterator().next().length() < MIN_LETRAS_PREFIJO;
     }
 
     /** Cada cuánto se vuelve a leer la lista de calles para buscar por parecido (se aprende una calle nueva cada tanto). */
     private static final Duration VIGENCIA_LISTA_DE_CALLES = Duration.ofMinutes(2);
     private static final int MAX_CALLES_PARECIDAS = 5;
 
-    private record CalleConocida(String varianteNorm, String canonica) {}
+    /** {@code palabras}: las de la variante que distinguen a la calle (ver {@link CallesParecidas#palabrasClave}). */
+    private record CalleConocida(String varianteNorm, String canonica, Set<String> palabras) {}
 
     private volatile List<CalleConocida> callesConocidas = List.of();
     private volatile Instant callesConocidasHasta = Instant.EPOCH;
@@ -271,7 +291,8 @@ public class DireccionCacheService {
     private List<CalleConocida> callesConocidas() {
         if (Instant.now().isAfter(callesConocidasHasta)) {
             callesConocidas = aliasRepository.findAll().stream()
-                    .map(a -> new CalleConocida(a.getVarianteNorm(), a.getCalleCanonica())).toList();
+                    .map(a -> new CalleConocida(a.getVarianteNorm(), a.getCalleCanonica(),
+                            Set.copyOf(CallesParecidas.palabrasClave(a.getVarianteNorm())))).toList();
             callesConocidasHasta = Instant.now().plus(VIGENCIA_LISTA_DE_CALLES);
         }
         return callesConocidas;
@@ -300,18 +321,36 @@ public class DireccionCacheService {
         return canonicas.stream().limit(MAX_CALLES_PARECIDAS).toList();
     }
 
-    /** Calles que antes se llamaban como lo tipeado ("rivadavia" -> "virgen de la merced"), ver {@link CalleNombreAnterior}. */
+    private record NombreAnterior(Set<String> palabras, String calleCanonica) {}
+
+    private volatile List<NombreAnterior> nombresAnteriores = List.of();
+    private volatile Instant nombresAnterioresHasta = Instant.EPOCH;
+
+    private List<NombreAnterior> nombresAnteriores() {
+        if (Instant.now().isAfter(nombresAnterioresHasta)) {
+            nombresAnteriores = nombreAnteriorRepository.findAll().stream()
+                    .map(n -> new NombreAnterior(Set.copyOf(CallesParecidas.palabrasClave(n.getNombreNorm())), n.getCalleCanonica()))
+                    .filter(n -> !n.palabras().isEmpty()).toList();
+            nombresAnterioresHasta = Instant.now().plus(VIGENCIA_LISTA_DE_CALLES);
+        }
+        return nombresAnteriores;
+    }
+
+    /**
+     * Calles que antes se llamaban (o también se llaman) como lo tipeado: "rivadavia" -> "virgen de la
+     * merced", "roca" o "av gral roca" -> "avenida nestor kirchner" (ver {@link CalleNombreAnterior}).
+     * Se compara por las palabras que distinguen al nombre, como {@link #callesPorPalabras}: lo
+     * tipeado tiene que ser el nombre viejo entero o estar dentro de él.
+     */
     public List<String> callesConNombreAnterior(String calleTexto) {
         if (nombreAnteriorRepository == null) return List.of();
+        Set<String> tipeadas = new HashSet<>(CallesParecidas.palabrasClave(
+                DireccionUtils.normalizar(DireccionUtils.expandirAbreviaturas(calleTexto))));
+        if (tipeadas.isEmpty() || soloPalabraCorta(tipeadas)) return List.of();
         Set<String> canonicas = new LinkedHashSet<>();
-        // Tal cual y con las abreviaturas expandidas ("gral roca" / "general roca"); casi siempre es el mismo texto.
-        Set<String> nombres = new LinkedHashSet<>(List.of(DireccionUtils.normalizar(calleTexto)));
-        nombres.add(DireccionUtils.normalizar(DireccionUtils.expandirAbreviaturas(calleTexto)));
-        for (String nombre : nombres) {
-            for (CalleNombreAnterior n : nombreAnteriorRepository.findByNombreNorm(nombre)) {
-                // El Excel se carga con el nombre de hoy; si ese nombre es alias de otro, vale la canónica.
-                canonicas.add(canonicalizar(n.getCalleCanonica()));
-            }
+        for (NombreAnterior n : nombresAnteriores()) {
+            // El Excel se carga con el nombre de hoy; si ese nombre es alias de otro, vale la canónica.
+            if (n.palabras().containsAll(tipeadas)) canonicas.add(canonicalizar(n.calleCanonica()));
         }
         return List.copyOf(canonicas);
     }

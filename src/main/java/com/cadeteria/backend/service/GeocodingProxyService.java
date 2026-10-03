@@ -139,18 +139,19 @@ public class GeocodingProxyService {
         // La calle conocida de la que se sacan las cuadras vecinas si esta cuadra no está aprendida.
         boolean calleConocida = direccionCache.conoceCalle(streetPart);
         String canonicaConocida = calleConocida ? direccionCache.canonicalizar(streetPart) : null;
+        // 2026-10-03: las otras calles que se dicen con esas palabras ("mitre" / "avenida bartolome
+        // mitre" / "av mitre", "suipacha" / "batalla de suipacha", el pasaje sin "pasaje") y las que
+        // antes se llamaban así ("rivadavia" -> Virgen de la Merced). No se adivina cuál es: se ofrecen.
+        Set<String> otras = otrasCalles(streetPart, canonicaConocida);
 
         if (numero != null) {
-            // 2026-10-03: en todas las localidades donde esté ("Belgrano 500" en San Miguel y en Yerba
-            // Buena se ofrecen las dos); antes con más de una se trataba como desconocida.
+            // En todas las localidades donde esté ("Belgrano 500" en San Miguel y en Yerba Buena se
+            // ofrecen las dos); antes con más de una se trataba como desconocida.
             List<GeoAddress> propias = desdeCache(direccionCache.buscarOpciones(streetPart, numero), numero);
             if (!propias.isEmpty()) {
-                // Y si ese nombre es el anterior de otra calle ("rivadavia" -> Virgen de la Merced), también esa.
                 List<GeoAddress> todas = new ArrayList<>(propias);
-                for (String canonica : direccionCache.callesConNombreAnterior(streetPart)) {
-                    todas.addAll(desdeCache(direccionCache.mirarOpciones(canonica, numero), numero));
-                }
-                return todas;
+                for (String canonica : otras) todas.addAll(desdeCache(direccionCache.mirarOpciones(canonica, numero), numero));
+                return sinRepetir(todas);
             }
         }
         // Cuadras estimadas con las vecinas ("sin altura exacta"): van al final, si no aparece nada mejor.
@@ -160,8 +161,9 @@ public class GeocodingProxyService {
         // sola calle que empiece así se completa el nombre — también antes de preguntar afuera, que
         // con "colom" no encuentran nada. Con varias ("sant" -> Santiago, Santa Fe...) no se adivina:
         // se ofrecen las que ya tienen esa cuadra aprendida. 2026-10-03: si ninguna empieza así, las
-        // que se le parecen ("belgarno", "bolibar", "mate luna"), con la misma regla.
-        if (!calleConocida) {
+        // que se le parecen ("belgarno", "bolibar"), con la misma regla. Nada de esto si ya hay
+        // calles con esas palabras: "lopez" es el Pasaje Belisario López antes que "López Mañán".
+        if (!calleConocida && otras.isEmpty()) {
             List<String> candidatas = direccionCache.callesQueEmpiezanCon(streetPart);
             if (candidatas.isEmpty()) candidatas = direccionCache.callesParecidas(streetPart);
             if (candidatas.size() == 1) {
@@ -182,27 +184,23 @@ public class GeocodingProxyService {
             }
         }
 
-        // 2026-10-03: "suipacha 750" no veía la cuadra que el teléfono aprendió como "Batalla de
-        // Suipacha". Las calles conocidas que llevan lo tipeado en el nombre y ya tienen esa cuadra
-        // se ofrecen primero, con su nombre completo; no reemplazan a los buscadores porque puede
-        // ser otra calle ("peru" no es "camino del peru") y el que elige es quien carga.
-        // Y las que antes se llamaban así ("rivadavia" -> Virgen de la Merced): también se ofrecen,
-        // sin dejar de buscar la Rivadavia de otra localidad.
+        // Las otras calles que ya tienen esa cuadra van primero, con su nombre completo; no reemplazan
+        // a los buscadores porque puede ser otra calle ("peru" no es "camino del peru") y el que elige
+        // es quien carga.
         List<GeoAddress> parecidas = new ArrayList<>();
         if (numero != null) {
-            java.util.Set<String> otras = new java.util.LinkedHashSet<>(direccionCache.callesConNombreAnterior(streetPart));
-            otras.addAll(direccionCache.callesQueContienen(streetPart));
+            // La calle es conocida pero no esa cuadra: se estima con las vecinas, antes que las de las otras.
+            if (canonicaConocida != null) estimadasPropias.addAll(0, estimadas(canonicaConocida, numero));
             for (String canonica : otras) {
                 List<GeoAddress> exactas = desdeCache(direccionCache.mirarOpciones(canonica, numero), numero);
-                parecidas.addAll(exactas.isEmpty() ? estimadas(canonica, numero) : exactas);
+                if (exactas.isEmpty()) estimadasPropias.addAll(estimadas(canonica, numero));
+                else parecidas.addAll(exactas);
             }
         }
-        // La calle es conocida pero no esa cuadra: se estima con las vecinas.
-        if (canonicaConocida != null && numero != null) estimadasPropias.addAll(estimadas(canonicaConocida, numero));
 
         if (!busquedaExternaActiva()) {
             parecidas.addAll(estimadasPropias);
-            return parecidas;
+            return sinRepetir(parecidas);
         }
 
         List<GeoAddress> out = buscarAfuera(q, streetPart, numero);
@@ -214,7 +212,45 @@ public class GeocodingProxyService {
         parecidas.addAll(out);
         // La estimación propia va al final, y solo si afuera tampoco dieron con la altura exacta.
         if (out.stream().allMatch(GeoAddress::approximate)) parecidas.addAll(estimadasPropias);
-        return parecidas;
+        return sinRepetir(parecidas);
+    }
+
+    /** Calles que antes se llamaban como lo tipeado y las que se dicen con las mismas palabras, sin la propia. */
+    private Set<String> otrasCalles(String streetPart, String propia) {
+        Set<String> otras = new java.util.LinkedHashSet<>(direccionCache.callesConNombreAnterior(streetPart));
+        otras.addAll(direccionCache.callesPorPalabras(streetPart));
+        otras.remove(propia);
+        return otras;
+    }
+
+    /** La misma dirección puede llegar por dos caminos (el nombre anterior y las palabras): queda la primera. */
+    private static List<GeoAddress> sinRepetir(List<GeoAddress> resultados) {
+        Set<String> vistas = new HashSet<>();
+        List<GeoAddress> out = new ArrayList<>();
+        for (GeoAddress a : resultados) {
+            if (vistas.add(a.label().toLowerCase())) out.add(a);
+        }
+        return out;
+    }
+
+    private static final int MAX_SUGERENCIAS_DE_CALLE = 8;
+
+    /**
+     * Nombres de calles conocidas para lo que se viene escribiendo SIN la altura (2026-10-03): la base
+     * propia responde por calle + cuadra, así que con "alem" sola no hay nada que ubicar. El panel
+     * los muestra para completar ("Avenida Alem") y que solo falte escribir el número.
+     */
+    public List<String> sugerirCalles(String textoCrudo) {
+        String q = textoCrudo == null ? "" : textoCrudo.trim().replaceAll("\\s+", " ");
+        if (q.length() < 4 || NUMERO_FINAL.matcher(q).matches()) return List.of();
+        Set<String> canonicas = new java.util.LinkedHashSet<>();
+        if (direccionCache.conoceCalle(q)) canonicas.add(direccionCache.canonicalizar(q));
+        canonicas.addAll(direccionCache.callesConNombreAnterior(q));
+        canonicas.addAll(direccionCache.callesPorPalabras(q));
+        canonicas.addAll(direccionCache.callesQueEmpiezanCon(q));
+        if (canonicas.isEmpty()) canonicas.addAll(direccionCache.callesParecidas(q));
+        return canonicas.stream().filter(java.util.Objects::nonNull).limit(MAX_SUGERENCIAS_DE_CALLE)
+                .map(DireccionUtils::nombreParaMostrar).toList();
     }
 
     /** Los buscadores gratuitos, con el texto completo y con la calle sola (+ la altura tipeada). */

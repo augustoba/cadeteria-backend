@@ -219,7 +219,7 @@ class GeocodingProxyServicePinYBuscadorTest {
     @Test
     void suipachaTambienOfreceLaCuadraAprendidaComoBatallaDeSuipacha() {
         when(cache.conoceCalle("suipacha")).thenReturn(true);
-        when(cache.callesQueContienen("suipacha")).thenReturn(List.of("batalla de suipacha"));
+        when(cache.callesPorPalabras("suipacha")).thenReturn(List.of("batalla de suipacha"));
         when(cache.mirarOpciones("batalla de suipacha", 750))
                 .thenReturn(List.of(new DireccionCacheService.ResultadoCache("batalla de suipacha", SMT, 700, LAT, LNG, false)));
         doReturn(List.of(geo("Suipacha", 750, true))).when(service).buscarAfuera(anyString(), anyString(), any());
@@ -234,7 +234,7 @@ class GeocodingProxyServicePinYBuscadorTest {
     @Test
     void sinEsaCuadraAprendidaConElOtroNombreSoloQuedanLosBuscadores() {
         when(cache.conoceCalle("suipacha")).thenReturn(true);
-        when(cache.callesQueContienen("suipacha")).thenReturn(List.of("batalla de suipacha"));
+        when(cache.callesPorPalabras("suipacha")).thenReturn(List.of("batalla de suipacha"));
         doReturn(List.of(geo("Suipacha", 750, true))).when(service).buscarAfuera(anyString(), anyString(), any());
 
         assertEquals(1, service.buscar("suipacha 750").size());
@@ -304,6 +304,46 @@ class GeocodingProxyServicePinYBuscadorTest {
         assertEquals("Suipacha 750, " + SMT, r.get(0).label());
         // "Sin altura exacta": el panel pide corregir el pin, y recién ahí se aprende.
         assertEquals(true, r.get(0).approximate());
+    }
+
+    @Test
+    void conLaCalleExactaTambienOfreceLasOtrasQueSeDicenIgual() {
+        when(cache.buscarOpciones("guemes", 300))
+                .thenReturn(List.of(new DireccionCacheService.ResultadoCache("guemes", SMT, 300, LAT, LNG, false)));
+        when(cache.callesPorPalabras("guemes")).thenReturn(List.of("martin de guemes"));
+        when(cache.mirarOpciones("martin de guemes", 300))
+                .thenReturn(List.of(new DireccionCacheService.ResultadoCache("martin de guemes", "San Andrés", 300, LAT_400M, LNG, false)));
+
+        List<GeoAddress> r = service.buscar("guemes 300");
+
+        assertEquals(List.of("Guemes 300, " + SMT, "Martin de Guemes 300, San Andrés"), r.stream().map(GeoAddress::label).toList());
+        verify(service, never()).buscarAfuera(anyString(), anyString(), any());
+    }
+
+    @Test
+    void lasCallesConEsasPalabrasVanAntesQueLasQueEmpiezanAsi() {
+        // "lopez": el Pasaje Belisario López tiene esa cuadra; López Mañán (que empieza así) no.
+        when(cache.callesPorPalabras("lopez")).thenReturn(List.of("pasaje belisario lopez", "lopez manan"));
+        when(cache.mirarOpciones("pasaje belisario lopez", 500))
+                .thenReturn(List.of(new DireccionCacheService.ResultadoCache("pasaje belisario lopez", SMT, 500, LAT, LNG, false)));
+        when(cache.estimar("lopez manan", 500))
+                .thenReturn(List.of(new DireccionCacheService.ResultadoCache("lopez manan", SMT, 500, LAT_400M, LNG, true)));
+        doReturn(List.of()).when(service).buscarAfuera(anyString(), anyString(), any());
+
+        List<GeoAddress> r = service.buscar("lopez 500");
+
+        // Primero la exacta, después la estimada, y sin repetir.
+        assertEquals(List.of("Pasaje Belisario Lopez 500, " + SMT, "Lopez Manan 500, " + SMT), r.stream().map(GeoAddress::label).toList());
+        verify(cache, never()).callesQueEmpiezanCon(anyString());
+    }
+
+    @Test
+    void sinLaAlturaSugiereLasCallesParaCompletar() {
+        when(cache.callesPorPalabras("alem")).thenReturn(List.of("avenida alem", "pasaje alem"));
+
+        assertEquals(List.of("Avenida Alem", "Pasaje Alem"), service.sugerirCalles("alem"));
+        // Con la altura ya escrita no hay nada que sugerir: eso lo contesta buscar().
+        assertEquals(List.of(), service.sugerirCalles("alem 500"));
     }
 
     @Test

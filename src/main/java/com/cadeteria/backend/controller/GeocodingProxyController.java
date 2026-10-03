@@ -40,6 +40,12 @@ public class GeocodingProxyController {
         return linkService.resolver(url);
     }
 
+    /** Calles conocidas para lo escrito sin la altura: el buscador las ofrece para completar (2026-10-03). */
+    @GetMapping("/calles")
+    public java.util.List<String> calles(@RequestParam String q) {
+        return service.sugerirCalles(q);
+    }
+
     @GetMapping("/reverse")
     public GeoAddress reverse(@RequestParam double lat, @RequestParam double lng) {
         return service.reverseParaConsulta(lat, lng);
