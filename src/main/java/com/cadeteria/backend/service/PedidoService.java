@@ -1207,7 +1207,7 @@ public class PedidoService {
         ofertaRepo.save(oferta);
 
         publisher.publicarAlertaRechazo(cadete, PedidoResponse.from(pedido));
-        liberarYReasignar(pedido, cadete);
+        liberarYReasignar(pedido, cadete, false);
         return pedido;
     }
 
@@ -1623,12 +1623,21 @@ public class PedidoService {
 
     // --- Reasignacion automatica (fix del bug, spec sección 4) ---
 
-    private void liberarYReasignar(Pedido pedido, Cadete cadeteQueNoAcepto) {
+    /**
+     * {@code vencio}: true si se le pasó el tiempo para aceptar; false si lo rechazó él. Al que
+     * rechaza no se le manda la notificación (2026-10-03: le llegaba "Viaje quitado — Se te quito el
+     * viaje" por algo que acababa de hacer él); el evento por WebSocket sí, para que la app saque la
+     * oferta de la pantalla.
+     */
+    private void liberarYReasignar(Pedido pedido, Cadete cadeteQueNoAcepto, boolean vencio) {
         liberarCadete(cadeteQueNoAcepto);
         PedidoResponse dtoQuitado = PedidoResponse.paraCadete(pedido);
         publisher.publicarEventoViaje(cadeteQueNoAcepto.getId(), "VIAJE_QUITADO", dtoQuitado);
-        fcmService.enviar(cadeteQueNoAcepto.getFcmToken(), "Viaje quitado",
-                "Se te quito el viaje", Map.of("tipo", "VIAJE_QUITADO", "pedidoId", pedido.getId()));
+        if (vencio) {
+            fcmService.enviar(cadeteQueNoAcepto.getFcmToken(), "Se venció el tiempo para aceptar",
+                    "El viaje que tenías ofrecido pasó a otro cadete.",
+                    Map.of("tipo", "VIAJE_QUITADO", "pedidoId", pedido.getId()));
+        }
 
         Pedido pedidoAOfertar = pedido;
         Optional<Cadete> siguiente = buscarCandidato(pedido);
@@ -1850,7 +1859,7 @@ public class PedidoService {
             }
             oferta.setResultado(resultado("EXPIRADO"));
             ofertaRepo.save(oferta);
-            liberarYReasignar(oferta.getPedido(), oferta.getCadete());
+            liberarYReasignar(oferta.getPedido(), oferta.getCadete(), true);
         }
     }
 

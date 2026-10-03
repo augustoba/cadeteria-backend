@@ -56,8 +56,11 @@ class PedidoServiceReasignacionTest {
         return r;
     }
 
+    private FcmService fcmService;
+
     @BeforeEach
     void setUp() {
+        fcmService = mock(FcmService.class);
         repo = mock(PedidoRepository.class);
         // La lectura con bloqueo (2026-09-26) devuelve lo mismo que findById en estos tests.
         when(repo.findByIdParaActualizar(org.mockito.ArgumentMatchers.anyString()))
@@ -71,7 +74,7 @@ class PedidoServiceReasignacionTest {
         service = new PedidoService(
                 repo, cadeteRepo, estadoPedidoRepo, resultadoOfertaRepo, ofertaRepo,
                 mock(EstadoCadeteRepository.class), configuracionService,
-                mock(WebSocketPublisher.class), mock(FcmService.class), mock(SmsGatewayService.class),
+                mock(WebSocketPublisher.class), fcmService, mock(SmsGatewayService.class),
                 mock(PedidoUbicacionRepository.class), mock(PedidoComentarioRepository.class),
                 mock(PedidoPrecioLogRepository.class), mock(WebPushService.class),
                 mock(PedidoParadaRepository.class), mock(MovimientoCreditoRepository.class),
@@ -148,6 +151,23 @@ class PedidoServiceReasignacionTest {
         assertEquals(cadete, masViejo.getCadeteAsignado());
         assertNull(rechazado.getCadeteAsignado(), "el rechazado vuelve a quedar sin cadete");
         assertEquals("SIN_ASIGNAR", rechazado.getEstado().getId());
+    }
+
+    @Test
+    void alQueRechazaNoLeLlegaLaNotificacionDeQueSeLoQuitaron() {
+        Pedido rechazado = pedido("p-rechazado", Instant.parse("2026-09-20T20:00:00Z"));
+        rechazado.setCadeteAsignado(cadete);
+        ofertaPendienteSobre(rechazado);
+
+        service.rechazar("p-rechazado", "juanp", null);
+
+        // Lo rechazó él: avisarle "Viaje quitado" era ruido (2026-10-03). Solo se avisa si venció el tiempo.
+        org.mockito.Mockito.verify(fcmService, org.mockito.Mockito.never()).enviar(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq("Viaje quitado"),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.verify(fcmService, org.mockito.Mockito.never()).enviar(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq("Se venció el tiempo para aceptar"),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 
     @Test
