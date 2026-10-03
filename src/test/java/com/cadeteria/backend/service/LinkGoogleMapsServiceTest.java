@@ -40,6 +40,30 @@ class LinkGoogleMapsServiceTest {
     }
 
     @Test
+    void sacaCalleYNumeroDelLinkDeUnaDireccion() {
+        var r = service.resolver("https://www.google.com/maps/place/Belgrano+750,+T4000+San+Miguel+de+Tucum%C3%A1n,+Tucum%C3%A1n/@-26.82,-65.21,17z/data=!3m1!4b1!4m6!3m5!1s0x0:0x0!8m2!3d-26.8212!4d-65.2105!16s");
+        assertEquals("Belgrano 750", r.direccion());
+        assertEquals(-26.8212, r.lat());
+        assertEquals("24 de Septiembre 500", LinkGoogleMapsService.calleYNumero("24 de Septiembre 500, San Miguel de Tucumán"));
+        assertEquals("Av. Mate de Luna 2400",LinkGoogleMapsService.direccionDe("https://www.google.com/maps/place/Av.+Mate+de+Luna+2400,+San+Miguel+de+Tucum%C3%A1n/@-26.8,-65.2,17z"));
+    }
+
+    @Test
+    void unComercioOUnPuntoMarcadoNoTraenDireccion() {
+        assertNull(LinkGoogleMapsService.direccionDe("https://www.google.com/maps/place/Farmacia+del+Pueblo/@-26.82,-65.21,17z"));
+        assertNull(LinkGoogleMapsService.direccionDe("https://www.google.com/maps/place/26%C2%B049'05.2%22S+65%C2%B012'53.1%22W/@-26.8181,-65.2147,17z"));
+        assertNull(LinkGoogleMapsService.direccionDe("https://www.google.com/maps/place/-26.8181,-65.2147/@-26.8181,-65.2147,17z"));
+        assertNull(service.resolver("https://www.google.com/maps/@-26.7954738,-65.2568815,17z").direccion());
+    }
+
+    @Test
+    void usaLaDireccionQueCompartirCopiaAntesDelLink() {
+        var r = service.resolver("Colombia 4695\nhttps://www.google.com/maps/@-26.7954738,-65.2568815,17z");
+        assertEquals("Colombia 4695", r.direccion());
+        assertNull(service.resolver("Farmacia del Pueblo\nhttps://www.google.com/maps/@-26.7954738,-65.2568815,17z").direccion());
+    }
+
+    @Test
     void rechazaLinksQueNoSonDeGoogle() {
         assertEquals(LinkGoogleMapsService.NO_ES_LINK, service.resolver("https://evilgoogle.com/maps/@-26.79,-65.25,17z").error());
         assertEquals(LinkGoogleMapsService.NO_ES_LINK, service.resolver("Colombia 4695").error());

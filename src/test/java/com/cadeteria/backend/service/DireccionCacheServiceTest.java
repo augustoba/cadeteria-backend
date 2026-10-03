@@ -63,6 +63,29 @@ class DireccionCacheServiceTest {
     }
 
     @Test
+    void callesQueContienenLoTipeadoComoPalabraEnteraSinLaPropia() {
+        when(aliasRepository.findByVarianteNorm("suipacha")).thenReturn(Optional.of(alias("suipacha", "suipacha")));
+        when(aliasRepository.findTop50ByVarianteNormContaining("suipacha")).thenReturn(List.of(
+                alias("suipacha", "suipacha"),
+                alias("batalla de suipacha", "batalla de suipacha"),
+                alias("suipachas", "suipachas")));
+
+        assertEquals(List.of("batalla de suipacha"), service.callesQueContienen("Suipacha"));
+        // Con menos de 4 letras no se busca: saldría media ciudad.
+        assertEquals(List.of(), service.callesQueContienen("san"));
+    }
+
+    @Test
+    void mirarUnaCuadraNoLeSumaConfirmaciones() {
+        CuadraCoords coords = coords("batalla de suipacha", SMT, 700, -26.81, -65.21, 4);
+        when(coordsRepository.findByCalleCanonicaAndCuadra("batalla de suipacha", 700)).thenReturn(List.of(coords));
+
+        assertNotNull(service.mirarPorCanonica("batalla de suipacha", 750));
+        assertEquals(4, coords.getConfirmaciones());
+        verify(coordsRepository, never()).save(any());
+    }
+
+    @Test
     void esMissSiElAliasExistePeroNoHayCoordenadasDeEsaCuadra() {
         DireccionAlias alias = alias("av peron", "presidente peron");
         when(aliasRepository.findByVarianteNorm("av peron")).thenReturn(Optional.of(alias));

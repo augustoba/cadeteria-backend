@@ -157,13 +157,27 @@ public class GeocodingProxyService {
             }
         }
 
+        // 2026-10-03: "suipacha 750" no veía la cuadra que el teléfono aprendió como "Batalla de
+        // Suipacha". Las calles conocidas que llevan lo tipeado en el nombre y ya tienen esa cuadra
+        // se ofrecen primero, con su nombre completo; no reemplazan a los buscadores porque puede
+        // ser otra calle ("peru" no es "camino del peru") y el que elige es quien carga.
+        List<GeoAddress> parecidas = new ArrayList<>();
+        if (numero != null) {
+            for (String canonica : direccionCache.callesQueContienen(streetPart)) {
+                GeoAddress op = desdeCache(direccionCache.mirarPorCanonica(canonica, numero), numero);
+                if (op != null) parecidas.add(op);
+            }
+        }
+
         List<GeoAddress> out = buscarAfuera(q, streetPart, numero);
         if (numero != null && !out.isEmpty() && !out.get(0).approximate() && esLaCalleTipeada(streetPart, out.get(0).street())) {
             GeoAddress mejor = out.get(0);
             direccionCache.guardar(streetPart, numero, mejor.street(), mejor.locality(),
                     mejor.lat(), mejor.lng(), mejor.approximate(), mejor.proveedor());
         }
-        return out;
+        if (parecidas.isEmpty()) return out;
+        parecidas.addAll(out);
+        return parecidas;
     }
 
     /** Los buscadores gratuitos, con el texto completo y con la calle sola (+ la altura tipeada). */

@@ -211,6 +211,32 @@ class GeocodingProxyServicePinYBuscadorTest {
         verify(service).buscarAfuera("Colombia 4695", "Colombia", 4695);
     }
 
+    // ---- 2026-10-03: la misma calle con un nombre más largo ----
+
+    @Test
+    void suipachaTambienOfreceLaCuadraAprendidaComoBatallaDeSuipacha() {
+        when(cache.conoceCalle("suipacha")).thenReturn(true);
+        when(cache.callesQueContienen("suipacha")).thenReturn(List.of("batalla de suipacha"));
+        when(cache.mirarPorCanonica("batalla de suipacha", 750))
+                .thenReturn(new DireccionCacheService.ResultadoCache("batalla de suipacha", SMT, 700, LAT, LNG, false));
+        doReturn(List.of(geo("Suipacha", 750, true))).when(service).buscarAfuera(anyString(), anyString(), any());
+
+        List<GeoAddress> r = service.buscar("suipacha 750");
+
+        // Primero la propia, con su nombre completo; después lo de los buscadores.
+        assertEquals(List.of("Batalla de Suipacha 750, " + SMT, "Suipacha 750, " + SMT), r.stream().map(GeoAddress::label).toList());
+        assertEquals(GeocodingProxyService.PROVEEDOR_CACHE, r.get(0).proveedor());
+    }
+
+    @Test
+    void sinEsaCuadraAprendidaConElOtroNombreSoloQuedanLosBuscadores() {
+        when(cache.conoceCalle("suipacha")).thenReturn(true);
+        when(cache.callesQueContienen("suipacha")).thenReturn(List.of("batalla de suipacha"));
+        doReturn(List.of(geo("Suipacha", 750, true))).when(service).buscarAfuera(anyString(), anyString(), any());
+
+        assertEquals(1, service.buscar("suipacha 750").size());
+    }
+
     /** Sin altura exacta, así el reverse no alimenta la cache y solo se ve lo que guarda el pin. */
     private void mapaDice(String calle, int altura) {
         doReturn(geo(calle, altura, true)).when(service).reverseProveedores(anyDouble(), anyDouble());

@@ -154,6 +154,34 @@ public class DireccionCacheService {
     }
 
     /**
+     * Otras calles conocidas (canónicas) que llevan lo tipeado dentro del nombre, como palabras
+     * enteras (2026-10-03): el teléfono a veces llama "Batalla de Suipacha" a la calle que todos
+     * escriben "Suipacha", cada nombre abrió su fila y buscando "suipacha 750" no se veía la cuadra
+     * aprendida con el otro. No incluye la calle a la que ya apunta lo tipeado.
+     */
+    public List<String> callesQueContienen(String calleTexto) {
+        String norm = DireccionUtils.normalizar(calleTexto);
+        if (norm.replace(" ", "").length() < MIN_LETRAS_PREFIJO) return List.of();
+        String propia = canonicaDeAlias(calleTexto);
+        Set<String> canonicas = new LinkedHashSet<>();
+        for (DireccionAlias a : aliasRepository.findTop50ByVarianteNormContaining(norm)) {
+            if (a.getCalleCanonica().equals(propia)) continue;
+            // "peru" no es "perugia": tiene que estar como palabra entera.
+            if (!(" " + a.getVarianteNorm() + " ").contains(" " + norm + " ")) continue;
+            canonicas.add(a.getCalleCanonica());
+            if (canonicas.size() >= MAX_CALLES_PREFIJO) break;
+        }
+        return List.copyOf(canonicas);
+    }
+
+    /** Lo que respondería {@link #buscarPorCanonica}, sin sumarle una confirmación: ofrecerla no la confirma. */
+    public ResultadoCache mirarPorCanonica(String calleCanonica, int numero) {
+        CuadraCoords c = unicaFila(calleCanonica, numero);
+        return c == null ? null
+                : new ResultadoCache(c.getCalleCanonica(), c.getLocalidad(), c.getCuadra(), c.getLat(), c.getLng(), c.isApproximate());
+    }
+
+    /**
      * El punto aprendido de una fuente propia más cercano a (lat, lng), a menos de {@code radioM}
      * (3i/3j, 2026-09-28): qué calle hay en un punto según lo que ya confirmaron los cadetes o las
      * personas, antes de preguntarle a OpenStreetMap (que en barrios con calles sin nombre engancha
