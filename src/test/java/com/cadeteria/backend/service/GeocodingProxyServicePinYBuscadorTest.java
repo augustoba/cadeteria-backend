@@ -347,10 +347,49 @@ class GeocodingProxyServicePinYBuscadorTest {
     }
 
     @Test
+    void lasPropiasSalenSinEsperarALosDeAfueraYLasExternasSePidenAparte() {
+        when(cache.callesPorPalabras("mitre")).thenReturn(List.of("avenida mitre"));
+        when(cache.mirarOpciones("avenida mitre", 400))
+                .thenReturn(List.of(new DireccionCacheService.ResultadoCache("avenida mitre", SMT, 400, LAT, LNG, false)));
+        doReturn(List.of(geo("Bartolomé Mitre", 400, false))).when(service).buscarAfuera(anyString(), anyString(), any());
+
+        List<GeoAddress> propias = service.buscarPropias("mitre 400");
+
+        assertEquals(List.of("Avenida Mitre 400, " + SMT), propias.stream().map(GeoAddress::label).toList());
+        verify(service, never()).buscarAfuera(anyString(), anyString(), any());
+
+        List<GeoAddress> externas = service.buscarExternas("mitre 400");
+
+        assertEquals(List.of("Bartolomé Mitre 400, " + SMT), externas.stream().map(GeoAddress::label).toList());
+    }
+
+    @Test
+    void loQueEncuentranAfueraConLaAlturaExactaSeGuardaEnLaBasePropia() {
+        when(cache.conoceCalle("Colombia")).thenReturn(true);
+        when(cache.canonicalizar("Colombia")).thenReturn("colombia");
+        doReturn(List.of(geo("Colombia", 4695, false))).when(service).buscarAfuera(anyString(), anyString(), any());
+
+        service.buscarExternas("Colombia 4695");
+
+        verify(cache).guardar(eq("Colombia"), eq(4695), eq("Colombia"), eq(SMT), eq(LAT), eq(LNG), eq(false), eq("nominatim"));
+    }
+
+    @Test
+    void siLaBaseYaLaTieneConEseNombreNoSeConsultaAfuera() {
+        when(cache.buscarOpciones("Colombia", 4695))
+                .thenReturn(List.of(new DireccionCacheService.ResultadoCache("colombia", SMT, 4600, LAT, LNG, false)));
+
+        assertEquals(1, service.buscarPropias("Colombia 4695").size());
+        assertEquals(List.of(), service.buscarExternas("Colombia 4695"));
+        verify(service, never()).buscarAfuera(anyString(), anyString(), any());
+    }
+
+    @Test
     void conLaBusquedaExternaApagadaNoSaleAPreguntarAfuera() {
         when(config.getBoolean(eq(GeocodingProxyService.CONFIG_BUSQUEDA_EXTERNA), anyBoolean())).thenReturn(false);
 
         assertEquals(List.of(), service.buscar("calle que nadie conoce 123"));
+        assertEquals(List.of(), service.buscarExternas("calle que nadie conoce 123"));
         assertEquals(List.of(), service.buscarAmpliado("calle que nadie conoce 123"));
 
         verify(service, never()).buscarAfuera(anyString(), anyString(), any());

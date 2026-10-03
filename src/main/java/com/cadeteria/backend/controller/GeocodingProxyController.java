@@ -28,6 +28,18 @@ public class GeocodingProxyController {
         return service.buscar(q);
     }
 
+    /** Solo la base propia: contesta al instante (el panel la muestra mientras llegan las externas). */
+    @GetMapping("/buscar-propias")
+    public List<GeoAddress> buscarPropias(@RequestParam String q) {
+        return service.buscarPropias(q);
+    }
+
+    /** Solo los servicios de afuera; vacío si la base ya lo resolvió o si la búsqueda externa está apagada. */
+    @GetMapping("/buscar-externas")
+    public List<GeoAddress> buscarExternas(@RequestParam String q) {
+        return service.buscarExternas(q);
+    }
+
     /** "No está mi dirección — buscar de nuevo": sin cache y con Google si hay key (ver el service). */
     @GetMapping("/buscar-ampliado")
     public List<GeoAddress> buscarAmpliado(@RequestParam String q) {

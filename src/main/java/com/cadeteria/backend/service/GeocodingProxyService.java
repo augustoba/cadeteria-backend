@@ -127,9 +127,79 @@ public class GeocodingProxyService {
         return nominatimOk;
     }
 
+    /**
+     * Lo que la base propia sabe de lo tipeado, sin salir a internet.
+     *
+     * @param resuelto true si la base tiene esa calle y cuadra con el nombre tal cual se escribió (o el
+     *                 único que empieza así o se le parece): no hace falta preguntar afuera.
+     * @param exactas  con la altura aprendida: las del nombre tipeado y las de otras calles que se
+     *                 dicen igual.
+     * @param estimadas calle conocida sin esa cuadra, calculada con las vecinas ("sin altura exacta").
+     * @param q        el texto para los buscadores de afuera, con el nombre de la calle ya corregido.
+     */
+    private record Propias(boolean resuelto, List<GeoAddress> exactas, List<GeoAddress> estimadas,
+                           String q, String streetPart, Integer numero) {}
+
+    /**
+     * Todo junto: lo propio y, si no alcanza y la búsqueda externa está prendida, lo de afuera. La
+     * respuesta espera a los servicios de afuera; el panel usa {@link #buscarPropias} y
+     * {@link #buscarExternas} para mostrar lo propio al instante (2026-10-03).
+     */
     public List<GeoAddress> buscar(String textoCrudo) {
+        Propias p = propias(textoCrudo);
+        if (p == null) return List.of();
+        if (p.resuelto()) return p.exactas();
+        List<GeoAddress> resultados = new ArrayList<>(p.exactas());
+        if (!busquedaExternaActiva()) {
+            resultados.addAll(p.estimadas());
+            return sinRepetir(resultados);
+        }
+        List<GeoAddress> out = externas(p);
+        resultados.addAll(out);
+        // La estimación propia va al final, y solo si afuera tampoco dieron con la altura exacta.
+        if (out.stream().allMatch(GeoAddress::approximate)) resultados.addAll(p.estimadas());
+        return sinRepetir(resultados);
+    }
+
+    /**
+     * Primera mitad de la búsqueda del panel (2026-10-03): solo la base propia, que contesta en
+     * milisegundos. Antes el operador esperaba 8 a 15 segundos a los tres servicios de afuera aunque
+     * la dirección ya estuviera aprendida.
+     */
+    public List<GeoAddress> buscarPropias(String textoCrudo) {
+        Propias p = propias(textoCrudo);
+        if (p == null) return List.of();
+        List<GeoAddress> resultados = new ArrayList<>(p.exactas());
+        if (!p.resuelto()) resultados.addAll(p.estimadas());
+        return sinRepetir(resultados);
+    }
+
+    /**
+     * Segunda mitad: los servicios de afuera, que el panel pide en paralelo y agrega cuando llegan.
+     * Vacío si la base ya lo resolvió o si la búsqueda externa está apagada. Lo que encuentren con
+     * la altura exacta se guarda en la base propia, como siempre.
+     */
+    public List<GeoAddress> buscarExternas(String textoCrudo) {
+        Propias p = propias(textoCrudo);
+        if (p == null || p.resuelto() || !busquedaExternaActiva()) return List.of();
+        return externas(p);
+    }
+
+    /** Consulta afuera con el nombre ya corregido y guarda el mejor resultado si trae la altura exacta. */
+    private List<GeoAddress> externas(Propias p) {
+        List<GeoAddress> out = buscarAfuera(p.q(), p.streetPart(), p.numero());
+        if (p.numero() != null && !out.isEmpty() && !out.get(0).approximate()
+                && esLaCalleTipeada(p.streetPart(), out.get(0).street())) {
+            GeoAddress mejor = out.get(0);
+            direccionCache.guardar(p.streetPart(), p.numero(), mejor.street(), mejor.locality(),
+                    mejor.lat(), mejor.lng(), mejor.approximate(), mejor.proveedor());
+        }
+        return out;
+    }
+
+    private Propias propias(String textoCrudo) {
         String q = textoCrudo == null ? "" : textoCrudo.trim().replaceAll("\\s+", " ");
-        if (q.length() < 4) return List.of();
+        if (q.length() < 4) return null;
 
         Matcher m = NUMERO_FINAL.matcher(q);
         boolean tieneNumero = m.matches();
@@ -147,11 +217,11 @@ public class GeocodingProxyService {
         if (numero != null) {
             // En todas las localidades donde esté ("Belgrano 500" en San Miguel y en Yerba Buena se
             // ofrecen las dos); antes con más de una se trataba como desconocida.
-            List<GeoAddress> propias = desdeCache(direccionCache.buscarOpciones(streetPart, numero), numero);
-            if (!propias.isEmpty()) {
-                List<GeoAddress> todas = new ArrayList<>(propias);
+            List<GeoAddress> deEsaCalle = desdeCache(direccionCache.buscarOpciones(streetPart, numero), numero);
+            if (!deEsaCalle.isEmpty()) {
+                List<GeoAddress> todas = new ArrayList<>(deEsaCalle);
                 for (String canonica : otras) todas.addAll(desdeCache(direccionCache.mirarOpciones(canonica, numero), numero));
-                return sinRepetir(todas);
+                return new Propias(true, sinRepetir(todas), List.of(), q, streetPart, numero);
             }
         }
         // Cuadras estimadas con las vecinas ("sin altura exacta"): van al final, si no aparece nada mejor.
@@ -171,15 +241,15 @@ public class GeocodingProxyService {
                 streetPart = DireccionUtils.nombreParaMostrar(candidatas.get(0));
                 q = numero != null ? streetPart + " " + numero : streetPart;
                 if (numero != null) {
-                    List<GeoAddress> propias = desdeCache(direccionCache.opcionesPorCanonica(candidatas.get(0), numero), numero);
-                    if (!propias.isEmpty()) return propias;
+                    List<GeoAddress> deEsaCalle = desdeCache(direccionCache.opcionesPorCanonica(candidatas.get(0), numero), numero);
+                    if (!deEsaCalle.isEmpty()) return new Propias(true, deEsaCalle, List.of(), q, streetPart, numero);
                 }
             } else if (candidatas.size() > 1 && numero != null) {
                 List<GeoAddress> opciones = new ArrayList<>();
                 for (String canonica : candidatas) {
                     opciones.addAll(desdeCache(direccionCache.mirarOpciones(canonica, numero), numero));
                 }
-                if (!opciones.isEmpty()) return opciones;
+                if (!opciones.isEmpty()) return new Propias(true, opciones, List.of(), q, streetPart, numero);
                 for (String canonica : candidatas) estimadasPropias.addAll(estimadas(canonica, numero));
             }
         }
@@ -197,22 +267,7 @@ public class GeocodingProxyService {
                 else parecidas.addAll(exactas);
             }
         }
-
-        if (!busquedaExternaActiva()) {
-            parecidas.addAll(estimadasPropias);
-            return sinRepetir(parecidas);
-        }
-
-        List<GeoAddress> out = buscarAfuera(q, streetPart, numero);
-        if (numero != null && !out.isEmpty() && !out.get(0).approximate() && esLaCalleTipeada(streetPart, out.get(0).street())) {
-            GeoAddress mejor = out.get(0);
-            direccionCache.guardar(streetPart, numero, mejor.street(), mejor.locality(),
-                    mejor.lat(), mejor.lng(), mejor.approximate(), mejor.proveedor());
-        }
-        parecidas.addAll(out);
-        // La estimación propia va al final, y solo si afuera tampoco dieron con la altura exacta.
-        if (out.stream().allMatch(GeoAddress::approximate)) parecidas.addAll(estimadasPropias);
-        return sinRepetir(parecidas);
+        return new Propias(false, sinRepetir(parecidas), sinRepetir(estimadasPropias), q, streetPart, numero);
     }
 
     /** Calles que antes se llamaban como lo tipeado y las que se dicen con las mismas palabras, sin la propia. */
@@ -253,18 +308,61 @@ public class GeocodingProxyService {
                 .map(DireccionUtils::nombreParaMostrar).toList();
     }
 
-    /** Los buscadores gratuitos, con el texto completo y con la calle sola (+ la altura tipeada). */
+    /** Hilos para preguntarle a los tres servicios de afuera a la vez (son llamadas de red, no de CPU). */
+    private static final java.util.concurrent.ExecutorService HILOS_EXTERNOS =
+            java.util.concurrent.Executors.newFixedThreadPool(6, r -> {
+                Thread t = new Thread(r, "buscadores-externos");
+                t.setDaemon(true);
+                return t;
+            });
+    /** Si un servicio no contestó en este tiempo, se sigue con lo que trajeron los otros. */
+    private static final int ESPERA_MAX_EXTERNO_SEG = 6;
+
+    /**
+     * Los buscadores gratuitos, con el texto completo y con la calle sola (+ la altura tipeada).
+     * 2026-10-03: todas las consultas a la vez. Antes iban de a una y la espera era la suma (8 a 15
+     * segundos desde el servidor; Geoapify sola tarda unos 4 por consulta); ahora es la de la más
+     * lenta. Las dos de Nominatim siguen yendo una atrás de la otra (pide no más de una por
+     * segundo). El orden de los resultados es el de siempre.
+     */
     List<GeoAddress> buscarAfuera(String q, String streetPart, Integer numero) {
+        boolean conCalleSola = numero != null && streetPart.length() >= 3;
+        var nominatim = enParalelo("nominatim", q, () -> {
+            List<GeoAddress> conElTexto = queryNominatim(q, numero);
+            List<GeoAddress> conLaCalle = conCalleSola ? queryNominatim(streetPart, null) : List.<GeoAddress>of();
+            return List.of(conElTexto, conLaCalle);
+        }, List.of(List.<GeoAddress>of(), List.<GeoAddress>of()));
+        var geoapifyTexto = enParalelo(PROVEEDOR_GEOAPIFY, q, () -> queryGeoapify(q, numero), List.<GeoAddress>of());
+        var locationIqTexto = enParalelo(PROVEEDOR_LOCATIONIQ, q, () -> queryLocationIq(q, numero), List.<GeoAddress>of());
+        var geoapifyCalle = enParalelo(PROVEEDOR_GEOAPIFY, streetPart,
+                () -> conCalleSola ? queryGeoapify(streetPart, null) : List.<GeoAddress>of(), List.<GeoAddress>of());
+        var locationIqCalle = enParalelo(PROVEEDOR_LOCATIONIQ, streetPart,
+                () -> conCalleSola ? queryLocationIq(streetPart, null) : List.<GeoAddress>of(), List.<GeoAddress>of());
+
         List<GeoAddress> resultados = new ArrayList<>();
-        resultados.addAll(queryNominatim(q, numero));
-        resultados.addAll(queryGeoapify(q, numero));
-        resultados.addAll(queryLocationIq(q, numero));
-        if (numero != null && streetPart.length() >= 3) {
-            queryNominatim(streetPart, null).forEach(r -> resultados.add(conNumero(r, numero)));
-            queryGeoapify(streetPart, null).forEach(r -> resultados.add(conNumero(r, numero)));
-            queryLocationIq(streetPart, null).forEach(r -> resultados.add(conNumero(r, numero)));
-        }
+        resultados.addAll(nominatim.join().get(0));
+        resultados.addAll(geoapifyTexto.join());
+        resultados.addAll(locationIqTexto.join());
+        nominatim.join().get(1).forEach(r -> resultados.add(conNumero(r, numero)));
+        geoapifyCalle.join().forEach(r -> resultados.add(conNumero(r, numero)));
+        locationIqCalle.join().forEach(r -> resultados.add(conNumero(r, numero)));
         return dedupe(resultados);
+    }
+
+    /** Lanza una consulta en su propio hilo; si falla o no llega a tiempo vale {@code siNoLlega}. */
+    private <T> java.util.concurrent.CompletableFuture<T> enParalelo(String proveedor, String texto,
+                                                                    java.util.function.Supplier<T> consulta, T siNoLlega) {
+        return java.util.concurrent.CompletableFuture
+                .supplyAsync(() -> {
+                    long inicio = System.currentTimeMillis();
+                    T r = consulta.get();
+                    long ms = System.currentTimeMillis() - inicio;
+                    // Para saber cuál frena la búsqueda cuando el operador dice que tarda.
+                    if (ms > 3000) log.warn("El buscador {} tardó {} ms con \"{}\".", proveedor, ms, texto);
+                    return r;
+                }, HILOS_EXTERNOS)
+                .completeOnTimeout(siNoLlega, ESPERA_MAX_EXTERNO_SEG, java.util.concurrent.TimeUnit.SECONDS)
+                .exceptionally(e -> siNoLlega);
     }
 
     /**
