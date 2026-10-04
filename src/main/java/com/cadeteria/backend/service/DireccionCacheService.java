@@ -83,15 +83,25 @@ public class DireccionCacheService {
     private final CuadraCoordsRepository coordsRepository;
     private final ConfiguracionService configuracionService;
     private final CalleNombreAnteriorRepository nombreAnteriorRepository;
+    /** Null en los tests de la cache que no prueban la unión de nombres. */
+    private final UnionCallesService unionCalles;
 
     @org.springframework.beans.factory.annotation.Autowired
     public DireccionCacheService(DireccionAliasRepository aliasRepository, CuadraCoordsRepository coordsRepository,
                                  ConfiguracionService configuracionService,
-                                 CalleNombreAnteriorRepository nombreAnteriorRepository) {
+                                 CalleNombreAnteriorRepository nombreAnteriorRepository,
+                                 UnionCallesService unionCalles) {
         this.aliasRepository = aliasRepository;
         this.coordsRepository = coordsRepository;
         this.configuracionService = configuracionService;
         this.nombreAnteriorRepository = nombreAnteriorRepository;
+        this.unionCalles = unionCalles;
+    }
+
+    public DireccionCacheService(DireccionAliasRepository aliasRepository, CuadraCoordsRepository coordsRepository,
+                                 ConfiguracionService configuracionService,
+                                 CalleNombreAnteriorRepository nombreAnteriorRepository) {
+        this(aliasRepository, coordsRepository, configuracionService, nombreAnteriorRepository, null);
     }
 
     /** Sin la tabla de nombres anteriores (tests de la cache que no la usan). */
@@ -421,7 +431,12 @@ public class DireccionCacheService {
         // El nombre del proveedor también pasa por los alias (2026-09-26): Nominatim dice "General
         // Lamadrid" y el teléfono "Lamadrid"; sin esto cada uno abría su propia fila y buscar con un
         // nombre no veía lo aprendido con el otro, aunque los alias estuvieran curados.
-        String canonicaNorm = canonicalizar(calleCanonica);
+        int cuadra = DireccionUtils.cuadra(numero);
+        String localidadNorm = localidad == null ? "" : localidad;
+        // 2026-10-03: si esa cuadra ya está ahí mismo con otro nombre de la misma calle ("Batalla de
+        // Suipacha" / "Suipacha"), se unen y se guarda con el que queda, en vez de abrir otra fila.
+        String canonicaNorm = unionCalles == null ? canonicalizar(calleCanonica)
+                : unionCalles.alAprender(canonicalizar(calleCanonica), localidadNorm, cuadra, lat, lng);
 
         String varianteNorm = DireccionUtils.normalizar(calleTextoOriginal);
         if (aliasRepository.findByVarianteNorm(varianteNorm).isEmpty()) {
@@ -433,8 +448,6 @@ public class DireccionCacheService {
             aliasRepository.save(alias);
         }
 
-        int cuadra = DireccionUtils.cuadra(numero);
-        String localidadNorm = localidad == null ? "" : localidad;
         coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra(canonicaNorm, localidadNorm, cuadra).ifPresentOrElse(
                 existente -> {
                     existente.setConfirmaciones(existente.getConfirmaciones() + 1);
