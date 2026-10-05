@@ -216,11 +216,16 @@ public final class PedidoDtos {
 
     /**
      * Dirección que un cliente ya usó (2026-09-25): para cargarla con un clic como origen o
-     * destino. lat/lng, piso, depto y observaciones son los de la última vez que se usó.
+     * destino. lat/lng, piso, depto y observaciones son los de la última vez que se usó (el punto,
+     * el validado de la base propia si el del pedido quedó lejos). {@code clave} identifica la
+     * dirección para quitarla de las sugerencias de ese cliente.
      */
     public record DireccionFrecuenteResponse(String direccion, Double lat, Double lng,
                                              String piso, String depto, String observaciones,
-                                             int vecesOrigen, int vecesDestino, Instant ultimaVez) {}
+                                             int vecesOrigen, int vecesDestino, Instant ultimaVez, String clave) {}
+
+    /** La "x" de una dirección habitual: teléfono del cliente y la {@code clave} que vino en la sugerencia. */
+    public record OcultarDireccionRequest(@NotBlank String telefono, @NotBlank String clave) {}
 
     public record AsignarRequest(@NotBlank String cadeteId) {}
 

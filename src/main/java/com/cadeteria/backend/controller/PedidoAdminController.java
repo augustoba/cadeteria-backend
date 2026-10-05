@@ -34,10 +34,13 @@ public class PedidoAdminController {
 
     private final GeocodingProxyService geocodingProxyService;
     private final com.cadeteria.backend.service.ReclamoService reclamoService;
+    private final com.cadeteria.backend.service.DireccionesClienteService direccionesClienteService;
 
     public PedidoAdminController(PedidoService service, PdfComprobanteService pdfService,
                                  GeocodingProxyService geocodingProxyService,
-                                 com.cadeteria.backend.service.ReclamoService reclamoService) {
+                                 com.cadeteria.backend.service.ReclamoService reclamoService,
+                                 com.cadeteria.backend.service.DireccionesClienteService direccionesClienteService) {
+        this.direccionesClienteService = direccionesClienteService;
         this.reclamoService = reclamoService;
         this.geocodingProxyService = geocodingProxyService;
         this.service = service;
@@ -148,7 +151,15 @@ public class PedidoAdminController {
     /** Direcciones habituales del cliente de ese teléfono (2026-09-25) — vacía si nunca pidió. */
     @GetMapping("/cliente/direcciones")
     public List<com.cadeteria.backend.dto.PedidoDtos.DireccionFrecuenteResponse> direccionesCliente(@RequestParam String telefono) {
-        return service.direccionesFrecuentes(telefono);
+        return direccionesClienteService.frecuentes(telefono);
+    }
+
+    /** La "x" de una dirección habitual (2026-10-05): deja de ofrecérsela a ese cliente. */
+    @PostMapping("/cliente/direcciones/ocultar")
+    public ResponseEntity<Void> ocultarDireccionCliente(
+            @Valid @RequestBody com.cadeteria.backend.dto.PedidoDtos.OcultarDireccionRequest req, Authentication auth) {
+        direccionesClienteService.ocultar(req.telefono(), req.clave(), auth.getName());
+        return ResponseEntity.noContent().build();
     }
 
     /** Autocompletar nombre por teléfono al cargar un pedido (spec 5.6) — 204 si nunca se vio ese número. */
