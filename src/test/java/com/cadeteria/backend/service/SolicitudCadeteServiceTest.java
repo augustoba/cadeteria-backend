@@ -182,9 +182,17 @@ class SolicitudCadeteServiceTest {
     }
 
     private SolicitudFormRequest form(String fotoCarnet, String dni, String patente, boolean mayorDeEdad) {
+        return form(fotoCarnet, dni, patente, mayorDeEdad, DOMICILIO);
+    }
+
+    private static final com.cadeteria.backend.dto.DomicilioDto DOMICILIO =
+            new com.cadeteria.backend.dto.DomicilioDto("Lamadrid", " 450 ", "2", "B", "San Miguel de Tucumán");
+
+    private SolicitudFormRequest form(String fotoCarnet, String dni, String patente, boolean mayorDeEdad,
+                                      com.cadeteria.backend.dto.DomicilioDto domicilio) {
         return new SolicitudFormRequest("Juan", "Pérez", dni, "381 555 1234", "juan@mail.com", "MOTO",
                 "Rojo", patente, "Honda", "Wave", "https://img/foto.jpg", "https://img/moto.jpg", fotoCarnet,
-                "https://img/dni-dorso.jpg", "https://img/tv.jpg", "https://img/tv-dorso.jpg", mayorDeEdad);
+                "https://img/dni-dorso.jpg", "https://img/tv.jpg", "https://img/tv-dorso.jpg", mayorDeEdad, domicilio);
     }
 
     // --- Validaciones del formulario (2026-09-26): antes solo las controlaba el front ---
@@ -208,6 +216,34 @@ class SolicitudCadeteServiceTest {
         assertNotNull(s.getMayorEdadDeclaradaEn());
         assertEquals("A123BCD", s.getVehiculoPatente());
         assertEquals("30111222", s.getDni());
+    }
+
+    // --- Domicilio del cadete (2026-10-05): calle, altura y localidad obligatorias ---
+
+    @Test
+    void sinDomicilioCompletoNoSePuedeAnotar() {
+        when(repo.findByToken("tok")).thenReturn(Optional.of(pendiente()));
+        var sinLocalidad = new com.cadeteria.backend.dto.DomicilioDto("Lamadrid", "450", null, null, " ");
+        for (var domicilio : new com.cadeteria.backend.dto.DomicilioDto[]{null, sinLocalidad}) {
+            var e = assertThrows(BadRequestException.class,
+                    () -> service.enviarFormulario("tok", form("https://img/dni.jpg", "30111222", "A123BCD", true, domicilio)));
+            assertTrue(e.getMessage().contains("domicilio"));
+        }
+    }
+
+    @Test
+    void alAnotarseQuedaGuardadoElDomicilioSinEspaciosDeMas() {
+        SolicitudCadete s = pendiente();
+        when(repo.findByToken("tok")).thenReturn(Optional.of(s));
+        when(repo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.enviarFormulario("tok", form("https://img/dni.jpg"));
+
+        assertEquals("Lamadrid", s.getDomicilio().getCalle());
+        assertEquals("450", s.getDomicilio().getAltura());
+        assertEquals("2", s.getDomicilio().getPiso());
+        assertEquals("B", s.getDomicilio().getDepto());
+        assertEquals("San Miguel de Tucumán", s.getDomicilio().getLocalidad());
     }
 
     @Test

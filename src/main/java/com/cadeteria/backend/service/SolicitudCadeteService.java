@@ -7,6 +7,7 @@ import com.cadeteria.backend.common.Validaciones;
 import com.cadeteria.backend.common.ResourceNotFoundException;
 import com.cadeteria.backend.config.AppProperties;
 import com.cadeteria.backend.dto.CadeteDtos.CadeteRequest;
+import com.cadeteria.backend.dto.DomicilioDto;
 import com.cadeteria.backend.dto.SolicitudCadeteDtos.CadeteExistenteResponse;
 import com.cadeteria.backend.dto.SolicitudCadeteDtos.CorreccionResponse;
 import com.cadeteria.backend.dto.SolicitudCadeteDtos.ObservacionResponse;
@@ -145,7 +146,7 @@ public class SolicitudCadeteService {
                 obs.containsKey("fotoCarnetDorsoUrl") ? null : s.getFotoCarnetDorsoUrl(),
                 obs.containsKey("fotoTarjetaVerdeUrl") ? null : s.getFotoTarjetaVerdeUrl(),
                 obs.containsKey("fotoTarjetaVerdeDorsoUrl") ? null : s.getFotoTarjetaVerdeDorsoUrl(),
-                observacionesDe(s));
+                observacionesDe(s), DomicilioDto.from(s.getDomicilio()));
     }
 
     /** El postulante envía el formulario — de un solo uso, queda EN_REVISION para el admin. */
@@ -177,6 +178,9 @@ public class SolicitudCadeteService {
         if (!req.mayorDeEdad()) {
             throw new BadRequestException("Tenés que ser mayor de 18 años para anotarte como cadete.");
         }
+        if (req.domicilio() == null || !req.domicilio().completo()) {
+            throw new BadRequestException(DomicilioDto.MSJ_INCOMPLETO);
+        }
         if (vacio(req.fotoUrl()) || vacio(req.fotoCarnetUrl()) || vacio(req.fotoCarnetDorsoUrl())) {
             throw new BadRequestException("Faltan tu foto y/o las fotos de frente y dorso del DNI.");
         }
@@ -202,6 +206,7 @@ public class SolicitudCadeteService {
         s.setVehiculoPatente(esMoto ? Validaciones.normalizarPatente(req.vehiculoPatente()) : null);
         s.setVehiculoMarca(blankToNull(req.vehiculoMarca()));
         s.setVehiculoModelo(blankToNull(req.vehiculoModelo()));
+        s.setDomicilio(req.domicilio().aEntidad());
         s.setFotoUrl(blankToNull(req.fotoUrl()));
         s.setFotoVehiculoUrl(blankToNull(req.fotoVehiculoUrl()));
         s.setFotoCarnetUrl(blankToNull(req.fotoCarnetUrl()));
@@ -251,7 +256,8 @@ public class SolicitudCadeteService {
                 s.getFotoCarnetDorsoUrl(), s.getFotoTarjetaVerdeUrl(), s.getFotoTarjetaVerdeDorsoUrl(),
                 username.trim(), passwordTemporal,
                 null, null, null, null, null, null,
-                modalidadPago == null || modalidadPago.isBlank() ? "SEMANAL" : modalidadPago, null, true);
+                modalidadPago == null || modalidadPago.isBlank() ? "SEMANAL" : modalidadPago, null, true,
+                DomicilioDto.from(s.getDomicilio()));
         Cadete cadete = cadeteService.create(cadeteReq, "postulante");
         // La constancia es la del formulario (cuándo lo tildó), no la del momento de aprobar.
         cadete.setMayorEdadDeclaradaEn(s.getMayorEdadDeclaradaEn());
@@ -312,6 +318,7 @@ public class SolicitudCadeteService {
         c.setVehiculoPatente(s.getVehiculoPatente());
         c.setVehiculoMarca(s.getVehiculoMarca());
         c.setVehiculoModelo(s.getVehiculoModelo());
+        if (s.getDomicilio() != null) c.setDomicilio(s.getDomicilio());
         if (s.getFotoUrl() != null) c.setFotoUrl(s.getFotoUrl());
         if (s.getFotoVehiculoUrl() != null) c.setFotoVehiculoUrl(s.getFotoVehiculoUrl());
         if (s.getFotoCarnetUrl() != null) c.setFotoCarnetUrl(s.getFotoCarnetUrl());

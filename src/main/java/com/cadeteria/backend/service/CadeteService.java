@@ -7,6 +7,7 @@ import com.cadeteria.backend.common.ResourceNotFoundException;
 import com.cadeteria.backend.dto.CadeteDtos.AvisoGeneralResponse;
 import com.cadeteria.backend.dto.CadeteDtos.CadeteFichaResponse;
 import com.cadeteria.backend.dto.CadeteDtos.CadeteRequest;
+import com.cadeteria.backend.dto.DomicilioDto;
 import com.cadeteria.backend.dto.CadeteDtos.CadeteResponse;
 import com.cadeteria.backend.model.AvisoGeneral;
 import com.cadeteria.backend.model.AvisoGeneralLectura;
@@ -169,6 +170,11 @@ public class CadeteService {
         }
         if (!Boolean.TRUE.equals(req.mayorDeEdad())) {
             throw new BadRequestException("Confirmá que el cadete es mayor de 18 años: no se puede dar de alta a un menor.");
+        }
+        // El domicilio es obligatorio en las altas del panel (2026-10-05). Al aprobar una solicitud vale
+        // el que cargó el postulante: las anteriores a esa fecha no lo traen y se tienen que poder aprobar.
+        if (!"postulante".equals(declaradoPor) && (req.domicilio() == null || !req.domicilio().completo())) {
+            throw new BadRequestException(DomicilioDto.MSJ_INCOMPLETO);
         }
         exigirDniYUsuarioLibres(null, req);
         Cadete c = new Cadete();
@@ -655,6 +661,12 @@ public class CadeteService {
         c.setVehiculoPatente(Validaciones.normalizarPatente(req.vehiculoPatente()));
         c.setVehiculoMarca(blankToNull(req.vehiculoMarca()));
         c.setVehiculoModelo(blankToNull(req.vehiculoModelo()));
+        // Sin domicilio en el pedido (o todo en blanco) no se toca: así se puede editar a un cadete
+        // anterior al 2026-10-05 sin tener que cargarlo en ese momento. A medio cargar no se acepta.
+        if (req.domicilio() != null && !req.domicilio().enBlanco()) {
+            if (!req.domicilio().completo()) throw new BadRequestException(DomicilioDto.MSJ_INCOMPLETO);
+            c.setDomicilio(req.domicilio().aEntidad());
+        }
         c.setVehiculoAnio(req.vehiculoAnio());
         c.setFotoVehiculoUrl(blankToNull(req.fotoVehiculoUrl()));
         c.setFotoCarnetUrl(blankToNull(req.fotoCarnetUrl()));

@@ -40,6 +40,10 @@ public class Cadete {
     private String vehiculoColor;
     private String vehiculoPatente;
     private String vehiculoMarca;
+
+    /** Dónde vive (2026-10-05): obligatorio en las altas nuevas; null en los cadetes anteriores hasta que el admin lo cargue. */
+    @Embedded
+    private Domicilio domicilio;
     private String vehiculoModelo;
     private Integer vehiculoAnio;
 
@@ -348,6 +352,14 @@ public class Cadete {
 
     public void setFotoVehiculoUrl(String fotoVehiculoUrl) {
         this.fotoVehiculoUrl = fotoVehiculoUrl;
+    }
+
+    public Domicilio getDomicilio() {
+        return domicilio;
+    }
+
+    public void setDomicilio(Domicilio domicilio) {
+        this.domicilio = domicilio;
     }
 
     public String getVehiculoMarca() {

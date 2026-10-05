@@ -2,6 +2,7 @@ package com.cadeteria.backend.dto;
 
 import com.cadeteria.backend.common.Validaciones;
 import com.cadeteria.backend.model.Cadete;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
@@ -70,7 +71,12 @@ public final class CadeteDtos {
              * El admin confirma que verificó que tiene 18 años o más (2026-09-26). Obligatorio al crear;
              * al editar se ignora (la constancia ya quedó guardada).
              */
-            Boolean mayorDeEdad
+            Boolean mayorDeEdad,
+            /**
+             * Dónde vive (2026-10-05). Obligatorio al crear desde el panel (calle, altura y localidad);
+             * al editar, null = no se toca (así un cadete anterior sin domicilio se puede seguir editando).
+             */
+            @Valid DomicilioDto domicilio
     ) {}
 
     public record CadeteResponse(
@@ -105,7 +111,9 @@ public final class CadeteDtos {
             /** Última calle que resolvió el teléfono del cadete, y cuándo (2026-09-26) — null si nunca mandó. */
             String calleTelefono, Instant calleTelefonoEn,
             /** Constancia de mayor de edad (2026-09-26): cuándo y quién ("postulante" o el admin que lo cargó). */
-            Instant mayorEdadDeclaradaEn, String mayorEdadDeclaradaPor
+            Instant mayorEdadDeclaradaEn, String mayorEdadDeclaradaPor,
+            /** null = todavía no se cargó (cadetes anteriores al 2026-10-05). */
+            DomicilioDto domicilio
     ) {
         /** Conveniencia para los endpoints que no recalculan la calificación (una mutación puntual, no la lista). */
         public static CadeteResponse from(Cadete c) {
@@ -129,7 +137,8 @@ public final class CadeteDtos {
                     c.getCreditoDisponible(), c.getNotasInternas(),
                     c.getUltimaVersionApp(), c.getUltimaVersionAppEn(),
                     c.getCalleTelefono(), c.getCalleTelefonoEn(),
-                    c.getMayorEdadDeclaradaEn(), c.getMayorEdadDeclaradaPor());
+                    c.getMayorEdadDeclaradaEn(), c.getMayorEdadDeclaradaPor(),
+                    DomicilioDto.from(c.getDomicilio()));
         }
 
         /**
@@ -166,7 +175,8 @@ public final class CadeteDtos {
                     r.creditoDisponible(), r.notasInternas(),
                     r.ultimaVersionApp(), r.ultimaVersionAppEn(),
                     r.calleTelefono(), r.calleTelefonoEn(),
-                    r.mayorEdadDeclaradaEn(), r.mayorEdadDeclaradaPor());
+                    r.mayorEdadDeclaradaEn(), r.mayorEdadDeclaradaPor(),
+                    r.domicilio());
         }
     }
 

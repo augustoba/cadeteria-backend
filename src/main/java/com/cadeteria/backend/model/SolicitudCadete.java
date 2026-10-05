@@ -1,6 +1,7 @@
 package com.cadeteria.backend.model;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -52,6 +53,10 @@ public class SolicitudCadete {
     private String vehiculoColor;
     private String vehiculoPatente;
     private String vehiculoMarca;
+
+    /** Dónde vive (2026-10-05): lo carga el postulante; null en las solicitudes anteriores. */
+    @Embedded
+    private Domicilio domicilio;
     private String vehiculoModelo;
 
     @Column(length = 500)
@@ -203,6 +208,14 @@ public class SolicitudCadete {
 
     public void setVehiculoPatente(String vehiculoPatente) {
         this.vehiculoPatente = vehiculoPatente;
+    }
+
+    public Domicilio getDomicilio() {
+        return domicilio;
+    }
+
+    public void setDomicilio(Domicilio domicilio) {
+        this.domicilio = domicilio;
     }
 
     public String getVehiculoMarca() {
