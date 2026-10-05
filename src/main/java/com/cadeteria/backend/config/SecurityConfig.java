@@ -55,6 +55,7 @@ public class SecurityConfig {
                         // (roles configurables, mejora 2026-09-16 — antes era un solo bit "DUENO" fijo,
                         // ver RolService/RolSeeder). Tienen que ir ANTES del matcher general de
                         // /api/admin/** para que Spring Security las evalúe primero.
+                        .requestMatchers("/api/admin/sistema/**").hasAuthority("PERM_sistema")
                         .requestMatchers("/api/admin/configuracion/**").hasAuthority("PERM_configuracion")
                         .requestMatchers("/api/admin/metricas/**").hasAuthority("PERM_metricas")
                         .requestMatchers("/api/admin/pagos/**", "/api/admin/cadetes/*/pagos/**").hasAuthority("PERM_pagos")
