@@ -69,6 +69,17 @@ public class GeocodingProxyService {
     public static final String PROVEEDOR_GOOGLE = "google";
     /** Keys de Google Geocoding (Configuración). Vacío = la búsqueda ampliada usa solo los gratuitos. */
     public static final String CONFIG_GOOGLE_KEYS = "google_geocoding_keys";
+    /**
+     * HERE Geocoding (2026-10-05): segundo intento de la búsqueda ampliada, después de Google. Medido
+     * ese día con 200 direcciones reales de Tucumán: altura y calle correctas en el 80 % (error típico
+     * 10 m) y altura en OTRA calle en el 12 %, por eso se guarda solo si la calle es la escrita. Sus
+     * condiciones tampoco dejan guardar más de 30 días: vence igual que lo de Google.
+     */
+    public static final String PROVEEDOR_HERE = "here";
+    public static final String CONFIG_HERE_KEYS = "here_geocoding_keys";
+    private static final String HERE_URL = "https://geocode.search.hereapi.com/v1/geocode";
+    /** Por debajo de este puntaje HERE suele haber cambiado la calle ("Lamadrid" -> "Madrid"): se muestra como aproximada. */
+    private static final double HERE_PUNTAJE_MIN = 0.85;
     public static final String CONFIG_GEOAPIFY_KEYS = "geoapify_keys";
     public static final String CONFIG_LOCATIONIQ_KEYS = "locationiq_keys";
     private static final int MAX_INTENTOS_POR_PROVEEDOR = 10;
@@ -417,13 +428,20 @@ public class GeocodingProxyService {
         boolean tieneNumero = m.matches();
         Integer numero = tieneNumero ? Integer.parseInt(m.group(2)) : null;
 
-        List<GeoAddress> google = queryGoogle(q, numero);
-        if (!google.isEmpty()) {
-            List<GeoAddress> out = dedupe(google);
+        // Google primero; si no trae nada (o se quedó sin cupo, o no hay key), HERE. Los dos se guardan
+        // con vencimiento y solo cuando ubicaron la altura en la calle que se escribió.
+        List<GeoAddress> pagos = queryGoogle(q, numero);
+        String proveedor = PROVEEDOR_GOOGLE;
+        if (pagos.isEmpty()) {
+            pagos = queryHere(q, numero);
+            proveedor = PROVEEDOR_HERE;
+        }
+        if (!pagos.isEmpty()) {
+            List<GeoAddress> out = dedupe(pagos);
             GeoAddress mejor = out.get(0);
             if (numero != null && !mejor.approximate() && esLaCalleTipeada(m.group(1).trim(), mejor.street())) {
                 direccionCache.guardar(m.group(1).trim(), numero, mejor.street(), mejor.locality(),
-                        mejor.lat(), mejor.lng(), false, PROVEEDOR_GOOGLE);
+                        mejor.lat(), mejor.lng(), false, proveedor);
             }
             return out;
         }
@@ -472,6 +490,70 @@ public class GeocodingProxyService {
             }
         }
         return List.of();
+    }
+
+    private List<GeoAddress> queryHere(String texto, Integer numeroEsperado) {
+        for (int intento = 0; intento < MAX_INTENTOS_POR_PROVEEDOR; intento++) {
+            String key = apiKeyPool.siguienteClave(PROVEEDOR_HERE, CONFIG_HERE_KEYS);
+            if (key == null || key.isBlank()) return List.of();
+            String url = HERE_URL + "?lang=es&limit=5&in=" + encode("countryCode:ARG")
+                    + "&q=" + encode(texto + ", Tucumán") + "&apiKey=" + key;
+            try {
+                apiKeyPool.registrarUso(PROVEEDOR_HERE, CONFIG_HERE_KEYS, key);
+                Map<String, Object> data = restClient.get().uri(java.net.URI.create(url))
+                        .retrieve()
+                        .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+                if (data == null) return List.of();
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> items = (List<Map<String, Object>>) data.get("items");
+                if (items == null) return List.of();
+                List<GeoAddress> out = new ArrayList<>();
+                for (Map<String, Object> item : items) {
+                    GeoAddress a = desdeHere(item, numeroEsperado);
+                    if (a != null) out.add(a);
+                }
+                return out;
+            } catch (org.springframework.web.client.HttpClientErrorException e) {
+                int status = e.getStatusCode().value();
+                // 429 = sin cupo o demasiado seguido; 401/403 = key inválida o sin permiso para este servicio.
+                if (status == 429 || status == 401 || status == 403) {
+                    log.warn("HERE Geocoding respondió {} — se pasa a la siguiente key.", status);
+                    apiKeyPool.marcarAgotada(PROVEEDOR_HERE, CONFIG_HERE_KEYS, key);
+                    continue;
+                }
+                log.warn("Fallo la búsqueda en HERE de \"{}\": {}", texto, e.getMessage());
+                return List.of();
+            } catch (Exception e) {
+                log.warn("Fallo la búsqueda en HERE de \"{}\": {}", texto, e.getMessage());
+                return List.of();
+            }
+        }
+        return List.of();
+    }
+
+    @SuppressWarnings("unchecked")
+    static GeoAddress desdeHere(Map<String, Object> item, Integer numeroEsperado) {
+        Map<String, Object> direccion = (Map<String, Object>) item.get("address");
+        Map<String, Object> posicion = (Map<String, Object>) item.get("position");
+        if (direccion == null || posicion == null || posicion.get("lat") == null || posicion.get("lng") == null) return null;
+        String calle = texto(direccion.get("street"));
+        String provincia = texto(direccion.get("state"));
+        if (calle.isBlank() || !provincia.toLowerCase().contains("tucum")) return null;
+        String localidad = texto(direccion.get("city"));
+        String altura = direccion.get("houseNumber") == null ? null : texto(direccion.get("houseNumber"));
+        Map<String, Object> puntajes = (Map<String, Object>) item.get("scoring");
+        double puntaje = puntajes != null && puntajes.get("queryScore") instanceof Number n ? n.doubleValue() : 0;
+        // houseNumber = ubicó la altura (interpolada sobre la cuadra); street / locality = solo la calle o la zona.
+        boolean aproximada = altura == null || !"houseNumber".equals(texto(item.get("resultType"))) || puntaje < HERE_PUNTAJE_MIN;
+        Integer numero = parseNumero(altura, numeroEsperado);
+        String base = numero != null ? calle + " " + numero : calle;
+        String label = localidad.isBlank() ? base : base + ", " + localidad;
+        return new GeoAddress(label, calle, numero, localidad,
+                ((Number) posicion.get("lat")).doubleValue(), ((Number) posicion.get("lng")).doubleValue(), aproximada, PROVEEDOR_HERE);
+    }
+
+    private static String texto(Object o) {
+        return o == null ? "" : String.valueOf(o);
     }
 
     @SuppressWarnings("unchecked")
@@ -969,7 +1051,7 @@ public class GeocodingProxyService {
         return out;
     }
 
-    private Integer parseNumero(Object crudo, Integer porDefecto) {
+    private static Integer parseNumero(Object crudo, Integer porDefecto) {
         if (crudo == null) return porDefecto;
         try {
             return Integer.parseInt(String.valueOf(crudo));

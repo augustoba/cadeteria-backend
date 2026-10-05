@@ -20,6 +20,7 @@ public final class ConfiguracionSistema {
             GeocodingProxyService.CONFIG_GEOAPIFY_KEYS,
             GeocodingProxyService.CONFIG_LOCATIONIQ_KEYS,
             GeocodingProxyService.CONFIG_GOOGLE_KEYS,
+            GeocodingProxyService.CONFIG_HERE_KEYS,
             RutaService.CONFIG_GRAPHHOPPER_KEYS,
             RutaService.CONFIG_ORS_KEYS);
 

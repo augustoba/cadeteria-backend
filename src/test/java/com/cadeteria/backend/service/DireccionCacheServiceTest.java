@@ -402,12 +402,12 @@ class DireccionCacheServiceTest {
     void elBorradoDiarioIncluyeElLinkDeGoogleMapsSoloSiEstaConfigurado() {
         service.borrarVencidas();
         verify(coordsRepository).deleteByProveedorInAndCreadaEnBefore(
-                eq(java.util.Set.of("google", DireccionCacheService.PROVEEDOR_ANDROID_GEOCODER)), any());
+                eq(java.util.Set.of("google", "here", DireccionCacheService.PROVEEDOR_ANDROID_GEOCODER)), any());
 
         when(configuracion.getBoolean(eq(DireccionCacheService.CONFIG_GOOGLE_LINK_VENCE), anyBoolean())).thenReturn(true);
         service.borrarVencidas();
         verify(coordsRepository).deleteByProveedorInAndCreadaEnBefore(
-                eq(java.util.Set.of("google", DireccionCacheService.PROVEEDOR_ANDROID_GEOCODER, DireccionCacheService.PROVEEDOR_GOOGLE_LINK)), any());
+                eq(java.util.Set.of("google", "here", DireccionCacheService.PROVEEDOR_ANDROID_GEOCODER, DireccionCacheService.PROVEEDOR_GOOGLE_LINK)), any());
     }
 
     // --- Qué fuente pisa a cuál (2026-09-26) ---

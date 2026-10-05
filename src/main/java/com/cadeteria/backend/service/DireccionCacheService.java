@@ -542,7 +542,7 @@ public class DireccionCacheService {
             // Una persona lo vio en el mapa: mejor que lo que interpola un buscador, pero no se
             // promedia con él (ver guardar) y lo pisa un cadete o un pin confirmado.
             case PROVEEDOR_MANUAL_SIN_CONFIRMAR -> 2;
-            case GeocodingProxyService.PROVEEDOR_GOOGLE -> 0;
+            case GeocodingProxyService.PROVEEDOR_GOOGLE, GeocodingProxyService.PROVEEDOR_HERE -> 0;
             // Mismo nivel que un buscador gratuito: viene de un punto en movimiento.
             case PROVEEDOR_ANDROID_GEOCODER -> 1;
             default -> 1; // nominatim, geoapify, locationiq
@@ -578,6 +578,8 @@ public class DireccionCacheService {
     private Set<String> proveedoresQueVencen() {
         Set<String> out = new HashSet<>();
         out.add(PROVEEDOR_GOOGLE);
+        // HERE (2026-10-05): sus condiciones tampoco dejan guardar más de 30 días; misma regla y misma pausa.
+        out.add(GeocodingProxyService.PROVEEDOR_HERE);
         out.add(PROVEEDOR_ANDROID_GEOCODER);
         if (configuracionService.getBoolean(CONFIG_GOOGLE_LINK_VENCE, false)) out.add(PROVEEDOR_GOOGLE_LINK);
         return out;

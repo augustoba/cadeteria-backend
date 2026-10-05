@@ -76,6 +76,7 @@ public class ConfiguracionController {
                 apiKeyPool.estadoDe(GeocodingProxyService.PROVEEDOR_GEOAPIFY, GeocodingProxyService.CONFIG_GEOAPIFY_KEYS),
                 apiKeyPool.estadoDe(GeocodingProxyService.PROVEEDOR_LOCATIONIQ, GeocodingProxyService.CONFIG_LOCATIONIQ_KEYS),
                 apiKeyPool.estadoDe(GeocodingProxyService.PROVEEDOR_GOOGLE, GeocodingProxyService.CONFIG_GOOGLE_KEYS),
+                apiKeyPool.estadoDe(GeocodingProxyService.PROVEEDOR_HERE, GeocodingProxyService.CONFIG_HERE_KEYS),
                 apiKeyPool.estadoDe(RutaService.PROVEEDOR_GRAPHHOPPER, RutaService.CONFIG_GRAPHHOPPER_KEYS),
                 apiKeyPool.estadoDe(RutaService.PROVEEDOR_ORS, RutaService.CONFIG_ORS_KEYS)
         ).flatMap(List::stream)

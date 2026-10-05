@@ -43,7 +43,10 @@ public class ApiKeyPoolService {
             "openrouteservice", 2500,
             // Google no es gratis: es un tope PROPIO para no pasarse del cupo sin cargo (10.000
             // geocodificaciones/mes por SKU desde 2025) — 300/día por key ≈ 9.000/mes.
-            "google", 300
+            "google", 300,
+            // HERE (2026-10-05): tope propio igual que Google — 30.000 búsquedas/mes sin cargo en el
+            // plan Base (dato a confirmar en la cuenta), 900/día por key ≈ 27.000/mes.
+            "here", 900
     );
 
     /**
