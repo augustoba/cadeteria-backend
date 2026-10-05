@@ -31,7 +31,7 @@ public final class SolicitudCadeteDtos {
             String vehiculoColor, String vehiculoPatente, String vehiculoMarca, String vehiculoModelo,
             String fotoUrl, String fotoVehiculoUrl, String fotoCarnetUrl, String fotoCarnetDorsoUrl,
             String fotoTarjetaVerdeUrl, String fotoTarjetaVerdeDorsoUrl,
-            List<ObservacionResponse> observaciones, DomicilioDto domicilio) {}
+            List<ObservacionResponse> observaciones, DomicilioDto domicilio, java.time.LocalDate fechaNacimiento) {}
 
     /**
      * Ya hay (o hubo) un cadete con ese DNI — puede ser alguien que quiere volver. Con la última
@@ -72,7 +72,9 @@ public final class SolicitudCadeteDtos {
             /** Tildó "Soy mayor de 18 años" (2026-09-26): sin esto no se acepta el formulario. */
             @AssertTrue(message = "Tenés que ser mayor de 18 años para anotarte como cadete.") boolean mayorDeEdad,
             /** Dónde vive (2026-10-05): calle, altura y localidad obligatorias (lo valida el service). */
-            @Valid DomicilioDto domicilio
+            @Valid DomicilioDto domicilio,
+            /** Fecha de nacimiento (2026-10-05): obligatoria y de alguien con 18 años cumplidos (lo valida el service). */
+            java.time.LocalDate fechaNacimiento
     ) {}
 
     public record SolicitudResponse(
@@ -89,7 +91,9 @@ public final class SolicitudCadeteDtos {
             /** Cuándo tildó "Soy mayor de 18 años" (2026-09-26); null en solicitudes anteriores a esa casilla. */
             Instant mayorEdadDeclaradaEn,
             /** null en las solicitudes anteriores al 2026-10-05. */
-            DomicilioDto domicilio
+            DomicilioDto domicilio,
+            /** null en las solicitudes anteriores al 2026-10-05. */
+            java.time.LocalDate fechaNacimiento
     ) {
         public static SolicitudResponse from(SolicitudCadete s) {
             return from(s, null);
@@ -108,7 +112,7 @@ public final class SolicitudCadeteDtos {
                     s.getCorrecciones() == null ? 0 : s.getCorrecciones(),
                     cadeteExistente,
                     s.getMayorEdadDeclaradaEn(),
-                    DomicilioDto.from(s.getDomicilio()));
+                    DomicilioDto.from(s.getDomicilio()), s.getFechaNacimiento());
         }
     }
 

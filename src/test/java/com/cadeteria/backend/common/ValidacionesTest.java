@@ -70,13 +70,13 @@ class ValidacionesTest {
     @Test
     void formularioDeCadeteRechazaCadaCampoMal() {
         SolicitudFormRequest mal = new SolicitudFormRequest("Juan2", "P3rez", "30a", "abc", "no-es-mail", "MOTO",
-                "Rojo5", "AB123CD", "Honda", "Wave", null, null, null, null, null, null, false, null);
+                "Rojo5", "AB123CD", "Honda", "Wave", null, null, null, null, null, null, false, null, null);
         assertEquals(Set.of("nombre", "apellido", "dni", "telefono", "email", "vehiculoColor", "vehiculoPatente", "mayorDeEdad"),
                 campos(VALIDATOR.validate(mal)));
 
         SolicitudFormRequest bien = new SolicitudFormRequest("Juan", "Pérez", "30.111.222", "381 555 1234", "juan@mail.com",
                 "MOTO", "Rojo", "A123BCD", "Honda", "Wave 110", null, null, null, null, null, null, true,
-                new com.cadeteria.backend.dto.DomicilioDto("Lamadrid", "450", null, null, "San Miguel de Tucumán"));
+                new com.cadeteria.backend.dto.DomicilioDto("Lamadrid", "450", null, null, "San Miguel de Tucumán"), java.time.LocalDate.of(1995, 5, 17));
         assertTrue(VALIDATOR.validate(bien).isEmpty());
     }
 

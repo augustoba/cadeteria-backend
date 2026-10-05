@@ -192,7 +192,32 @@ class SolicitudCadeteServiceTest {
                                       com.cadeteria.backend.dto.DomicilioDto domicilio) {
         return new SolicitudFormRequest("Juan", "Pérez", dni, "381 555 1234", "juan@mail.com", "MOTO",
                 "Rojo", patente, "Honda", "Wave", "https://img/foto.jpg", "https://img/moto.jpg", fotoCarnet,
-                "https://img/dni-dorso.jpg", "https://img/tv.jpg", "https://img/tv-dorso.jpg", mayorDeEdad, domicilio);
+                "https://img/dni-dorso.jpg", "https://img/tv.jpg", "https://img/tv-dorso.jpg", mayorDeEdad, domicilio, nacimiento);
+    }
+
+    /** Fecha de nacimiento que manda el formulario de prueba; los tests de edad la cambian. */
+    private java.time.LocalDate nacimiento = java.time.LocalDate.of(1995, 5, 17);
+
+    @Test
+    void conFechaDeNacimientoDeUnMenorNoSePuedeAnotarAunqueTildeLaCasilla() {
+        when(repo.findByToken("tok")).thenReturn(Optional.of(pendiente()));
+        nacimiento = java.time.LocalDate.now().minusYears(17);
+        var e = assertThrows(BadRequestException.class, () -> service.enviarFormulario("tok", form("https://img/dni.jpg")));
+        assertTrue(e.getMessage().contains("menos de 18"));
+
+        nacimiento = null;
+        assertThrows(BadRequestException.class, () -> service.enviarFormulario("tok", form("https://img/dni.jpg")));
+    }
+
+    @Test
+    void alAnotarseQuedaGuardadaLaFechaDeNacimiento() {
+        SolicitudCadete s = pendiente();
+        when(repo.findByToken("tok")).thenReturn(Optional.of(s));
+        when(repo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.enviarFormulario("tok", form("https://img/dni.jpg"));
+
+        assertEquals(java.time.LocalDate.of(1995, 5, 17), s.getFechaNacimiento());
     }
 
     // --- Validaciones del formulario (2026-09-26): antes solo las controlaba el front ---

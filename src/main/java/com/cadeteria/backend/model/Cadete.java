@@ -44,6 +44,10 @@ public class Cadete {
     /** Dónde vive (2026-10-05): obligatorio en las altas nuevas; null en los cadetes anteriores hasta que el admin lo cargue. */
     @Embedded
     private Domicilio domicilio;
+
+    /** 2026-10-05: obligatoria en las altas nuevas; null en los cadetes anteriores hasta que el admin la cargue. */
+    @Column(name = "fecha_nacimiento")
+    private java.time.LocalDate fechaNacimiento;
     private String vehiculoModelo;
     private Integer vehiculoAnio;
 
@@ -352,6 +356,14 @@ public class Cadete {
 
     public void setFotoVehiculoUrl(String fotoVehiculoUrl) {
         this.fotoVehiculoUrl = fotoVehiculoUrl;
+    }
+
+    public java.time.LocalDate getFechaNacimiento() {
+        return fechaNacimiento;
+    }
+
+    public void setFechaNacimiento(java.time.LocalDate fechaNacimiento) {
+        this.fechaNacimiento = fechaNacimiento;
     }
 
     public Domicilio getDomicilio() {

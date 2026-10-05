@@ -176,6 +176,10 @@ public class CadeteService {
         if (!"postulante".equals(declaradoPor) && (req.domicilio() == null || !req.domicilio().completo())) {
             throw new BadRequestException(DomicilioDto.MSJ_INCOMPLETO);
         }
+        // Lo mismo con la fecha de nacimiento: obligatoria en el alta del panel (apply() controla los 18 años).
+        if (!"postulante".equals(declaradoPor) && req.fechaNacimiento() == null) {
+            throw new BadRequestException(com.cadeteria.backend.common.Edad.MSJ_FALTA);
+        }
         exigirDniYUsuarioLibres(null, req);
         Cadete c = new Cadete();
         c.setId(UUID.randomUUID().toString());
@@ -666,6 +670,11 @@ public class CadeteService {
         if (req.domicilio() != null && !req.domicilio().enBlanco()) {
             if (!req.domicilio().completo()) throw new BadRequestException(DomicilioDto.MSJ_INCOMPLETO);
             c.setDomicilio(req.domicilio().aEntidad());
+        }
+        // Sin fecha en el pedido no se toca (cadetes anteriores al 2026-10-05); si viene, tiene que dar 18 años o más.
+        if (req.fechaNacimiento() != null) {
+            com.cadeteria.backend.common.Edad.exigirMayor(req.fechaNacimiento());
+            c.setFechaNacimiento(req.fechaNacimiento());
         }
         c.setVehiculoAnio(req.vehiculoAnio());
         c.setFotoVehiculoUrl(blankToNull(req.fotoVehiculoUrl()));

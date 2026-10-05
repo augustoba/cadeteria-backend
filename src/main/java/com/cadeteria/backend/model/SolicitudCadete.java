@@ -57,6 +57,10 @@ public class SolicitudCadete {
     /** Dónde vive (2026-10-05): lo carga el postulante; null en las solicitudes anteriores. */
     @Embedded
     private Domicilio domicilio;
+
+    /** 2026-10-05: la carga el postulante; null en las solicitudes anteriores. */
+    @Column(name = "fecha_nacimiento")
+    private java.time.LocalDate fechaNacimiento;
     private String vehiculoModelo;
 
     @Column(length = 500)
@@ -208,6 +212,14 @@ public class SolicitudCadete {
 
     public void setVehiculoPatente(String vehiculoPatente) {
         this.vehiculoPatente = vehiculoPatente;
+    }
+
+    public java.time.LocalDate getFechaNacimiento() {
+        return fechaNacimiento;
+    }
+
+    public void setFechaNacimiento(java.time.LocalDate fechaNacimiento) {
+        this.fechaNacimiento = fechaNacimiento;
     }
 
     public Domicilio getDomicilio() {

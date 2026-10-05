@@ -76,7 +76,12 @@ public final class CadeteDtos {
              * Dónde vive (2026-10-05). Obligatorio al crear desde el panel (calle, altura y localidad);
              * al editar, null = no se toca (así un cadete anterior sin domicilio se puede seguir editando).
              */
-            @Valid DomicilioDto domicilio
+            @Valid DomicilioDto domicilio,
+            /**
+             * Fecha de nacimiento (2026-10-05). Obligatoria al crear desde el panel y tiene que dar 18 años
+             * o más; al editar, null = no se toca (cadetes anteriores).
+             */
+            java.time.LocalDate fechaNacimiento
     ) {}
 
     public record CadeteResponse(
@@ -113,7 +118,9 @@ public final class CadeteDtos {
             /** Constancia de mayor de edad (2026-09-26): cuándo y quién ("postulante" o el admin que lo cargó). */
             Instant mayorEdadDeclaradaEn, String mayorEdadDeclaradaPor,
             /** null = todavía no se cargó (cadetes anteriores al 2026-10-05). */
-            DomicilioDto domicilio
+            DomicilioDto domicilio,
+            /** null = todavía no se cargó (cadetes anteriores al 2026-10-05). */
+            java.time.LocalDate fechaNacimiento
     ) {
         /** Conveniencia para los endpoints que no recalculan la calificación (una mutación puntual, no la lista). */
         public static CadeteResponse from(Cadete c) {
@@ -138,7 +145,7 @@ public final class CadeteDtos {
                     c.getUltimaVersionApp(), c.getUltimaVersionAppEn(),
                     c.getCalleTelefono(), c.getCalleTelefonoEn(),
                     c.getMayorEdadDeclaradaEn(), c.getMayorEdadDeclaradaPor(),
-                    DomicilioDto.from(c.getDomicilio()));
+                    DomicilioDto.from(c.getDomicilio()), c.getFechaNacimiento());
         }
 
         /**
@@ -176,7 +183,7 @@ public final class CadeteDtos {
                     r.ultimaVersionApp(), r.ultimaVersionAppEn(),
                     r.calleTelefono(), r.calleTelefonoEn(),
                     r.mayorEdadDeclaradaEn(), r.mayorEdadDeclaradaPor(),
-                    r.domicilio());
+                    r.domicilio(), r.fechaNacimiento());
         }
     }
 
