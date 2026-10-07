@@ -151,6 +151,52 @@ class CallesARevisarServiceTest {
         assertEquals(100, lista.get(0).cercanas().get(0).cuadra());
     }
 
+    @Test
+    void conElDibujoAnotaLaCuadraLejosDeSuCalleYAlCorregirlaElCalculoCompletaElHueco() {
+        CuadraCoordsRepository coords = mock(CuadraCoordsRepository.class);
+        when(coords.findAll()).thenAnswer(i -> List.copyOf(tabla));
+        when(coords.findByCalleCanonica(anyString())).thenAnswer(i ->
+                tabla.stream().filter(c -> c.getCalleCanonica().equals(i.getArgument(0))).toList());
+        when(coords.findByCalleCanonicaAndLocalidadAndCuadra(anyString(), anyString(), anyInt())).thenAnswer(i ->
+                tabla.stream().filter(c -> c.getCalleCanonica().equals(i.getArgument(0)) && c.getLocalidad().equals(i.getArgument(1))
+                        && c.getCuadra() == (int) i.getArgument(2)).findFirst());
+        when(coords.save(any(CuadraCoords.class))).thenAnswer(i -> {
+            if (!tabla.contains((CuadraCoords) i.getArgument(0))) tabla.add(i.getArgument(0));
+            return i.getArgument(0);
+        });
+        DireccionAliasRepository alias = mock(DireccionAliasRepository.class);
+        when(alias.findAll()).thenReturn(List.of());
+        CalleDudaRepository dudasRepo = mock(CalleDudaRepository.class);
+        when(dudasRepo.findAll()).thenAnswer(i -> List.copyOf(dudas));
+        when(dudasRepo.findByEstado(anyString())).thenAnswer(i -> dudas.stream().filter(d -> d.getEstado().equals(i.getArgument(0))).toList());
+        when(dudasRepo.findById(anyString())).thenAnswer(i -> dudas.stream().filter(d -> d.getId().equals(i.getArgument(0))).findFirst());
+        when(dudasRepo.save(any(CalleDuda.class))).thenAnswer(i -> {
+            if (!dudas.contains((CalleDuda) i.getArgument(0))) dudas.add(i.getArgument(0));
+            return i.getArgument(0);
+        });
+        CalleNombreAnteriorRepository anteriores = mock(CalleNombreAnteriorRepository.class);
+        when(anteriores.findAll()).thenReturn(List.of());
+        // "lavalle" dibujada recta hacia el norte; la 500 quedó 300 m al costado.
+        TrazadoCalles trazado = new TrazadoCalles(java.util.Map.of("lavalle", List.of(new TrazadoCalles.Tramo(SMT, new double[][]{
+                TrazadoCalles.xy(LAT, LNG), TrazadoCalles.xy(LAT + 20 * M100, LNG)}))));
+        CallesARevisarService conDibujo = new CallesARevisarService(coords, dudasRepo,
+                new UnionCallesService(coords, alias, mock(CalleUnionRepository.class)), links, anteriores, new RellenoCallesService(coords, alias, trazado));
+        fila("lavalle", SMT, 100, LAT + M100, LNG, "osm");
+        CuadraCoords lejos = fila("lavalle", SMT, 500, LAT + 5 * M100, LNG + 0.003, "nominatim");
+
+        conDibujo.actualizar();
+
+        CalleDuda d = dudas.stream().filter(x -> x.getCuadra() == 500).findFirst().orElseThrow();
+        assertTrue(d.getMotivo().contains("del dibujo de la calle"), d.getMotivo());
+
+        google(LAT + 5 * M100, LNG);
+        assertEquals(CallesARevisarService.CORREGIDA, conDibujo.resolverConLink(d.getId(), LINK, "admin").estado());
+        assertEquals(LNG, lejos.getLng());
+        // Con la 500 en su lugar, el cálculo completa la 200, la 300 y la 400.
+        assertEquals(5, tabla.size());
+        assertTrue(tabla.stream().filter(c -> c.getCuadra() == 300).allMatch(c -> c.getProveedor().equals("osm_relleno")));
+    }
+
     // --- pegar el link de Google Maps ---
 
     @Test

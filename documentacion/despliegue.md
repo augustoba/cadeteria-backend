@@ -199,6 +199,15 @@ teléfonos; **volver a producción antes de tener cadetes reales**.
       guardan cómo estaba todo antes (columnas nuevas `calle_union.respaldo` y `calle_union.deshecha_en`,
       las crea Hibernate) y se vuelven atrás con "Deshacer" en "Ver uniones hechas"
       (`POST .../calles/uniones/{id}/deshacer`); las anteriores y las hechas con un .sql no.
+- [ ] **Calles a buscar y relleno de huecos en el backend (2026-10-07)**: pantalla Calles, solapa "A buscar".
+      El dibujo de las calles de OpenStreetMap viaja con el backend (`resources/calles/trazado.tsv.gz`, 291 KB,
+      lo arma `importador-direcciones/osm/exportar-trazado.py`; volver a generarlo solo si se baja un trazado
+      nuevo). Tabla nueva `calle_a_buscar_descartada` (la crea Hibernate) y rutas `GET .../calles/a-buscar`,
+      `POST .../calles/a-buscar/link` y `POST .../calles/a-buscar/descartar` (permiso "configuracion"). La lista
+      no se guarda: se calcula al pedirla (~0,2 s). Al cargar o corregir una cuadra desde Calles, el backend
+      completa solo las cuadras intermedias de esa calle (`osm_relleno`), sin exportar ni importar nada. "A
+      revisar" suma el control "lejos del dibujo de la calle" (~78 dudas más la primera noche). Sin variables
+      ni claves nuevas. El cálculo por paralelas sigue en el importador.
 - [ ] **Recordatorios al entrar a la app (2026-09-29)**: Configuración → App de cadetes → "Cartel de
       recordatorios al entrar". Revisar título y renglones (hasta 6 de 150 caracteres; sin tocar valen
       los 3 de siempre). Claves `recordatorios_entrar_activo`, `recordatorios_entrar_titulo` y

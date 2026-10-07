@@ -78,10 +78,28 @@ public class CallesARevisarService {
     private final UnionCallesService unionCalles;
     private final LinkGoogleMapsService linkGoogleMaps;
     private final CalleNombreAnteriorRepository nombreAnteriorRepository;
+    /** Null en las pruebas que no usan el dibujo de las calles. */
+    private final RellenoCallesService relleno;
+
+    /** A más de esto del dibujo de su calle, la cuadra es sospechosa. */
+    static final int LEJOS_DEL_DIBUJO_M = 100;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public CallesARevisarService(CuadraCoordsRepository coordsRepository, CalleDudaRepository dudaRepository,
+                                 UnionCallesService unionCalles, LinkGoogleMapsService linkGoogleMaps,
+                                 CalleNombreAnteriorRepository nombreAnteriorRepository, RellenoCallesService relleno) {
+        this.coordsRepository = coordsRepository;
+        this.dudaRepository = dudaRepository;
+        this.unionCalles = unionCalles;
+        this.linkGoogleMaps = linkGoogleMaps;
+        this.nombreAnteriorRepository = nombreAnteriorRepository;
+        this.relleno = relleno;
+    }
 
     public CallesARevisarService(CuadraCoordsRepository coordsRepository, CalleDudaRepository dudaRepository,
                                  UnionCallesService unionCalles, LinkGoogleMapsService linkGoogleMaps,
                                  CalleNombreAnteriorRepository nombreAnteriorRepository) {
+        this.relleno = null;
         this.nombreAnteriorRepository = nombreAnteriorRepository;
         this.coordsRepository = coordsRepository;
         this.dudaRepository = dudaRepository;
@@ -125,7 +143,7 @@ public class CallesARevisarService {
             }
         }
         // Las repetidas con el nombre viejo no se juzgan por ubicación ni sirven de vecinas.
-        Map<CuadraCoords, String> sospechas = sospechas(filas.stream().filter(c -> !repetidas.containsKey(c)).toList());
+        Map<CuadraCoords, String> sospechas = conElDibujo(filas.stream().filter(c -> !repetidas.containsKey(c)).toList());
         for (Map.Entry<CuadraCoords, String> s : sospechas.entrySet()) {
             CuadraCoords c = s.getKey();
             if (conocidas.add(clave(TIPO_UBICACION, c.getCalleCanonica(), c.getLocalidad(), c.getCuadra(), ""))) {
@@ -207,6 +225,7 @@ public class CallesARevisarService {
                 if (!deUbicacion) throw new BadRequestException("Esa opción es solo para las dudas de ubicación.");
                 if (d.getLinkLat() == null || d.getLinkLng() == null) throw new BadRequestException("Primero pegá el link de Google Maps.");
                 corregirPunto(d.getCalleCanonica(), d.getLocalidad(), d.getCuadra(), d.getLinkLat(), d.getLinkLng());
+                recalcular(d.getCalleCanonica(), d.getLocalidad());
                 Resultado res = cerrar(d, CORREGIDA, "Cuadra corrida a mano al punto de Google.", quien);
                 cerrarLasQueYaCierran(sospechasDeHoy());
                 return res;
@@ -302,6 +321,7 @@ public class CallesARevisarService {
                     + sigue.substring(1) + " No se cambió nada; si igual es el lugar correcto, elegí usar el punto de Google.");
         }
         corregirPunto(fila.getCalleCanonica(), fila.getLocalidad(), fila.getCuadra(), lat, lng);
+        recalcular(fila.getCalleCanonica(), fila.getLocalidad());
         Resultado res = cerrar(d, CORREGIDA, "Cuadra corrida " + distancia(alPunto) + " al punto de Google.", quien);
         // Una cuadra mal puesta hace dudar de sus vecinas: con esta corregida, las que ya cierran salen de la lista.
         cerrarLasQueYaCierran(sospechasDeHoy());
@@ -309,7 +329,7 @@ public class CallesARevisarService {
     }
 
     /** El nombre de calle que trae el link de Google si no es el de la cuadra (ni uno contiene al otro); null si coincide o no trae. */
-    private static String otroNombreSegunGoogle(String calleCanonica, String direccionDeGoogle) {
+    static String otroNombreSegunGoogle(String calleCanonica, String direccionDeGoogle) {
         if (direccionDeGoogle == null) return null;
         String calleGoogle = direccionDeGoogle.replaceFirst("\\s+\\d+$", "").trim();
         Set<String> deGoogle = new HashSet<>(CallesParecidas.palabrasClave(DireccionUtils.normalizar(DireccionUtils.expandirAbreviaturas(calleGoogle))));
@@ -322,7 +342,24 @@ public class CallesARevisarService {
     private Map<CuadraCoords, String> sospechasDeHoy() {
         List<CuadraCoords> filas = coordsRepository.findAll().stream().filter(c -> !c.isApproximate()).toList();
         Map<CuadraCoords, CuadraCoords> repetidas = conNombreViejo(filas);
-        return sospechas(filas.stream().filter(c -> !repetidas.containsKey(c)).toList());
+        return conElDibujo(filas.stream().filter(c -> !repetidas.containsKey(c)).toList());
+    }
+
+    /** Las sospechas por las vecinas más las cuadras que quedan lejos del dibujo de su calle (si el dibujo está). */
+    private Map<CuadraCoords, String> conElDibujo(List<CuadraCoords> filas) {
+        Map<CuadraCoords, String> out = sospechas(filas);
+        if (relleno == null) return out;
+        Map<String, List<TrazadoCalles.Tramo>> dibujo = relleno.dibujoDeHoy();
+        for (CuadraCoords c : filas) {
+            TrazadoCalles.Arrime a = TrazadoCalles.arrimar(dibujo.get(c.getCalleCanonica()), TrazadoCalles.xy(c.getLat(), c.getLng()));
+            if (a != null && a.metros() > LEJOS_DEL_DIBUJO_M) anotar(out, c, "Está a " + Math.round(a.metros()) + " m del dibujo de la calle.");
+        }
+        return out;
+    }
+
+    /** Una cuadra real cambió: las calculadas de esa calle se completan o se vuelven a ubicar. */
+    private void recalcular(String calle, String localidad) {
+        if (relleno != null) relleno.rellenar(calle, localidad);
     }
 
     /**

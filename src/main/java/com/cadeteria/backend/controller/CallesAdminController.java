@@ -1,6 +1,7 @@
 package com.cadeteria.backend.controller;
 
 import com.cadeteria.backend.model.CalleUnion;
+import com.cadeteria.backend.service.CallesABuscarService;
 import com.cadeteria.backend.service.CallesARevisarService;
 import com.cadeteria.backend.service.UnionCallesService;
 import jakarta.validation.Valid;
@@ -28,12 +29,37 @@ public class CallesAdminController {
 
     public record DecisionRequest(@NotBlank String decision) {}
 
+    /** Una cuadra de la lista "A buscar"; {@code link} solo para cargarla. */
+    public record ABuscarRequest(@NotBlank String calle, @NotBlank String localidad, int cuadra, String link) {}
+
     private final UnionCallesService service;
     private final CallesARevisarService aRevisar;
+    private final CallesABuscarService aBuscar;
 
-    public CallesAdminController(UnionCallesService service, CallesARevisarService aRevisar) {
+    public CallesAdminController(UnionCallesService service, CallesARevisarService aRevisar, CallesABuscarService aBuscar) {
         this.service = service;
         this.aRevisar = aRevisar;
+        this.aBuscar = aBuscar;
+    }
+
+    /** Las cuadras que faltan y destraban más cálculo, primero las que más rinden. Se calcula en el momento. */
+    @GetMapping("/a-buscar")
+    public List<CallesABuscarService.ABuscar> aBuscar() {
+        return aBuscar.lista();
+    }
+
+    /** Carga una cuadra de la lista con el link de Google Maps de esa dirección. */
+    @PostMapping("/a-buscar/link")
+    public CallesABuscarService.Resultado cargar(@Valid @RequestBody ABuscarRequest req, Principal principal) {
+        if (req.link() == null || req.link().isBlank()) throw new com.cadeteria.backend.common.BadRequestException("Falta el link de Google Maps.");
+        return aBuscar.cargarConLink(req.calle(), req.localidad(), req.cuadra(), req.link(), principal == null ? null : principal.getName());
+    }
+
+    /** Esa cuadra no existe: no se vuelve a pedir. */
+    @PostMapping("/a-buscar/descartar")
+    public Map<String, Boolean> descartar(@Valid @RequestBody ABuscarRequest req, Principal principal) {
+        aBuscar.descartar(req.calle(), req.localidad(), req.cuadra(), principal == null ? null : principal.getName());
+        return Map.of("ok", true);
     }
 
     /** Qué pares se unirían, sin tocar nada. */

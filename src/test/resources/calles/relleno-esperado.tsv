@@ -1,0 +1,912 @@
+# CONOCIDA = cuadra real de producción (2026-10-07); ESPERADA = lo que calcula relleno.py (paso 1, huecos) con ellas.
+CONOCIDA	juan larrea	San Miguel de Tucumán	200	-26.8512815	-65.2051125
+CONOCIDA	juan larrea	San Miguel de Tucumán	400	-26.8505901	-65.2080404
+CONOCIDA	juan larrea	San Miguel de Tucumán	500	-26.8501027	-65.2094652
+CONOCIDA	juan larrea	San Miguel de Tucumán	600	-26.8497013	-65.2111572
+CONOCIDA	juan larrea	San Miguel de Tucumán	700	-26.8494626	-65.2125606
+CONOCIDA	juan larrea	San Miguel de Tucumán	800	-26.8490313	-65.2140577
+CONOCIDA	juan larrea	San Miguel de Tucumán	900	-26.8487558	-65.2151714
+CONOCIDA	juan larrea	San Miguel de Tucumán	1700	-26.8459755	-65.2293343
+CONOCIDA	juan larrea	San Miguel de Tucumán	2100	-26.8448227	-65.2360174
+CONOCIDA	juan larrea	San Miguel de Tucumán	2200	-26.8446614	-65.2368651
+CONOCIDA	juan larrea	San Miguel de Tucumán	2300	-26.8442019	-65.2382825
+CONOCIDA	juan larrea	San Miguel de Tucumán	3000	-26.8423226	-65.2484789
+CONOCIDA	buenos aires	San Miguel de Tucumán	0	-26.8309542	-65.2064624
+CONOCIDA	buenos aires	San Miguel de Tucumán	100	-26.8324632	-65.2067744
+CONOCIDA	buenos aires	San Miguel de Tucumán	200	-26.8334723	-65.2070298
+CONOCIDA	buenos aires	San Miguel de Tucumán	300	-26.8347237	-65.2072813
+CONOCIDA	buenos aires	San Miguel de Tucumán	400	-26.8368427	-65.2079807
+CONOCIDA	buenos aires	San Miguel de Tucumán	500	-26.8375975	-65.2078721
+CONOCIDA	buenos aires	San Miguel de Tucumán	600	-26.8389099	-65.2083142
+CONOCIDA	buenos aires	San Miguel de Tucumán	700	-26.8404140	-65.2087089
+CONOCIDA	buenos aires	San Miguel de Tucumán	800	-26.8416184	-65.2090247
+CONOCIDA	buenos aires	San Miguel de Tucumán	900	-26.8430068	-65.2094302
+CONOCIDA	buenos aires	San Miguel de Tucumán	1000	-26.8442323	-65.2096454
+CONOCIDA	buenos aires	San Miguel de Tucumán	1100	-26.8456519	-65.2100571
+CONOCIDA	buenos aires	San Miguel de Tucumán	1200	-26.8471286	-65.2102577
+CONOCIDA	buenos aires	San Miguel de Tucumán	1300	-26.8484412	-65.2105823
+CONOCIDA	buenos aires	San Miguel de Tucumán	1400	-26.8507871	-65.2110729
+CONOCIDA	buenos aires	San Miguel de Tucumán	1500	-26.8519490	-65.2113458
+CONOCIDA	buenos aires	San Miguel de Tucumán	1600	-26.8533892	-65.2116556
+CONOCIDA	buenos aires	San Miguel de Tucumán	1700	-26.8545229	-65.2119187
+CONOCIDA	buenos aires	San Miguel de Tucumán	1800	-26.8554233	-65.2120693
+CONOCIDA	buenos aires	San Miguel de Tucumán	1900	-26.8571803	-65.2124711
+CONOCIDA	buenos aires	San Miguel de Tucumán	2000	-26.8584293	-65.2127684
+CONOCIDA	buenos aires	San Miguel de Tucumán	2100	-26.8590514	-65.2128704
+CONOCIDA	buenos aires	San Miguel de Tucumán	2600	-26.8654901	-65.2143367
+CONOCIDA	buenos aires	San Miguel de Tucumán	2700	-26.8668437	-65.2146710
+CONOCIDA	buenos aires	San Miguel de Tucumán	3100	-26.8721196	-65.2163125
+CONOCIDA	buenos aires	San Miguel de Tucumán	3900	-26.8797381	-65.2222413
+CONOCIDA	buenos aires	San Miguel de Tucumán	4500	-26.8853340	-65.2239103
+CONOCIDA	buenos aires	Tafí Viejo	0	-26.7367106	-65.2556656
+CONOCIDA	buenos aires	Tafí Viejo	100	-26.7364969	-65.2567345
+CONOCIDA	buenos aires	Yerba Buena	2000	-26.8271863	-65.3057080
+CONOCIDA	ecuador	San Miguel de Tucumán	500	-26.8071084	-65.1996963
+CONOCIDA	ecuador	San Miguel de Tucumán	600	-26.8069832	-65.2007222
+CONOCIDA	ecuador	San Miguel de Tucumán	700	-26.8069455	-65.2015167
+CONOCIDA	ecuador	San Miguel de Tucumán	1000	-26.8063628	-65.2064018
+CONOCIDA	ecuador	San Miguel de Tucumán	1100	-26.8059573	-65.2084085
+CONOCIDA	ecuador	San Miguel de Tucumán	1200	-26.8059256	-65.2106574
+CONOCIDA	ecuador	San Miguel de Tucumán	1300	-26.8056195	-65.2121641
+CONOCIDA	ecuador	San Miguel de Tucumán	1400	-26.8052664	-65.2142311
+CONOCIDA	ecuador	San Miguel de Tucumán	1500	-26.8051218	-65.2151241
+CONOCIDA	ecuador	San Miguel de Tucumán	1600	-26.8048376	-65.2165394
+CONOCIDA	ecuador	San Miguel de Tucumán	1700	-26.8043753	-65.2188694
+CONOCIDA	ecuador	San Miguel de Tucumán	2100	-26.8029276	-65.2238726
+CONOCIDA	ecuador	San Miguel de Tucumán	2200	-26.8026008	-65.2254523
+CONOCIDA	ecuador	San Miguel de Tucumán	2300	-26.8023398	-65.2262750
+CONOCIDA	ecuador	San Miguel de Tucumán	2500	-26.8019019	-65.2292879
+CONOCIDA	ecuador	San Miguel de Tucumán	2800	-26.8010359	-65.2350707
+CONOCIDA	ecuador	San Miguel de Tucumán	2900	-26.8007669	-65.2354725
+CONOCIDA	ecuador	San Miguel de Tucumán	3000	-26.8004253	-65.2380117
+CONOCIDA	ecuador	San Miguel de Tucumán	3100	-26.8000003	-65.2400685
+CONOCIDA	ecuador	San Miguel de Tucumán	3300	-26.7994758	-65.2430201
+CONOCIDA	ecuador	San Miguel de Tucumán	3400	-26.7993607	-65.2437724
+CONOCIDA	ecuador	San Miguel de Tucumán	3500	-26.7992340	-65.2446321
+CONOCIDA	ecuador	San Miguel de Tucumán	3600	-26.7989484	-65.2460212
+CONOCIDA	ecuador	San Miguel de Tucumán	3800	-26.7978755	-65.2479085
+CONOCIDA	ecuador	San Miguel de Tucumán	4400	-26.7975514	-65.2533244
+CONOCIDA	ecuador	San Miguel de Tucumán	4500	-26.7973178	-65.2544692
+CONOCIDA	ecuador	San Miguel de Tucumán	4600	-26.7969177	-65.2559315
+CONOCIDA	lavaisse	San Miguel de Tucumán	700	-26.8546462	-65.2144244
+CONOCIDA	lavaisse	San Miguel de Tucumán	1600	-26.8517122	-65.2289716
+CONOCIDA	lavaisse	San Miguel de Tucumán	2100	-26.8500346	-65.2372609
+CONOCIDA	lavaisse	San Miguel de Tucumán	2200	-26.8498454	-65.2381932
+CONOCIDA	lavaisse	San Miguel de Tucumán	2300	-26.8496413	-65.2392778
+CONOCIDA	coronel zelaya	San Miguel de Tucumán	0	-26.8239857	-65.2384335
+CONOCIDA	coronel zelaya	San Miguel de Tucumán	100	-26.8252792	-65.2387008
+CONOCIDA	coronel zelaya	San Miguel de Tucumán	200	-26.8266853	-65.2390757
+CONOCIDA	coronel zelaya	San Miguel de Tucumán	300	-26.8280627	-65.2395275
+CONOCIDA	coronel zelaya	San Miguel de Tucumán	400	-26.8293729	-65.2398106
+CONOCIDA	coronel zelaya	San Miguel de Tucumán	500	-26.8306086	-65.2402474
+CONOCIDA	coronel zelaya	San Miguel de Tucumán	600	-26.8331392	-65.2409919
+CONOCIDA	coronel zelaya	San Miguel de Tucumán	700	-26.8344071	-65.2413346
+CONOCIDA	coronel zelaya	San Miguel de Tucumán	800	-26.8356573	-65.2416791
+CONOCIDA	coronel zelaya	San Miguel de Tucumán	1600	-26.8467560	-65.2441913
+CONOCIDA	coronel zelaya	San Miguel de Tucumán	1700	-26.8482244	-65.2450533
+CONOCIDA	coronel zelaya	San Miguel de Tucumán	1800	-26.8489874	-65.2452574
+CONOCIDA	coronel zelaya	San Miguel de Tucumán	1900	-26.8503052	-65.2455829
+CONOCIDA	coronel zelaya	San Miguel de Tucumán	2000	-26.8517274	-65.2459454
+CONOCIDA	coronel zelaya	San Miguel de Tucumán	2100	-26.8525001	-65.2461302
+CONOCIDA	coronel zelaya	San Miguel de Tucumán	2600	-26.8465732	-65.2441245
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	200	-26.8330995	-65.2009833
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	300	-26.8329622	-65.2020720
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	400	-26.8324964	-65.2042224
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	500	-26.8321599	-65.2053417
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	600	-26.8318588	-65.2070353
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	700	-26.8315947	-65.2082664
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	800	-26.8312040	-65.2097790
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	900	-26.8309047	-65.2113390
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	1000	-26.8306009	-65.2130609
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	1100	-26.8302796	-65.2147858
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	1200	-26.8299152	-65.2161259
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	1300	-26.8295963	-65.2175089
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	1400	-26.8293149	-65.2190988
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	1500	-26.8290400	-65.2206365
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	1600	-26.8286419	-65.2226198
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	1700	-26.8283283	-65.2240016
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	1800	-26.8280002	-65.2254469
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	1900	-26.8278187	-65.2267308
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	2000	-26.8274908	-65.2281459
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	2100	-26.8271127	-65.2296468
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	2200	-26.8266963	-65.2316945
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	2300	-26.8261871	-65.2335470
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	2400	-26.8259362	-65.2348968
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	2500	-26.8257059	-65.2360117
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	2600	-26.8253409	-65.2377096
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	2700	-26.8249421	-65.2395351
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	2800	-26.8246376	-65.2409931
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	3500	-26.8229881	-65.2504973
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	3600	-26.8228926	-65.2515900
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	4200	-26.8215704	-65.2585860
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	4300	-26.8212409	-65.2602280
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	4400	-26.8213121	-65.2600758
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	4500	-26.8209873	-65.2619442
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	4600	-26.8207397	-65.2633127
+CONOCIDA	crisostomo alvarez	San Miguel de Tucumán	4700	-26.8205234	-65.2644552
+CONOCIDA	matheu	San Miguel de Tucumán	100	-26.8529288	-65.2044182
+CONOCIDA	matheu	San Miguel de Tucumán	200	-26.8525768	-65.2063077
+CONOCIDA	matheu	San Miguel de Tucumán	400	-26.8520310	-65.2082048
+CONOCIDA	matheu	San Miguel de Tucumán	500	-26.8515693	-65.2098706
+CONOCIDA	matheu	San Miguel de Tucumán	600	-26.8512313	-65.2113348
+CONOCIDA	matheu	San Miguel de Tucumán	700	-26.8508639	-65.2128732
+CONOCIDA	matheu	San Miguel de Tucumán	800	-26.8504956	-65.2143402
+CONOCIDA	matheu	San Miguel de Tucumán	900	-26.8503008	-65.2155999
+CONOCIDA	matheu	San Miguel de Tucumán	1400	-26.8486702	-65.2243659
+CONOCIDA	matheu	San Miguel de Tucumán	2100	-26.8461599	-65.2363154
+CONOCIDA	matheu	San Miguel de Tucumán	2200	-26.8459599	-65.2371874
+CONOCIDA	matheu	San Miguel de Tucumán	2300	-26.8454614	-65.2386756
+CONOCIDA	avenida francisco de aguirre	San Miguel de Tucumán	300	-26.7955584	-65.1940648
+CONOCIDA	avenida francisco de aguirre	San Miguel de Tucumán	500	-26.7948550	-65.1969572
+CONOCIDA	avenida francisco de aguirre	San Miguel de Tucumán	1300	-26.7922273	-65.2092088
+CONOCIDA	avenida francisco de aguirre	San Miguel de Tucumán	1400	-26.7920817	-65.2108284
+CONOCIDA	avenida francisco de aguirre	San Miguel de Tucumán	1500	-26.7919996	-65.2113259
+CONOCIDA	avenida francisco de aguirre	San Miguel de Tucumán	1600	-26.7916834	-65.2127238
+CONOCIDA	avenida francisco de aguirre	San Miguel de Tucumán	1700	-26.7915226	-65.2140995
+CONOCIDA	avenida francisco de aguirre	San Miguel de Tucumán	1800	-26.7911548	-65.2157403
+CONOCIDA	avenida francisco de aguirre	San Miguel de Tucumán	1900	-26.7909953	-65.2164437
+CONOCIDA	avenida francisco de aguirre	San Miguel de Tucumán	2000	-26.7906454	-65.2183380
+CONOCIDA	avenida francisco de aguirre	San Miguel de Tucumán	2100	-26.7900757	-65.2208055
+CONOCIDA	avenida francisco de aguirre	San Miguel de Tucumán	2200	-26.7897118	-65.2216186
+CONOCIDA	avenida francisco de aguirre	San Miguel de Tucumán	2300	-26.7895122	-65.2230780
+CONOCIDA	avenida francisco de aguirre	San Miguel de Tucumán	2400	-26.7893748	-65.2237358
+CONOCIDA	avenida francisco de aguirre	San Miguel de Tucumán	2800	-26.7877722	-65.2325495
+CONOCIDA	avenida francisco de aguirre	San Miguel de Tucumán	2900	-26.7875700	-65.2335847
+CONOCIDA	avenida francisco de aguirre	San Miguel de Tucumán	3000	-26.7874037	-65.2345983
+CONOCIDA	avenida francisco de aguirre	San Miguel de Tucumán	3300	-26.7863943	-65.2402929
+CONOCIDA	avenida francisco de aguirre	San Miguel de Tucumán	3400	-26.7863266	-65.2405639
+CONOCIDA	avenida francisco de aguirre	San Miguel de Tucumán	3500	-26.7858116	-65.2426567
+CONOCIDA	avenida francisco de aguirre	Tafí Viejo	3500	-26.7855740	-65.2425758
+CONOCIDA	avenida francisco de aguirre	Tafí Viejo	3600	-26.7854388	-65.2429855
+CONOCIDA	italia	Lules	0	-26.9253854	-65.3393678
+CONOCIDA	italia	Lules	100	-26.9266569	-65.3396300
+CONOCIDA	italia	Lules	200	-26.9282309	-65.3400484
+CONOCIDA	italia	San Miguel de Tucumán	0	-26.8172098	-65.1941467
+CONOCIDA	italia	San Miguel de Tucumán	100	-26.8168575	-65.1955085
+CONOCIDA	italia	San Miguel de Tucumán	200	-26.8166596	-65.1967994
+CONOCIDA	italia	San Miguel de Tucumán	300	-26.8163889	-65.1982364
+CONOCIDA	italia	San Miguel de Tucumán	400	-26.8161061	-65.1997488
+CONOCIDA	italia	San Miguel de Tucumán	500	-26.8154776	-65.2011466
+CONOCIDA	italia	San Miguel de Tucumán	600	-26.8152778	-65.2032429
+CONOCIDA	italia	San Miguel de Tucumán	700	-26.8153058	-65.2043433
+CONOCIDA	italia	San Miguel de Tucumán	800	-26.8149472	-65.2058425
+CONOCIDA	italia	San Miguel de Tucumán	900	-26.8146300	-65.2073193
+CONOCIDA	italia	San Miguel de Tucumán	1000	-26.8143164	-65.2086510
+CONOCIDA	italia	San Miguel de Tucumán	1100	-26.8139138	-65.2103825
+CONOCIDA	italia	San Miguel de Tucumán	1200	-26.8136106	-65.2118558
+CONOCIDA	italia	San Miguel de Tucumán	1500	-26.8127194	-65.2171745
+CONOCIDA	italia	San Miguel de Tucumán	1600	-26.8124807	-65.2182948
+CONOCIDA	italia	San Miguel de Tucumán	1700	-26.8122313	-65.2198663
+CONOCIDA	italia	San Miguel de Tucumán	1800	-26.8118768	-65.2215878
+CONOCIDA	italia	San Miguel de Tucumán	1900	-26.8114655	-65.2238404
+CONOCIDA	italia	San Miguel de Tucumán	2000	-26.8112896	-65.2246871
+CONOCIDA	italia	San Miguel de Tucumán	2100	-26.8110099	-65.2262014
+CONOCIDA	italia	San Miguel de Tucumán	2200	-26.8108545	-65.2270994
+CONOCIDA	italia	San Miguel de Tucumán	2300	-26.8104538	-65.2292824
+CONOCIDA	italia	San Miguel de Tucumán	2400	-26.8100484	-65.2302421
+CONOCIDA	italia	San Miguel de Tucumán	2500	-26.8098419	-65.2324752
+CONOCIDA	italia	San Miguel de Tucumán	2700	-26.8092914	-65.2353371
+CONOCIDA	italia	San Miguel de Tucumán	2800	-26.8090050	-65.2368276
+CONOCIDA	italia	San Miguel de Tucumán	2900	-26.8088433	-65.2377770
+CONOCIDA	italia	San Miguel de Tucumán	3000	-26.8084221	-65.2398429
+CONOCIDA	italia	San Miguel de Tucumán	3100	-26.8081801	-65.2410969
+CONOCIDA	italia	San Miguel de Tucumán	3200	-26.8080515	-65.2418679
+CONOCIDA	italia	San Miguel de Tucumán	3300	-26.8080354	-65.2430337
+CONOCIDA	italia	San Miguel de Tucumán	3400	-26.8073805	-65.2454459
+CONOCIDA	italia	San Miguel de Tucumán	3500	-26.8070385	-65.2473353
+CONOCIDA	italia	San Miguel de Tucumán	3600	-26.8063185	-65.2476864
+CONOCIDA	italia	San Miguel de Tucumán	4100	-26.8041978	-65.2524894
+CONOCIDA	italia	San Miguel de Tucumán	4500	-26.8024926	-65.2565097
+CONOCIDA	italia	Yerba Buena	2700	-26.8110321	-65.3109635
+CONOCIDA	italia	Yerba Buena	2800	-26.8107990	-65.3123910
+CONOCIDA	avenida juan b justo	Alderetes	1100	-26.8206886	-65.1348443
+CONOCIDA	avenida juan b justo	Alderetes	1200	-26.8205131	-65.1356697
+CONOCIDA	avenida juan b justo	San Miguel de Tucumán	900	-26.8197011	-65.1939197
+CONOCIDA	avenida juan b justo	San Miguel de Tucumán	1000	-26.8185525	-65.1937223
+CONOCIDA	avenida juan b justo	San Miguel de Tucumán	1100	-26.8167140	-65.1933700
+CONOCIDA	avenida juan b justo	San Miguel de Tucumán	1200	-26.8161202	-65.1933218
+CONOCIDA	avenida juan b justo	San Miguel de Tucumán	1500	-26.8112163	-65.1920879
+CONOCIDA	avenida juan b justo	San Miguel de Tucumán	1600	-26.8108029	-65.1920190
+CONOCIDA	avenida juan b justo	San Miguel de Tucumán	2200	-26.8018494	-65.1901833
+CONOCIDA	avenida juan b justo	San Miguel de Tucumán	2500	-26.8001999	-65.1892543
+CONOCIDA	avenida juan b justo	San Miguel de Tucumán	2600	-26.7966381	-65.1883449
+CONOCIDA	congreso de tucuman	San Miguel de Tucumán	0	-26.8321724	-65.2034773
+CONOCIDA	congreso de tucuman	San Miguel de Tucumán	100	-26.8328838	-65.2036864
+CONOCIDA	congreso de tucuman	San Miguel de Tucumán	200	-26.8344762	-65.2039998
+CONOCIDA	congreso de tucuman	San Miguel de Tucumán	300	-26.8354631	-65.2042868
+CONOCIDA	congreso de tucuman	San Miguel de Tucumán	500	-26.8382359	-65.2049734
+CONOCIDA	congreso de tucuman	San Miguel de Tucumán	600	-26.8398837	-65.2051432
+CONOCIDA	congreso de tucuman	San Miguel de Tucumán	700	-26.8408849	-65.2056004
+CONOCIDA	congreso de tucuman	San Miguel de Tucumán	800	-26.8422328	-65.2058766
+CONOCIDA	congreso de tucuman	San Miguel de Tucumán	900	-26.8436869	-65.2062581
+CONOCIDA	congreso de tucuman	San Miguel de Tucumán	1000	-26.8450140	-65.2065716
+CONOCIDA	congreso de tucuman	San Miguel de Tucumán	1100	-26.8464186	-65.2068334
+CONOCIDA	congreso de tucuman	San Miguel de Tucumán	1200	-26.8479349	-65.2072946
+CONOCIDA	congreso de tucuman	San Miguel de Tucumán	1300	-26.8492052	-65.2074678
+CONOCIDA	congreso de tucuman	San Miguel de Tucumán	1400	-26.8507169	-65.2077949
+CONOCIDA	congreso de tucuman	San Miguel de Tucumán	1500	-26.8526243	-65.2082015
+CONOCIDA	congreso de tucuman	San Miguel de Tucumán	1600	-26.8536244	-65.2083490
+CONOCIDA	congreso de tucuman	San Miguel de Tucumán	1700	-26.8553531	-65.2086555
+CONOCIDA	congreso de tucuman	San Miguel de Tucumán	2600	-26.8660445	-65.2113466
+CONOCIDA	congreso de tucuman	San Miguel de Tucumán	2700	-26.8668265	-65.2115735
+CONOCIDA	frias silva	San Miguel de Tucumán	0	-26.8270145	-65.2248326
+CONOCIDA	frias silva	San Miguel de Tucumán	100	-26.8283446	-65.2251939
+CONOCIDA	frias silva	San Miguel de Tucumán	200	-26.8298503	-65.2256571
+CONOCIDA	frias silva	San Miguel de Tucumán	300	-26.8310337	-65.2259313
+CONOCIDA	frias silva	San Miguel de Tucumán	400	-26.8323665	-65.2264159
+CONOCIDA	frias silva	San Miguel de Tucumán	500	-26.8336924	-65.2265189
+CONOCIDA	frias silva	San Miguel de Tucumán	600	-26.8350923	-65.2267651
+CONOCIDA	frias silva	San Miguel de Tucumán	700	-26.8366883	-65.2270975
+CONOCIDA	frias silva	San Miguel de Tucumán	800	-26.8391345	-65.2278893
+CONOCIDA	frias silva	San Miguel de Tucumán	900	-26.8392340	-65.2282529
+CONOCIDA	frias silva	San Miguel de Tucumán	1000	-26.8403867	-65.2281205
+CONOCIDA	frias silva	San Miguel de Tucumán	1300	-26.8453074	-65.2299726
+CONOCIDA	frias silva	San Miguel de Tucumán	1400	-26.8457970	-65.2300792
+CONOCIDA	frias silva	San Miguel de Tucumán	1700	-26.8513173	-65.2312222
+CONOCIDA	frias silva	San Miguel de Tucumán	1800	-26.8520569	-65.2313563
+CONOCIDA	frias silva	San Miguel de Tucumán	1900	-26.8532557	-65.2319545
+CONOCIDA	frias silva	San Miguel de Tucumán	2000	-26.8545917	-65.2322429
+CONOCIDA	frias silva	San Miguel de Tucumán	2100	-26.8559002	-65.2325177
+CONOCIDA	frias silva	San Miguel de Tucumán	2200	-26.8567168	-65.2326951
+CONOCIDA	frias silva	San Miguel de Tucumán	2800	-26.8638195	-65.2337964
+CONOCIDA	frias silva	Yerba Buena	200	-26.8105309	-65.2680545
+CONOCIDA	frias silva	Yerba Buena	300	-26.8104815	-65.2683083
+CONOCIDA	frias silva	Yerba Buena	400	-26.8102894	-65.2698829
+CONOCIDA	frias silva	Yerba Buena	500	-26.8100433	-65.2711828
+CONOCIDA	frias silva	Yerba Buena	600	-26.8097816	-65.2726228
+CONOCIDA	frias silva	Yerba Buena	700	-26.8095250	-65.2740633
+CONOCIDA	frias silva	Yerba Buena	800	-26.8090458	-65.2765714
+CONOCIDA	frias silva	Yerba Buena	1200	-26.8072005	-65.2861946
+CONOCIDA	frias silva	Yerba Buena	1800	-26.8054570	-65.2951637
+CONOCIDA	frias silva	Yerba Buena	1900	-26.8053015	-65.2959658
+CONOCIDA	frias silva	Yerba Buena	2000	-26.8048653	-65.2980780
+CONOCIDA	las higueritas	Yerba Buena	400	-26.8089341	-65.2701311
+CONOCIDA	las higueritas	Yerba Buena	500	-26.8087683	-65.2708741
+CONOCIDA	las higueritas	Yerba Buena	600	-26.8085047	-65.2723354
+CONOCIDA	las higueritas	Yerba Buena	700	-26.8082562	-65.2737119
+CONOCIDA	las higueritas	Yerba Buena	800	-26.8078165	-65.2763117
+CONOCIDA	las higueritas	Yerba Buena	1200	-26.8060813	-65.2859385
+CONOCIDA	las higueritas	Yerba Buena	1900	-26.8043292	-65.2956979
+CONOCIDA	las higueritas	Yerba Buena	2000	-26.8039495	-65.2978224
+CONOCIDA	las higueritas	Yerba Buena	2100	-26.8036832	-65.2993963
+CONOCIDA	las higueritas	Yerba Buena	2500	-26.8023166	-65.3067057
+CONOCIDA	las higueritas	Yerba Buena	2600	-26.8018595	-65.3072962
+CONOCIDA	las higueritas	Yerba Buena	2700	-26.8020305	-65.3083881
+CONOCIDA	venezuela	San Miguel de Tucumán	0	-26.8063557	-65.1916891
+CONOCIDA	venezuela	San Miguel de Tucumán	100	-26.8060983	-65.1932432
+CONOCIDA	venezuela	San Miguel de Tucumán	200	-26.8058356	-65.1947723
+CONOCIDA	venezuela	San Miguel de Tucumán	300	-26.8055296	-65.1963199
+CONOCIDA	venezuela	San Miguel de Tucumán	400	-26.8052127	-65.1977525
+CONOCIDA	venezuela	San Miguel de Tucumán	500	-26.8048904	-65.1993423
+CONOCIDA	venezuela	San Miguel de Tucumán	600	-26.8046439	-65.2006415
+CONOCIDA	venezuela	San Miguel de Tucumán	700	-26.8044164	-65.2019342
+CONOCIDA	venezuela	San Miguel de Tucumán	800	-26.8041726	-65.2033907
+CONOCIDA	venezuela	San Miguel de Tucumán	900	-26.8038811	-65.2048965
+CONOCIDA	venezuela	San Miguel de Tucumán	1000	-26.8034490	-65.2066027
+CONOCIDA	venezuela	San Miguel de Tucumán	1100	-26.8032066	-65.2077580
+CONOCIDA	venezuela	San Miguel de Tucumán	1200	-26.8027837	-65.2099118
+CONOCIDA	venezuela	San Miguel de Tucumán	1300	-26.8024900	-65.2113880
+CONOCIDA	venezuela	San Miguel de Tucumán	1500	-26.8019161	-65.2143742
+CONOCIDA	venezuela	San Miguel de Tucumán	1800	-26.8011117	-65.2188220
+CONOCIDA	venezuela	San Miguel de Tucumán	1900	-26.8009710	-65.2195212
+CONOCIDA	venezuela	San Miguel de Tucumán	2000	-26.8004976	-65.2221516
+CONOCIDA	venezuela	San Miguel de Tucumán	2100	-26.8003480	-65.2231381
+CONOCIDA	venezuela	San Miguel de Tucumán	2200	-26.8000443	-65.2246944
+CONOCIDA	venezuela	San Miguel de Tucumán	2300	-26.7997268	-65.2262096
+CONOCIDA	venezuela	San Miguel de Tucumán	2400	-26.7994698	-65.2276552
+CONOCIDA	venezuela	San Miguel de Tucumán	2500	-26.7993174	-65.2285118
+CONOCIDA	venezuela	San Miguel de Tucumán	2800	-26.7986540	-65.2332838
+CONOCIDA	venezuela	San Miguel de Tucumán	2900	-26.7977283	-65.2359290
+CONOCIDA	venezuela	San Miguel de Tucumán	3000	-26.7974557	-65.2375177
+CONOCIDA	venezuela	San Miguel de Tucumán	3100	-26.7971934	-65.2390500
+CONOCIDA	venezuela	San Miguel de Tucumán	3200	-26.7971524	-65.2392419
+CONOCIDA	venezuela	San Miguel de Tucumán	3400	-26.7962179	-65.2414654
+CONOCIDA	venezuela	San Miguel de Tucumán	3500	-26.7962341	-65.2443803
+CONOCIDA	venezuela	San Miguel de Tucumán	4000	-26.7949720	-65.2507217
+CONOCIDA	venezuela	Yerba Buena	500	-26.8101156	-65.2810491
+CONOCIDA	avenida independencia	Banda del Río Salí	200	-26.8373231	-65.1653760
+CONOCIDA	avenida independencia	Banda del Río Salí	400	-26.8350088	-65.1646257
+CONOCIDA	avenida independencia	San Miguel de Tucumán	0	-26.8503649	-65.2023584
+CONOCIDA	avenida independencia	San Miguel de Tucumán	100	-26.8502333	-65.2031279
+CONOCIDA	avenida independencia	San Miguel de Tucumán	200	-26.8497209	-65.2046782
+CONOCIDA	avenida independencia	San Miguel de Tucumán	300	-26.8494760	-65.2061772
+CONOCIDA	avenida independencia	San Miguel de Tucumán	400	-26.8488010	-65.2076117
+CONOCIDA	avenida independencia	San Miguel de Tucumán	500	-26.8486024	-65.2091277
+CONOCIDA	avenida independencia	San Miguel de Tucumán	600	-26.8482799	-65.2107559
+CONOCIDA	avenida independencia	San Miguel de Tucumán	700	-26.8479948	-65.2122511
+CONOCIDA	avenida independencia	San Miguel de Tucumán	800	-26.8477429	-65.2137462
+CONOCIDA	avenida independencia	San Miguel de Tucumán	900	-26.8473700	-65.2153119
+CONOCIDA	avenida independencia	San Miguel de Tucumán	1000	-26.8470736	-65.2168608
+CONOCIDA	avenida independencia	San Miguel de Tucumán	1100	-26.8469803	-65.2179637
+CONOCIDA	avenida independencia	San Miguel de Tucumán	1400	-26.8458894	-65.2235390
+CONOCIDA	avenida independencia	San Miguel de Tucumán	1500	-26.8454565	-65.2256948
+CONOCIDA	avenida independencia	San Miguel de Tucumán	1600	-26.8451618	-65.2271253
+CONOCIDA	avenida independencia	San Miguel de Tucumán	1700	-26.8447972	-65.2290724
+CONOCIDA	avenida independencia	San Miguel de Tucumán	1800	-26.8444826	-65.2307407
+CONOCIDA	avenida independencia	San Miguel de Tucumán	1900	-26.8442145	-65.2321275
+CONOCIDA	avenida independencia	San Miguel de Tucumán	2000	-26.8440027	-65.2333559
+CONOCIDA	avenida independencia	San Miguel de Tucumán	2200	-26.8434525	-65.2363025
+CONOCIDA	avenida independencia	San Miguel de Tucumán	2400	-26.8431635	-65.2395693
+CONOCIDA	avenida independencia	San Miguel de Tucumán	2500	-26.8428482	-65.2411362
+CONOCIDA	avenida independencia	San Miguel de Tucumán	2600	-26.8425082	-65.2428158
+CONOCIDA	avenida independencia	San Miguel de Tucumán	2700	-26.8421615	-65.2444413
+CONOCIDA	avenida independencia	San Miguel de Tucumán	2800	-26.8418285	-65.2460976
+CONOCIDA	avenida independencia	San Miguel de Tucumán	2900	-26.8415025	-65.2473927
+CONOCIDA	avenida independencia	San Miguel de Tucumán	3000	-26.8414435	-65.2498408
+CONOCIDA	avenida independencia	San Miguel de Tucumán	3100	-26.8413652	-65.2513168
+CONOCIDA	avenida independencia	San Miguel de Tucumán	3200	-26.8413081	-65.2525268
+CONOCIDA	avenida independencia	San Miguel de Tucumán	3300	-26.8412011	-65.2536403
+CONOCIDA	avenida independencia	San Miguel de Tucumán	3600	-26.8420559	-65.2548458
+CONOCIDA	avenida independencia	San Miguel de Tucumán	4000	-26.8404892	-65.2595195
+CONOCIDA	chiclana	San Miguel de Tucumán	0	-26.8256722	-65.2307721
+CONOCIDA	chiclana	San Miguel de Tucumán	100	-26.8269928	-65.2310184
+CONOCIDA	chiclana	San Miguel de Tucumán	200	-26.8280636	-65.2311490
+CONOCIDA	chiclana	San Miguel de Tucumán	600	-26.8347303	-65.2331441
+CONOCIDA	chiclana	San Miguel de Tucumán	700	-26.8355446	-65.2333464
+CONOCIDA	chiclana	San Miguel de Tucumán	800	-26.8370787	-65.2337589
+CONOCIDA	chiclana	San Miguel de Tucumán	1700	-26.8498536	-65.2372397
+CONOCIDA	chiclana	San Miguel de Tucumán	1800	-26.8507586	-65.2374794
+CONOCIDA	chiclana	San Miguel de Tucumán	1900	-26.8521489	-65.2378106
+CONOCIDA	chiclana	San Miguel de Tucumán	2000	-26.8535655	-65.2381461
+CONOCIDA	chiclana	San Miguel de Tucumán	2100	-26.8548900	-65.2384452
+CONOCIDA	chiclana	San Miguel de Tucumán	2200	-26.8556677	-65.2385946
+CONOCIDA	guemes	San Miguel de Tucumán	0	-26.8248255	-65.2345589
+CONOCIDA	guemes	San Miguel de Tucumán	100	-26.8261348	-65.2348217
+CONOCIDA	guemes	San Miguel de Tucumán	200	-26.8275252	-65.2351613
+CONOCIDA	guemes	San Miguel de Tucumán	300	-26.8289235	-65.2355351
+CONOCIDA	guemes	San Miguel de Tucumán	400	-26.8302403	-65.2358564
+CONOCIDA	guemes	San Miguel de Tucumán	500	-26.8315729	-65.2363038
+CONOCIDA	guemes	San Miguel de Tucumán	600	-26.8340896	-65.2369925
+CONOCIDA	guemes	San Miguel de Tucumán	700	-26.8350444	-65.2372589
+CONOCIDA	guemes	San Miguel de Tucumán	800	-26.8362194	-65.2375669
+CONOCIDA	guemes	San Miguel de Tucumán	1700	-26.8492673	-65.2401566
+CONOCIDA	guemes	San Miguel de Tucumán	1800	-26.8500200	-65.2403527
+CONOCIDA	guemes	San Miguel de Tucumán	1900	-26.8513192	-65.2406759
+CONOCIDA	guemes	San Miguel de Tucumán	2000	-26.8535842	-65.2412494
+CONOCIDA	guemes	San Miguel de Tucumán	2100	-26.8538065	-65.2413093
+CONOCIDA	guemes	Yerba Buena	0	-26.8139903	-65.2903693
+CONOCIDA	guemes	Yerba Buena	100	-26.8150079	-65.2905969
+CONOCIDA	guemes	Yerba Buena	200	-26.8160138	-65.2908016
+CONOCIDA	guemes	Yerba Buena	300	-26.8170243	-65.2910323
+CONOCIDA	guemes	Yerba Buena	400	-26.8180877	-65.2912613
+CONOCIDA	guemes	Yerba Buena	500	-26.8189383	-65.2914840
+CONOCIDA	juan benjamin teran	Alderetes	400	-26.8107469	-65.1338078
+CONOCIDA	juan benjamin teran	San Miguel de Tucumán	0	-26.8235602	-65.2403479
+CONOCIDA	juan benjamin teran	San Miguel de Tucumán	100	-26.8245873	-65.2404584
+CONOCIDA	juan benjamin teran	San Miguel de Tucumán	200	-26.8261113	-65.2411037
+CONOCIDA	juan benjamin teran	San Miguel de Tucumán	300	-26.8276484	-65.2414657
+CONOCIDA	juan benjamin teran	San Miguel de Tucumán	400	-26.8289840	-65.2417090
+CONOCIDA	juan benjamin teran	San Miguel de Tucumán	500	-26.8311876	-65.2424764
+CONOCIDA	juan benjamin teran	San Miguel de Tucumán	600	-26.8327836	-65.2429391
+CONOCIDA	juan benjamin teran	San Miguel de Tucumán	700	-26.8339515	-65.2432540
+CONOCIDA	juan benjamin teran	San Miguel de Tucumán	800	-26.8357862	-65.2434835
+CONOCIDA	juan benjamin teran	San Miguel de Tucumán	1700	-26.8478654	-65.2466839
+CONOCIDA	juan benjamin teran	San Miguel de Tucumán	1800	-26.8486318	-65.2468791
+CONOCIDA	juan benjamin teran	San Miguel de Tucumán	1900	-26.8494154	-65.2470632
+CONOCIDA	juan benjamin teran	San Miguel de Tucumán	2000	-26.8513881	-65.2475711
+CONOCIDA	juan benjamin teran	San Miguel de Tucumán	2100	-26.8521459	-65.2477812
+CONOCIDA	las heras	San Miguel de Tucumán	0	-26.8319689	-65.2020230
+CONOCIDA	las heras	San Miguel de Tucumán	100	-26.8335790	-65.2022924
+CONOCIDA	las heras	San Miguel de Tucumán	200	-26.8344376	-65.2024544
+CONOCIDA	las heras	San Miguel de Tucumán	300	-26.8366102	-65.2029665
+CONOCIDA	las heras	San Miguel de Tucumán	400	-26.8373135	-65.2030975
+CONOCIDA	las heras	San Miguel de Tucumán	500	-26.8385575	-65.2035159
+CONOCIDA	las heras	San Miguel de Tucumán	600	-26.8401455	-65.2038643
+CONOCIDA	las heras	San Miguel de Tucumán	700	-26.8411649	-65.2040121
+CONOCIDA	las heras	San Miguel de Tucumán	800	-26.8425015	-65.2043206
+CONOCIDA	las heras	San Miguel de Tucumán	900	-26.8439562	-65.2046689
+CONOCIDA	las heras	San Miguel de Tucumán	1000	-26.8456076	-65.2049875
+CONOCIDA	las heras	San Miguel de Tucumán	1100	-26.8468337	-65.2053593
+CONOCIDA	las heras	San Miguel de Tucumán	1200	-26.8480538	-65.2056424
+CONOCIDA	las heras	San Miguel de Tucumán	1300	-26.8496455	-65.2060249
+CONOCIDA	las heras	San Miguel de Tucumán	1400	-26.8510840	-65.2062407
+CONOCIDA	las heras	San Miguel de Tucumán	1500	-26.8529410	-65.2067657
+CONOCIDA	las heras	San Miguel de Tucumán	1600	-26.8537287	-65.2068630
+CONOCIDA	las heras	San Miguel de Tucumán	1700	-26.8562047	-65.2067534
+CONOCIDA	las heras	San Miguel de Tucumán	2600	-26.8664052	-65.2097048
+CONOCIDA	las heras	San Miguel de Tucumán	2700	-26.8671002	-65.2101274
+CONOCIDA	amador lucero	San Miguel de Tucumán	0	-26.8260046	-65.2292921
+CONOCIDA	amador lucero	San Miguel de Tucumán	100	-26.8273304	-65.2296591
+CONOCIDA	amador lucero	San Miguel de Tucumán	200	-26.8291532	-65.2301711
+CONOCIDA	amador lucero	San Miguel de Tucumán	600	-26.8349918	-65.2315678
+CONOCIDA	amador lucero	San Miguel de Tucumán	700	-26.8358498	-65.2317737
+CONOCIDA	amador lucero	San Miguel de Tucumán	800	-26.8373991	-65.2321754
+CONOCIDA	amador lucero	San Miguel de Tucumán	1300	-26.8447964	-65.2345995
+CONOCIDA	amador lucero	San Miguel de Tucumán	1700	-26.8504850	-65.2356402
+CONOCIDA	amador lucero	San Miguel de Tucumán	1800	-26.8512170	-65.2358091
+CONOCIDA	amador lucero	San Miguel de Tucumán	1900	-26.8524933	-65.2360309
+CONOCIDA	amador lucero	San Miguel de Tucumán	2000	-26.8532999	-65.2364681
+CONOCIDA	amador lucero	San Miguel de Tucumán	2100	-26.8551920	-65.2366368
+CONOCIDA	amador lucero	San Miguel de Tucumán	2200	-26.8559366	-65.2370073
+CONOCIDA	avenida colon	San Miguel de Tucumán	0	-26.8255510	-65.2323656
+CONOCIDA	avenida colon	San Miguel de Tucumán	100	-26.8269227	-65.2326008
+CONOCIDA	avenida colon	San Miguel de Tucumán	200	-26.8280075	-65.2330481
+CONOCIDA	avenida colon	San Miguel de Tucumán	300	-26.8299672	-65.2332609
+CONOCIDA	avenida colon	San Miguel de Tucumán	400	-26.8311727	-65.2336556
+CONOCIDA	avenida colon	San Miguel de Tucumán	500	-26.8323837	-65.2340641
+CONOCIDA	avenida colon	San Miguel de Tucumán	600	-26.8343856	-65.2348333
+CONOCIDA	avenida colon	San Miguel de Tucumán	700	-26.8355023	-65.2349963
+CONOCIDA	avenida colon	San Miguel de Tucumán	800	-26.8363752	-65.2351540
+CONOCIDA	avenida colon	San Miguel de Tucumán	900	-26.8381243	-65.2357856
+CONOCIDA	avenida colon	San Miguel de Tucumán	1700	-26.8495281	-65.2388275
+CONOCIDA	avenida colon	San Miguel de Tucumán	1800	-26.8500891	-65.2392882
+CONOCIDA	avenida colon	San Miguel de Tucumán	1900	-26.8516131	-65.2398096
+CONOCIDA	avenida colon	San Miguel de Tucumán	2000	-26.8530995	-65.2403969
+CONOCIDA	avenida colon	San Miguel de Tucumán	2100	-26.8544737	-65.2406667
+CONOCIDA	avenida colon	San Miguel de Tucumán	2200	-26.8556130	-65.2408800
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	0	-26.8302459	-65.2110082
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	100	-26.8313643	-65.2112869
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	200	-26.8326455	-65.2114697
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	300	-26.8340188	-65.2120335
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	400	-26.8351915	-65.2122596
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	500	-26.8365885	-65.2126466
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	600	-26.8380425	-65.2129339
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	700	-26.8394063	-65.2133134
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	800	-26.8407574	-65.2136468
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	900	-26.8422139	-65.2138688
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	1000	-26.8434681	-65.2140890
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	1100	-26.8448593	-65.2145892
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	1200	-26.8462072	-65.2147785
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	1400	-26.8493634	-65.2153705
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	1700	-26.8540583	-65.2169586
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	1800	-26.8552114	-65.2172111
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	1900	-26.8560812	-65.2175479
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	2000	-26.8572187	-65.2179757
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	2100	-26.8584387	-65.2183874
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	2200	-26.8594756	-65.2186937
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	2700	-26.8661324	-65.2208006
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	2800	-26.8674695	-65.2211109
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	2900	-26.8686872	-65.2213422
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	3000	-26.8693386	-65.2213377
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	3100	-26.8700540	-65.2216669
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	3600	-26.8721128	-65.2227377
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	4000	-26.8802370	-65.2265675
+CONOCIDA	avenida jujuy	San Miguel de Tucumán	4400	-26.8819464	-65.2271379
+CONOCIDA	avenida jujuy	Tafí Viejo	1000	-26.7419173	-65.2609603
+CONOCIDA	avenida jujuy	Yerba Buena	2000	-26.8261105	-65.3055523
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	0	-26.8445325	-65.2006270
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	100	-26.8443372	-65.2017565
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	200	-26.8440601	-65.2035355
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	300	-26.8437458	-65.2047620
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	400	-26.8433294	-65.2063068
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	500	-26.8431543	-65.2078057
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	600	-26.8426367	-65.2097922
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	700	-26.8422876	-65.2110433
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	800	-26.8421295	-65.2127300
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	900	-26.8419477	-65.2139674
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	1000	-26.8413852	-65.2160358
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	1100	-26.8412968	-65.2172700
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	1200	-26.8409360	-65.2192588
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	1300	-26.8407786	-65.2204171
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	1400	-26.8402132	-65.2221593
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	1500	-26.8402399	-65.2241276
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	1600	-26.8395789	-65.2259506
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	1700	-26.8391664	-65.2271077
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	1800	-26.8389506	-65.2288746
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	1900	-26.8386348	-65.2302753
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	2100	-26.8382846	-65.2336127
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	2200	-26.8378593	-65.2341030
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	2300	-26.8377696	-65.2354914
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	2400	-26.8372137	-65.2372692
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	2500	-26.8367060	-65.2394413
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	2600	-26.8361336	-65.2412655
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	2700	-26.8358575	-65.2435585
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	2900	-26.8359988	-65.2456576
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	3000	-26.8349361	-65.2480953
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	3100	-26.8354183	-65.2482591
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	3400	-26.8349647	-65.2523997
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	3600	-26.8341160	-65.2555087
+CONOCIDA	avenida nestor kirchner	San Miguel de Tucumán	3900	-26.8340814	-65.2586052
+CONOCIDA	bolivia	San Miguel de Tucumán	0	-26.8131987	-65.1932392
+CONOCIDA	bolivia	San Miguel de Tucumán	100	-26.8129187	-65.1942472
+CONOCIDA	bolivia	San Miguel de Tucumán	200	-26.8125377	-65.1962149
+CONOCIDA	bolivia	San Miguel de Tucumán	300	-26.8124315	-65.1972948
+CONOCIDA	bolivia	San Miguel de Tucumán	400	-26.8120334	-65.1990148
+CONOCIDA	bolivia	San Miguel de Tucumán	500	-26.8117973	-65.2003255
+CONOCIDA	bolivia	San Miguel de Tucumán	600	-26.8113994	-65.2022222
+CONOCIDA	bolivia	San Miguel de Tucumán	700	-26.8112230	-65.2039519
+CONOCIDA	bolivia	San Miguel de Tucumán	800	-26.8109992	-65.2048413
+CONOCIDA	bolivia	San Miguel de Tucumán	900	-26.8107814	-65.2062527
+CONOCIDA	bolivia	San Miguel de Tucumán	1500	-26.8086295	-65.2159491
+CONOCIDA	bolivia	San Miguel de Tucumán	1600	-26.8082363	-65.2179070
+CONOCIDA	bolivia	San Miguel de Tucumán	1700	-26.8078999	-65.2199384
+CONOCIDA	bolivia	San Miguel de Tucumán	1800	-26.8077290	-65.2210446
+CONOCIDA	bolivia	San Miguel de Tucumán	1900	-26.8073982	-65.2216623
+CONOCIDA	bolivia	San Miguel de Tucumán	2000	-26.8068536	-65.2244568
+CONOCIDA	bolivia	San Miguel de Tucumán	2100	-26.8068289	-65.2253022
+CONOCIDA	bolivia	San Miguel de Tucumán	2200	-26.8066904	-65.2263299
+CONOCIDA	bolivia	San Miguel de Tucumán	2300	-26.8063310	-65.2280119
+CONOCIDA	bolivia	San Miguel de Tucumán	2400	-26.8060122	-65.2294950
+CONOCIDA	bolivia	San Miguel de Tucumán	2500	-26.8059748	-65.2308157
+CONOCIDA	bolivia	San Miguel de Tucumán	2900	-26.8051899	-65.2367719
+CONOCIDA	bolivia	San Miguel de Tucumán	3000	-26.8044517	-65.2389275
+CONOCIDA	bolivia	San Miguel de Tucumán	3100	-26.8041980	-65.2403369
+CONOCIDA	bolivia	San Miguel de Tucumán	3200	-26.8038827	-65.2411618
+CONOCIDA	bolivia	San Miguel de Tucumán	3300	-26.8032875	-65.2444016
+CONOCIDA	bolivia	San Miguel de Tucumán	3400	-26.8032690	-65.2451338
+CONOCIDA	bolivia	San Miguel de Tucumán	3500	-26.8031862	-65.2460177
+CONOCIDA	bolivia	San Miguel de Tucumán	3600	-26.8026952	-65.2468177
+CONOCIDA	bolivia	San Miguel de Tucumán	3800	-26.8024156	-65.2514171
+CONOCIDA	bolivia	San Miguel de Tucumán	4000	-26.8018883	-65.2505538
+CONOCIDA	bolivia	San Miguel de Tucumán	4100	-26.8017176	-65.2506801
+CONOCIDA	bolivia	Yerba Buena	0	-26.8133549	-65.2654444
+CONOCIDA	bolivia	Yerba Buena	100	-26.8134178	-65.2655837
+CONOCIDA	bolivia	Yerba Buena	200	-26.8129121	-65.2685491
+CONOCIDA	bolivia	Yerba Buena	300	-26.8126536	-65.2694268
+CONOCIDA	bolivia	Yerba Buena	400	-26.8127102	-65.2709495
+CONOCIDA	bolivia	Yerba Buena	500	-26.8125789	-65.2717533
+CONOCIDA	bolivia	Yerba Buena	600	-26.8123453	-65.2731737
+CONOCIDA	bolivia	Yerba Buena	700	-26.8120481	-65.2746178
+CONOCIDA	bolivia	Yerba Buena	1600	-26.8088097	-65.2922042
+CONOCIDA	bolivia	Yerba Buena	1800	-26.8080871	-65.2958666
+CONOCIDA	bolivia	Yerba Buena	1900	-26.8078217	-65.2972703
+CONOCIDA	brasil	San Miguel de Tucumán	0	-26.8094263	-65.1924670
+CONOCIDA	brasil	San Miguel de Tucumán	100	-26.8091401	-65.1940199
+CONOCIDA	brasil	San Miguel de Tucumán	300	-26.8086446	-65.1970563
+CONOCIDA	brasil	San Miguel de Tucumán	400	-26.8084818	-65.1980502
+CONOCIDA	brasil	San Miguel de Tucumán	500	-26.8082503	-65.1997406
+CONOCIDA	brasil	San Miguel de Tucumán	600	-26.8084289	-65.2010865
+CONOCIDA	brasil	San Miguel de Tucumán	700	-26.8080671	-65.2020956
+CONOCIDA	brasil	San Miguel de Tucumán	800	-26.8079894	-65.2032779
+CONOCIDA	brasil	Yerba Buena	200	-26.8114247	-65.2672237
+CONOCIDA	brasil	Yerba Buena	400	-26.8108769	-65.2705745
+CONOCIDA	brasil	Yerba Buena	500	-26.8107345	-65.2713336
+CONOCIDA	brasil	Yerba Buena	600	-26.8104723	-65.2727360
+CONOCIDA	brasil	Yerba Buena	700	-26.8101953	-65.2742511
+CONOCIDA	brasil	Yerba Buena	800	-26.8097526	-65.2766928
+CONOCIDA	brasil	Yerba Buena	900	-26.8089459	-65.2805484
+CONOCIDA	brasil	Yerba Buena	1200	-26.8079211	-65.2863408
+CONOCIDA	brasil	Yerba Buena	1700	-26.8062819	-65.2935808
+CONOCIDA	brasil	Yerba Buena	1800	-26.8061477	-65.2953394
+CONOCIDA	brasil	Yerba Buena	1900	-26.8058581	-65.2966775
+CONOCIDA	brasil	Yerba Buena	2000	-26.8057651	-65.2969659
+CONOCIDA	chacabuco	San Miguel de Tucumán	0	-26.8309376	-65.2079054
+CONOCIDA	chacabuco	San Miguel de Tucumán	100	-26.8319867	-65.2083032
+CONOCIDA	chacabuco	San Miguel de Tucumán	200	-26.8333043	-65.2085213
+CONOCIDA	chacabuco	San Miguel de Tucumán	300	-26.8345176	-65.2088555
+CONOCIDA	chacabuco	San Miguel de Tucumán	400	-26.8358773	-65.2090716
+CONOCIDA	chacabuco	San Miguel de Tucumán	500	-26.8372267	-65.2094736
+CONOCIDA	chacabuco	San Miguel de Tucumán	600	-26.8386696	-65.2097866
+CONOCIDA	chacabuco	San Miguel de Tucumán	700	-26.8402620	-65.2102287
+CONOCIDA	chacabuco	San Miguel de Tucumán	800	-26.8414381	-65.2105392
+CONOCIDA	chacabuco	San Miguel de Tucumán	900	-26.8427737	-65.2108334
+CONOCIDA	chacabuco	San Miguel de Tucumán	1000	-26.8440429	-65.2110669
+CONOCIDA	chacabuco	San Miguel de Tucumán	1100	-26.8454407	-65.2113808
+CONOCIDA	chacabuco	San Miguel de Tucumán	1200	-26.8468194	-65.2117746
+CONOCIDA	chacabuco	San Miguel de Tucumán	1300	-26.8481813	-65.2120952
+CONOCIDA	chacabuco	San Miguel de Tucumán	1400	-26.8496391	-65.2124374
+CONOCIDA	chacabuco	San Miguel de Tucumán	1500	-26.8508062	-65.2125979
+CONOCIDA	chacabuco	San Miguel de Tucumán	1600	-26.8530469	-65.2132441
+CONOCIDA	chacabuco	San Miguel de Tucumán	1700	-26.8541514	-65.2134583
+CONOCIDA	chacabuco	San Miguel de Tucumán	1800	-26.8555612	-65.2138073
+CONOCIDA	chacabuco	San Miguel de Tucumán	1900	-26.8568337	-65.2141065
+CONOCIDA	chacabuco	San Miguel de Tucumán	2000	-26.8580583	-65.2144484
+CONOCIDA	chacabuco	San Miguel de Tucumán	2100	-26.8592662	-65.2148143
+CONOCIDA	chacabuco	San Miguel de Tucumán	2200	-26.8601678	-65.2146496
+CONOCIDA	chacabuco	San Miguel de Tucumán	2600	-26.8651785	-65.2159172
+CONOCIDA	chacabuco	San Miguel de Tucumán	2700	-26.8665481	-65.2162296
+CONOCIDA	chacabuco	San Miguel de Tucumán	3200	-26.8723808	-65.2183361
+CONOCIDA	constitucion	San Miguel de Tucumán	0	-26.8243248	-65.2368431
+CONOCIDA	constitucion	San Miguel de Tucumán	100	-26.8256380	-65.2371059
+CONOCIDA	constitucion	San Miguel de Tucumán	200	-26.8270126	-65.2374764
+CONOCIDA	constitucion	San Miguel de Tucumán	300	-26.8283903	-65.2378730
+CONOCIDA	constitucion	San Miguel de Tucumán	400	-26.8297356	-65.2382466
+CONOCIDA	constitucion	San Miguel de Tucumán	500	-26.8309403	-65.2387503
+CONOCIDA	constitucion	San Miguel de Tucumán	600	-26.8336037	-65.2394517
+CONOCIDA	constitucion	San Miguel de Tucumán	700	-26.8348401	-65.2398093
+CONOCIDA	constitucion	San Miguel de Tucumán	800	-26.8359082	-65.2401525
+CONOCIDA	constitucion	San Miguel de Tucumán	900	-26.8381626	-65.2406310
+CONOCIDA	constitucion	San Miguel de Tucumán	1700	-26.8485378	-65.2433715
+CONOCIDA	constitucion	San Miguel de Tucumán	1800	-26.8488043	-65.2434464
+CONOCIDA	constitucion	San Miguel de Tucumán	1900	-26.8506463	-65.2439124
+CONOCIDA	constitucion	San Miguel de Tucumán	2000	-26.8515400	-65.2441427
+CONOCIDA	constitucion	San Miguel de Tucumán	2100	-26.8529666	-65.2445195
+CONOCIDA	dorrego	Banda del Río Salí	200	-26.8413390	-65.1706339
+CONOCIDA	dorrego	Banda del Río Salí	1000	-26.8476672	-65.1720736
+CONOCIDA	dorrego	San Miguel de Tucumán	1000	-26.8382669	-65.2148553
+CONOCIDA	dorrego	San Miguel de Tucumán	1100	-26.8380276	-65.2161737
+CONOCIDA	dorrego	San Miguel de Tucumán	1200	-26.8376409	-65.2174627
+CONOCIDA	las piedras	San Miguel de Tucumán	0	-26.8364606	-65.1996214
+CONOCIDA	las piedras	San Miguel de Tucumán	100	-26.8364197	-65.2003079
+CONOCIDA	las piedras	San Miguel de Tucumán	200	-26.8360955	-65.2014179
+CONOCIDA	las piedras	San Miguel de Tucumán	300	-26.8354083	-65.2036552
+CONOCIDA	las piedras	San Miguel de Tucumán	400	-26.8352771	-65.2045855
+CONOCIDA	las piedras	San Miguel de Tucumán	500	-26.8348294	-65.2061644
+CONOCIDA	las piedras	San Miguel de Tucumán	600	-26.8345857	-65.2073759
+CONOCIDA	las piedras	San Miguel de Tucumán	700	-26.8343766	-65.2088233
+CONOCIDA	las piedras	San Miguel de Tucumán	800	-26.8340283	-65.2108476
+CONOCIDA	las piedras	San Miguel de Tucumán	900	-26.8337917	-65.2120932
+CONOCIDA	las piedras	San Miguel de Tucumán	1200	-26.8329640	-65.2169463
+CONOCIDA	las piedras	San Miguel de Tucumán	1300	-26.8327263	-65.2182294
+CONOCIDA	las piedras	San Miguel de Tucumán	1400	-26.8324530	-65.2197977
+CONOCIDA	las piedras	San Miguel de Tucumán	1500	-26.8319126	-65.2213263
+CONOCIDA	las piedras	San Miguel de Tucumán	1600	-26.8314682	-65.2229695
+CONOCIDA	las piedras	San Miguel de Tucumán	1700	-26.8311973	-65.2245481
+CONOCIDA	las piedras	San Miguel de Tucumán	1800	-26.8309154	-65.2259901
+CONOCIDA	las piedras	San Miguel de Tucumán	1900	-26.8304119	-65.2275903
+CONOCIDA	las piedras	San Miguel de Tucumán	2000	-26.8301128	-65.2294193
+CONOCIDA	las piedras	San Miguel de Tucumán	2100	-26.8298415	-65.2305665
+CONOCIDA	las piedras	San Miguel de Tucumán	2200	-26.8294585	-65.2321667
+CONOCIDA	las piedras	San Miguel de Tucumán	2300	-26.8290305	-65.2342445
+CONOCIDA	las piedras	San Miguel de Tucumán	2400	-26.8287285	-65.2355882
+CONOCIDA	las piedras	San Miguel de Tucumán	2500	-26.8284057	-65.2367395
+CONOCIDA	las piedras	San Miguel de Tucumán	2600	-26.8281299	-65.2384866
+CONOCIDA	las piedras	San Miguel de Tucumán	2700	-26.8277401	-65.2402708
+CONOCIDA	las piedras	San Miguel de Tucumán	2800	-26.8274458	-65.2414240
+CONOCIDA	las piedras	San Miguel de Tucumán	2900	-26.8277904	-65.2423516
+CONOCIDA	las piedras	San Miguel de Tucumán	3500	-26.8254311	-65.2511716
+CONOCIDA	las piedras	San Miguel de Tucumán	3600	-26.8253291	-65.2522642
+CONOCIDA	pasaje berutti	Yerba Buena	0	-26.8084984	-65.2989033
+CONOCIDA	pasaje berutti	Yerba Buena	800	-26.8033332	-65.2974400
+CONOCIDA	pasaje berutti	Yerba Buena	1300	-26.8017645	-65.2972699
+ESPERADA	amador lucero	San Miguel de Tucumán	300	-26.8306094	-65.2305355
+ESPERADA	amador lucero	San Miguel de Tucumán	400	-26.8320531	-65.2309535
+ESPERADA	amador lucero	San Miguel de Tucumán	500	-26.8334972	-65.2313709
+ESPERADA	amador lucero	San Miguel de Tucumán	1200	-26.8437069	-65.2340006
+ESPERADA	amador lucero	San Miguel de Tucumán	1400	-26.8462444	-65.2347075
+ESPERADA	amador lucero	San Miguel de Tucumán	1500	-26.8476566	-65.2350346
+ESPERADA	amador lucero	San Miguel de Tucumán	1600	-26.8490869	-65.2352529
+ESPERADA	avenida colon	San Miguel de Tucumán	1000	-26.8396069	-65.2358920
+ESPERADA	avenida colon	San Miguel de Tucumán	1100	-26.8410314	-65.2362702
+ESPERADA	avenida colon	San Miguel de Tucumán	1200	-26.8424602	-65.2366429
+ESPERADA	avenida colon	San Miguel de Tucumán	1300	-26.8438540	-65.2372511
+ESPERADA	avenida colon	San Miguel de Tucumán	1400	-26.8452192	-65.2378325
+ESPERADA	avenida colon	San Miguel de Tucumán	1500	-26.8466536	-65.2381887
+ESPERADA	avenida colon	San Miguel de Tucumán	1600	-26.8480889	-65.2385166
+ESPERADA	avenida francisco de aguirre	San Miguel de Tucumán	400	-26.7951189	-65.1954898
+ESPERADA	avenida francisco de aguirre	San Miguel de Tucumán	600	-26.7945458	-65.1984932
+ESPERADA	avenida francisco de aguirre	San Miguel de Tucumán	700	-26.7941474	-65.2000076
+ESPERADA	avenida francisco de aguirre	San Miguel de Tucumán	800	-26.7938452	-65.2015456
+ESPERADA	avenida francisco de aguirre	San Miguel de Tucumán	900	-26.7935479	-65.2030846
+ESPERADA	avenida francisco de aguirre	San Miguel de Tucumán	1000	-26.7932331	-65.2046199
+ESPERADA	avenida francisco de aguirre	San Miguel de Tucumán	1100	-26.7929206	-65.2061552
+ESPERADA	avenida francisco de aguirre	San Miguel de Tucumán	1200	-26.7926080	-65.2076907
+ESPERADA	avenida francisco de aguirre	San Miguel de Tucumán	3100	-26.7869995	-65.2364816
+ESPERADA	avenida francisco de aguirre	San Miguel de Tucumán	3200	-26.7866673	-65.2383808
+ESPERADA	avenida independencia	Banda del Río Salí	300	-26.8361728	-65.1649644
+ESPERADA	avenida independencia	San Miguel de Tucumán	1200	-26.8465220	-65.2198004
+ESPERADA	avenida independencia	San Miguel de Tucumán	1300	-26.8461835	-65.2216632
+ESPERADA	avenida independencia	San Miguel de Tucumán	2100	-26.8436422	-65.2348095
+ESPERADA	avenida independencia	San Miguel de Tucumán	2300	-26.8433533	-65.2379466
+ESPERADA	avenida independencia	San Miguel de Tucumán	3700	-26.8415703	-65.2559806
+ESPERADA	avenida independencia	San Miguel de Tucumán	3800	-26.8412415	-65.2571795
+ESPERADA	avenida independencia	San Miguel de Tucumán	3900	-26.8409128	-65.2583581
+ESPERADA	avenida juan b justo	San Miguel de Tucumán	1300	-26.8144986	-65.1928421
+ESPERADA	avenida juan b justo	San Miguel de Tucumán	1400	-26.8128595	-65.1924528
+ESPERADA	avenida juan b justo	San Miguel de Tucumán	1700	-26.8093291	-65.1916176
+ESPERADA	avenida juan b justo	San Miguel de Tucumán	1800	-26.8078428	-65.1912727
+ESPERADA	avenida juan b justo	San Miguel de Tucumán	1900	-26.8063635	-65.1909060
+ESPERADA	avenida juan b justo	San Miguel de Tucumán	2000	-26.8048807	-65.1905495
+ESPERADA	avenida juan b justo	San Miguel de Tucumán	2100	-26.8034031	-65.1901803
+ESPERADA	avenida juan b justo	San Miguel de Tucumán	2300	-26.8013343	-65.1896822
+ESPERADA	avenida juan b justo	San Miguel de Tucumán	2400	-26.8007534	-65.1895452
+ESPERADA	avenida jujuy	San Miguel de Tucumán	1300	-26.8477752	-65.2151252
+ESPERADA	avenida jujuy	San Miguel de Tucumán	1500	-26.8509138	-65.2159526
+ESPERADA	avenida jujuy	San Miguel de Tucumán	1600	-26.8524801	-65.2164823
+ESPERADA	avenida jujuy	San Miguel de Tucumán	2300	-26.8607561	-65.2193080
+ESPERADA	avenida jujuy	San Miguel de Tucumán	2400	-26.8620766	-65.2197594
+ESPERADA	avenida jujuy	San Miguel de Tucumán	2500	-26.8634034	-65.2202063
+ESPERADA	avenida jujuy	San Miguel de Tucumán	2600	-26.8647320	-65.2206435
+ESPERADA	avenida nestor kirchner	San Miguel de Tucumán	2000	-26.8384981	-65.2319544
+ESPERADA	avenida nestor kirchner	San Miguel de Tucumán	2800	-26.8358320	-65.2445839
+ESPERADA	avenida nestor kirchner	San Miguel de Tucumán	3200	-26.8349017	-65.2495580
+ESPERADA	avenida nestor kirchner	San Miguel de Tucumán	3300	-26.8346603	-65.2509134
+ESPERADA	avenida nestor kirchner	San Miguel de Tucumán	3500	-26.8341585	-65.2538656
+ESPERADA	avenida nestor kirchner	San Miguel de Tucumán	3700	-26.8340626	-65.2565454
+ESPERADA	avenida nestor kirchner	San Miguel de Tucumán	3800	-26.8340354	-65.2575784
+ESPERADA	bolivia	San Miguel de Tucumán	1200	-26.8096193	-65.2110752
+ESPERADA	bolivia	San Miguel de Tucumán	1300	-26.8092081	-65.2126815
+ESPERADA	bolivia	San Miguel de Tucumán	1400	-26.8088960	-65.2143106
+ESPERADA	bolivia	San Miguel de Tucumán	2600	-26.8055205	-65.2323160
+ESPERADA	bolivia	San Miguel de Tucumán	2700	-26.8052636	-65.2337274
+ESPERADA	bolivia	San Miguel de Tucumán	2800	-26.8050184	-65.2352063
+ESPERADA	bolivia	Yerba Buena	1700	-26.8084315	-65.2940307
+ESPERADA	brasil	Yerba Buena	300	-26.8109943	-65.2688662
+ESPERADA	brasil	Yerba Buena	1000	-26.8085842	-65.2824744
+ESPERADA	brasil	Yerba Buena	1100	-26.8082199	-65.2843998
+ESPERADA	brasil	Yerba Buena	1300	-26.8075624	-65.2877814
+ESPERADA	brasil	Yerba Buena	1400	-26.8072774	-65.2892399
+ESPERADA	brasil	Yerba Buena	1500	-26.8070528	-65.2907163
+ESPERADA	brasil	Yerba Buena	1600	-26.8067381	-65.2921675
+ESPERADA	buenos aires	San Miguel de Tucumán	2200	-26.8603272	-65.2132282
+ESPERADA	buenos aires	San Miguel de Tucumán	2300	-26.8616075	-65.2135418
+ESPERADA	buenos aires	San Miguel de Tucumán	2400	-26.8628953	-65.2138510
+ESPERADA	buenos aires	San Miguel de Tucumán	2500	-26.8641820	-65.2141532
+ESPERADA	buenos aires	San Miguel de Tucumán	2800	-26.8680734	-65.2155394
+ESPERADA	buenos aires	San Miguel de Tucumán	2900	-26.8694737	-65.2158286
+ESPERADA	buenos aires	San Miguel de Tucumán	3000	-26.8707596	-65.2161177
+ESPERADA	buenos aires	San Miguel de Tucumán	3200	-26.8731394	-65.2166554
+ESPERADA	buenos aires	San Miguel de Tucumán	3700	-26.8777317	-65.2213120
+ESPERADA	buenos aires	San Miguel de Tucumán	3800	-26.8787622	-65.2215775
+ESPERADA	buenos aires	San Miguel de Tucumán	4000	-26.8807214	-65.2223169
+ESPERADA	buenos aires	San Miguel de Tucumán	4100	-26.8816501	-65.2226486
+ESPERADA	buenos aires	San Miguel de Tucumán	4200	-26.8825579	-65.2230060
+ESPERADA	buenos aires	San Miguel de Tucumán	4300	-26.8834572	-65.2233832
+ESPERADA	buenos aires	San Miguel de Tucumán	4400	-26.8843326	-65.2238109
+ESPERADA	chacabuco	San Miguel de Tucumán	2300	-26.8614017	-65.2150594
+ESPERADA	chacabuco	San Miguel de Tucumán	2400	-26.8626482	-65.2154147
+ESPERADA	chacabuco	San Miguel de Tucumán	2500	-26.8639049	-65.2157129
+ESPERADA	chacabuco	San Miguel de Tucumán	2800	-26.8673601	-65.2165207
+ESPERADA	chacabuco	San Miguel de Tucumán	2900	-26.8687758	-65.2176524
+ESPERADA	chacabuco	San Miguel de Tucumán	3000	-26.8699693	-65.2179317
+ESPERADA	chacabuco	San Miguel de Tucumán	3100	-26.8711685	-65.2181899
+ESPERADA	chiclana	San Miguel de Tucumán	300	-26.8297080	-65.2317582
+ESPERADA	chiclana	San Miguel de Tucumán	400	-26.8313904	-65.2321803
+ESPERADA	chiclana	San Miguel de Tucumán	500	-26.8330693	-65.2326198
+ESPERADA	chiclana	San Miguel de Tucumán	900	-26.8380840	-65.2338927
+ESPERADA	chiclana	San Miguel de Tucumán	1300	-26.8441358	-65.2359045
+ESPERADA	chiclana	San Miguel de Tucumán	1400	-26.8455601	-65.2362454
+ESPERADA	chiclana	San Miguel de Tucumán	1500	-26.8469933	-65.2365815
+ESPERADA	chiclana	San Miguel de Tucumán	1600	-26.8484226	-65.2369059
+ESPERADA	congreso de tucuman	San Miguel de Tucumán	400	-26.8368605	-65.2045744
+ESPERADA	congreso de tucuman	San Miguel de Tucumán	1800	-26.8565350	-65.2089845
+ESPERADA	congreso de tucuman	San Miguel de Tucumán	1900	-26.8577220	-65.2092876
+ESPERADA	congreso de tucuman	San Miguel de Tucumán	2000	-26.8589072	-65.2095981
+ESPERADA	congreso de tucuman	San Miguel de Tucumán	2100	-26.8600952	-65.2098971
+ESPERADA	congreso de tucuman	San Miguel de Tucumán	2200	-26.8612816	-65.2102056
+ESPERADA	congreso de tucuman	San Miguel de Tucumán	2300	-26.8624621	-65.2105328
+ESPERADA	congreso de tucuman	San Miguel de Tucumán	2400	-26.8636476	-65.2108471
+ESPERADA	congreso de tucuman	San Miguel de Tucumán	2500	-26.8648332	-65.2111619
+ESPERADA	constitucion	San Miguel de Tucumán	1000	-26.8394790	-65.2407950
+ESPERADA	constitucion	San Miguel de Tucumán	1100	-26.8407891	-65.2409756
+ESPERADA	constitucion	San Miguel de Tucumán	1200	-26.8421101	-65.2411620
+ESPERADA	constitucion	San Miguel de Tucumán	1300	-26.8433271	-65.2421123
+ESPERADA	constitucion	San Miguel de Tucumán	1400	-26.8446279	-65.2424418
+ESPERADA	constitucion	San Miguel de Tucumán	1500	-26.8459292	-65.2427590
+ESPERADA	constitucion	San Miguel de Tucumán	1600	-26.8472271	-65.2430950
+ESPERADA	coronel zelaya	San Miguel de Tucumán	900	-26.8370531	-65.2419532
+ESPERADA	coronel zelaya	San Miguel de Tucumán	1000	-26.8384373	-65.2422635
+ESPERADA	coronel zelaya	San Miguel de Tucumán	1100	-26.8398357	-65.2424481
+ESPERADA	coronel zelaya	San Miguel de Tucumán	1200	-26.8412384	-65.2426443
+ESPERADA	coronel zelaya	San Miguel de Tucumán	1300	-26.8425103	-65.2436595
+ESPERADA	coronel zelaya	San Miguel de Tucumán	1400	-26.8438949	-65.2440149
+ESPERADA	coronel zelaya	San Miguel de Tucumán	1500	-26.8452744	-65.2443562
+ESPERADA	coronel zelaya	San Miguel de Tucumán	2200	-26.8512796	-65.2458986
+ESPERADA	coronel zelaya	San Miguel de Tucumán	2300	-26.8500757	-65.2455892
+ESPERADA	coronel zelaya	San Miguel de Tucumán	2400	-26.8488733	-65.2452773
+ESPERADA	coronel zelaya	San Miguel de Tucumán	2500	-26.8476685	-65.2449692
+ESPERADA	crisostomo alvarez	San Miguel de Tucumán	2900	-26.8242982	-65.2423223
+ESPERADA	crisostomo alvarez	San Miguel de Tucumán	3000	-26.8239958	-65.2436596
+ESPERADA	crisostomo alvarez	San Miguel de Tucumán	3100	-26.8241852	-65.2451372
+ESPERADA	crisostomo alvarez	San Miguel de Tucumán	3200	-26.8239000	-65.2464813
+ESPERADA	crisostomo alvarez	San Miguel de Tucumán	3300	-26.8236120	-65.2478194
+ESPERADA	crisostomo alvarez	San Miguel de Tucumán	3400	-26.8233251	-65.2491684
+ESPERADA	crisostomo alvarez	San Miguel de Tucumán	3700	-26.8225828	-65.2527331
+ESPERADA	crisostomo alvarez	San Miguel de Tucumán	3800	-26.8224015	-65.2539112
+ESPERADA	crisostomo alvarez	San Miguel de Tucumán	3900	-26.8222024	-65.2550818
+ESPERADA	crisostomo alvarez	San Miguel de Tucumán	4000	-26.8216911	-65.2564245
+ESPERADA	crisostomo alvarez	San Miguel de Tucumán	4100	-26.8215841	-65.2570354
+ESPERADA	dorrego	Banda del Río Salí	300	-26.8421086	-65.1709259
+ESPERADA	dorrego	Banda del Río Salí	400	-26.8428977	-65.1711155
+ESPERADA	dorrego	Banda del Río Salí	500	-26.8436873	-65.1713048
+ESPERADA	dorrego	Banda del Río Salí	600	-26.8444800	-65.1714903
+ESPERADA	dorrego	Banda del Río Salí	700	-26.8452727	-65.1716588
+ESPERADA	dorrego	Banda del Río Salí	800	-26.8460656	-65.1718288
+ESPERADA	dorrego	Banda del Río Salí	900	-26.8468577	-65.1719994
+ESPERADA	ecuador	San Miguel de Tucumán	800	-26.8065091	-65.2030824
+ESPERADA	ecuador	San Miguel de Tucumán	900	-26.8067541	-65.2048306
+ESPERADA	ecuador	San Miguel de Tucumán	2000	-26.8030152	-65.2229239
+ESPERADA	ecuador	San Miguel de Tucumán	2400	-26.8021213	-65.2275712
+ESPERADA	ecuador	San Miguel de Tucumán	2600	-26.8015059	-65.2311903
+ESPERADA	ecuador	San Miguel de Tucumán	2700	-26.8011520	-65.2331043
+ESPERADA	ecuador	San Miguel de Tucumán	3200	-26.7996673	-65.2415284
+ESPERADA	ecuador	San Miguel de Tucumán	3700	-26.7987353	-65.2470351
+ESPERADA	ecuador	San Miguel de Tucumán	4000	-26.7981815	-65.2497563
+ESPERADA	ecuador	San Miguel de Tucumán	4100	-26.7981078	-65.2506569
+ESPERADA	ecuador	San Miguel de Tucumán	4200	-26.7980342	-65.2515576
+ESPERADA	ecuador	San Miguel de Tucumán	4300	-26.7978810	-65.2525244
+ESPERADA	frias silva	San Miguel de Tucumán	2300	-26.8578751	-65.2330173
+ESPERADA	frias silva	San Miguel de Tucumán	2400	-26.8590291	-65.2333102
+ESPERADA	frias silva	San Miguel de Tucumán	2500	-26.8601774	-65.2336514
+ESPERADA	frias silva	San Miguel de Tucumán	2600	-26.8613444	-65.2339617
+ESPERADA	frias silva	Yerba Buena	1300	-26.8068933	-65.2876855
+ESPERADA	frias silva	Yerba Buena	1400	-26.8066927	-65.2887517
+ESPERADA	frias silva	Yerba Buena	1500	-26.8062775	-65.2912391
+ESPERADA	frias silva	Yerba Buena	1600	-26.8060365	-65.2921736
+ESPERADA	frias silva	Yerba Buena	1700	-26.8057200	-65.2936613
+ESPERADA	guemes	San Miguel de Tucumán	900	-26.8376766	-65.2378185
+ESPERADA	guemes	San Miguel de Tucumán	1000	-26.8391102	-65.2381860
+ESPERADA	guemes	San Miguel de Tucumán	1100	-26.8405435	-65.2385524
+ESPERADA	guemes	San Miguel de Tucumán	1200	-26.8419897	-65.2388845
+ESPERADA	guemes	San Miguel de Tucumán	1300	-26.8435283	-65.2387182
+ESPERADA	guemes	San Miguel de Tucumán	1400	-26.8449616	-65.2390862
+ESPERADA	guemes	San Miguel de Tucumán	1500	-26.8463929	-65.2394543
+ESPERADA	guemes	San Miguel de Tucumán	1600	-26.8478271	-65.2398202
+ESPERADA	italia	San Miguel de Tucumán	1300	-26.8133242	-65.2136315
+ESPERADA	italia	San Miguel de Tucumán	1400	-26.8129709	-65.2153911
+ESPERADA	italia	San Miguel de Tucumán	2600	-26.8095042	-65.2338913
+ESPERADA	italia	San Miguel de Tucumán	3700	-26.8058183	-65.2486079
+ESPERADA	italia	San Miguel de Tucumán	3800	-26.8054192	-65.2495814
+ESPERADA	italia	San Miguel de Tucumán	3900	-26.8050100	-65.2505488
+ESPERADA	italia	San Miguel de Tucumán	4000	-26.8046011	-65.2515176
+ESPERADA	italia	San Miguel de Tucumán	4200	-26.8037685	-65.2534929
+ESPERADA	italia	San Miguel de Tucumán	4300	-26.8033380	-65.2544957
+ESPERADA	italia	San Miguel de Tucumán	4400	-26.8029097	-65.2554998
+ESPERADA	juan benjamin teran	San Miguel de Tucumán	900	-26.8371014	-65.2440541
+ESPERADA	juan benjamin teran	San Miguel de Tucumán	1000	-26.8384593	-65.2443206
+ESPERADA	juan benjamin teran	San Miguel de Tucumán	1100	-26.8398218	-65.2444805
+ESPERADA	juan benjamin teran	San Miguel de Tucumán	1200	-26.8411790	-65.2447353
+ESPERADA	juan benjamin teran	San Miguel de Tucumán	1300	-26.8424852	-65.2453216
+ESPERADA	juan benjamin teran	San Miguel de Tucumán	1400	-26.8438294	-65.2456641
+ESPERADA	juan benjamin teran	San Miguel de Tucumán	1500	-26.8451740	-65.2460079
+ESPERADA	juan benjamin teran	San Miguel de Tucumán	1600	-26.8465180	-65.2463538
+ESPERADA	juan larrea	San Miguel de Tucumán	300	-26.8509033	-65.2065666
+ESPERADA	juan larrea	San Miguel de Tucumán	1000	-26.8484614	-65.2172144
+ESPERADA	juan larrea	San Miguel de Tucumán	1100	-26.8481450	-65.2187332
+ESPERADA	juan larrea	San Miguel de Tucumán	1200	-26.8477907	-65.2205016
+ESPERADA	juan larrea	San Miguel de Tucumán	1300	-26.8474450	-65.2222720
+ESPERADA	juan larrea	San Miguel de Tucumán	1400	-26.8470958	-65.2240424
+ESPERADA	juan larrea	San Miguel de Tucumán	1500	-26.8467405	-65.2258113
+ESPERADA	juan larrea	San Miguel de Tucumán	1600	-26.8463711	-65.2275762
+ESPERADA	juan larrea	San Miguel de Tucumán	1800	-26.8457070	-65.2310100
+ESPERADA	juan larrea	San Miguel de Tucumán	1900	-26.8453950	-65.2326749
+ESPERADA	juan larrea	San Miguel de Tucumán	2000	-26.8450736	-65.2343374
+ESPERADA	juan larrea	San Miguel de Tucumán	2400	-26.8438173	-65.2397083
+ESPERADA	juan larrea	San Miguel de Tucumán	2500	-26.8435134	-65.2411561
+ESPERADA	juan larrea	San Miguel de Tucumán	2600	-26.8432112	-65.2426037
+ESPERADA	juan larrea	San Miguel de Tucumán	2700	-26.8429088	-65.2440522
+ESPERADA	juan larrea	San Miguel de Tucumán	2800	-26.8426097	-65.2455000
+ESPERADA	juan larrea	San Miguel de Tucumán	2900	-26.8423069	-65.2469476
+ESPERADA	las heras	San Miguel de Tucumán	1800	-26.8573076	-65.2072233
+ESPERADA	las heras	San Miguel de Tucumán	1900	-26.8584477	-65.2075237
+ESPERADA	las heras	San Miguel de Tucumán	2000	-26.8595852	-65.2078342
+ESPERADA	las heras	San Miguel de Tucumán	2100	-26.8607243	-65.2081300
+ESPERADA	las heras	San Miguel de Tucumán	2200	-26.8618625	-65.2084364
+ESPERADA	las heras	San Miguel de Tucumán	2300	-26.8630006	-65.2087417
+ESPERADA	las heras	San Miguel de Tucumán	2400	-26.8641413	-65.2090345
+ESPERADA	las heras	San Miguel de Tucumán	2500	-26.8652824	-65.2093258
+ESPERADA	las higueritas	Yerba Buena	1300	-26.8057627	-65.2873184
+ESPERADA	las higueritas	Yerba Buena	1400	-26.8055294	-65.2887160
+ESPERADA	las higueritas	Yerba Buena	1500	-26.8052925	-65.2901130
+ESPERADA	las higueritas	Yerba Buena	1600	-26.8050494	-65.2915075
+ESPERADA	las higueritas	Yerba Buena	1700	-26.8047811	-65.2928987
+ESPERADA	las higueritas	Yerba Buena	1800	-26.8045319	-65.2942929
+ESPERADA	las higueritas	Yerba Buena	2200	-26.8032827	-65.3012114
+ESPERADA	las higueritas	Yerba Buena	2300	-26.8030094	-65.3030525
+ESPERADA	las higueritas	Yerba Buena	2400	-26.8027062	-65.3048889
+ESPERADA	las piedras	San Miguel de Tucumán	1000	-26.8335360	-65.2137156
+ESPERADA	las piedras	San Miguel de Tucumán	1100	-26.8332414	-65.2153289
+ESPERADA	las piedras	San Miguel de Tucumán	3000	-26.8270060	-65.2437285
+ESPERADA	las piedras	San Miguel de Tucumán	3100	-26.8267248	-65.2452268
+ESPERADA	las piedras	San Miguel de Tucumán	3200	-26.8264480	-65.2467238
+ESPERADA	las piedras	San Miguel de Tucumán	3300	-26.8261064	-65.2482038
+ESPERADA	las piedras	San Miguel de Tucumán	3400	-26.8258135	-65.2496990
+ESPERADA	lavaisse	San Miguel de Tucumán	800	-26.8544019	-65.2160640
+ESPERADA	lavaisse	San Miguel de Tucumán	900	-26.8540740	-65.2176768
+ESPERADA	lavaisse	San Miguel de Tucumán	1000	-26.8538063	-65.2192920
+ESPERADA	lavaisse	San Miguel de Tucumán	1100	-26.8534320	-65.2209015
+ESPERADA	lavaisse	San Miguel de Tucumán	1200	-26.8530630	-65.2225173
+ESPERADA	lavaisse	San Miguel de Tucumán	1300	-26.8527770	-65.2241411
+ESPERADA	lavaisse	San Miguel de Tucumán	1400	-26.8524641	-65.2257620
+ESPERADA	lavaisse	San Miguel de Tucumán	1500	-26.8521614	-65.2273858
+ESPERADA	lavaisse	San Miguel de Tucumán	1700	-26.8515562	-65.2306686
+ESPERADA	lavaisse	San Miguel de Tucumán	1800	-26.8512322	-65.2323346
+ESPERADA	lavaisse	San Miguel de Tucumán	1900	-26.8509362	-65.2339918
+ESPERADA	lavaisse	San Miguel de Tucumán	2000	-26.8503059	-65.2356653
+ESPERADA	matheu	San Miguel de Tucumán	300	-26.8521995	-65.2072251
+ESPERADA	matheu	San Miguel de Tucumán	1000	-26.8498916	-65.2173335
+ESPERADA	matheu	San Miguel de Tucumán	1100	-26.8495356	-65.2190741
+ESPERADA	matheu	San Miguel de Tucumán	1200	-26.8491540	-65.2208214
+ESPERADA	matheu	San Miguel de Tucumán	1300	-26.8488318	-65.2225725
+ESPERADA	matheu	San Miguel de Tucumán	1500	-26.8481291	-65.2260250
+ESPERADA	matheu	San Miguel de Tucumán	1600	-26.8477811	-65.2277392
+ESPERADA	matheu	San Miguel de Tucumán	1700	-26.8474522	-65.2294519
+ESPERADA	matheu	San Miguel de Tucumán	1800	-26.8471119	-65.2311629
+ESPERADA	matheu	San Miguel de Tucumán	1900	-26.8467690	-65.2328743
+ESPERADA	matheu	San Miguel de Tucumán	2000	-26.8464386	-65.2345892
+ESPERADA	pasaje berutti	Yerba Buena	100	-26.8078567	-65.2987020
+ESPERADA	pasaje berutti	Yerba Buena	200	-26.8072057	-65.2985459
+ESPERADA	pasaje berutti	Yerba Buena	300	-26.8065527	-65.2984055
+ESPERADA	pasaje berutti	Yerba Buena	400	-26.8059028	-65.2982320
+ESPERADA	pasaje berutti	Yerba Buena	500	-26.8052557	-65.2980607
+ESPERADA	pasaje berutti	Yerba Buena	600	-26.8046062	-65.2978979
+ESPERADA	pasaje berutti	Yerba Buena	700	-26.8039560	-65.2977341
+ESPERADA	venezuela	San Miguel de Tucumán	1400	-26.8023147	-65.2129077
+ESPERADA	venezuela	San Miguel de Tucumán	1600	-26.8017656	-65.2158821
+ESPERADA	venezuela	San Miguel de Tucumán	2600	-26.7989956	-65.2300804
+ESPERADA	venezuela	San Miguel de Tucumán	2700	-26.7987180	-65.2316583
+ESPERADA	venezuela	San Miguel de Tucumán	3300	-26.7968903	-65.2403994
+ESPERADA	venezuela	San Miguel de Tucumán	3600	-26.7959492	-65.2456419
+ESPERADA	venezuela	San Miguel de Tucumán	3700	-26.7957246	-65.2469158
+ESPERADA	venezuela	San Miguel de Tucumán	3800	-26.7954981	-65.2481896
+ESPERADA	venezuela	San Miguel de Tucumán	3900	-26.7952828	-65.2494672
