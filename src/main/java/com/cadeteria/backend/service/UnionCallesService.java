@@ -1,5 +1,7 @@
 package com.cadeteria.backend.service;
 
+import com.cadeteria.backend.common.BadRequestException;
+import com.cadeteria.backend.common.ResourceNotFoundException;
 import com.cadeteria.backend.model.CalleUnion;
 import com.cadeteria.backend.model.CuadraCoords;
 import com.cadeteria.backend.model.DireccionAlias;
@@ -54,6 +56,18 @@ public class UnionCallesService {
     public static final String ORIGEN_A_REVISAR = "calles a revisar";
     /** Al unir desde "calles a revisar" solo pasan las cuadras a menos de esto de la calle que queda. */
     static final int ZONA_M = 1500;
+
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
+
+    /** Una cuadra tal como estaba antes de una unión. */
+    record FilaAntes(String id, String calle, String localidad, int cuadra, double lat, double lng, boolean approximate,
+                     String proveedor, int confirmaciones, int muestras, long creadaEn) {}
+
+    /** A qué calle llevaba una forma de escribirla antes de una unión. */
+    record AliasAntes(String id, String calle) {}
+
+    /** Lo que hace falta para deshacer una unión: las cuadras y los alias que tocó y el alias que creó. */
+    record Respaldo(List<FilaAntes> filas, List<AliasAntes> alias, String aliasCreado) {}
 
     /** Lo que se unió o se uniría: {@code seFue} deja de existir como nombre propio. */
     public record Union(String seFue, String queda, String localidad, int cuadra, int distanciaM,
@@ -221,12 +235,16 @@ public class UnionCallesService {
     /** Pasa lo de {@code seVa} a {@code queda}: las cuadras (todas, o solo las de la zona) y las formas de escribirla. */
     private Union unir(String seVa, String queda, String localidad, int cuadra, int distanciaM, String origen, boolean soloLaZona) {
         int movidas = 0, fusionadas = 0;
+        List<FilaAntes> filasAntes = new ArrayList<>();
+        List<AliasAntes> aliasAntes = new ArrayList<>();
+        String aliasCreado = null;
         List<CuadraCoords> deLaQueQueda = soloLaZona ? coordsRepository.findByCalleCanonica(queda) : List.of();
         for (CuadraCoords fila : coordsRepository.findByCalleCanonica(seVa)) {
             if (!deLaQueQueda.isEmpty() && deLaQueQueda.stream().noneMatch(q ->
                     metros(fila.getLat(), fila.getLng(), q.getLat(), q.getLng()) <= ZONA_M)) continue;
             Optional<CuadraCoords> yaEsta = coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra(queda, fila.getLocalidad(), fila.getCuadra());
             if (yaEsta.isEmpty()) {
+                filasAntes.add(antes(fila));
                 fila.setCalleCanonica(queda);
                 coordsRepository.save(fila);
                 movidas++;
@@ -235,6 +253,8 @@ public class UnionCallesService {
             // Las dos tenían esa cuadra: queda el punto de la fuente más confiable (el GPS del
             // cadete en la puerta antes que un buscador) y se suman las confirmaciones.
             CuadraCoords destino = yaEsta.get();
+            filasAntes.add(antes(destino));
+            filasAntes.add(antes(fila));
             if (!fila.isApproximate() && (destino.isApproximate()
                     || DireccionCacheService.confianza(fila.getProveedor()) > DireccionCacheService.confianza(destino.getProveedor()))) {
                 destino.setLat(fila.getLat());
@@ -252,6 +272,7 @@ public class UnionCallesService {
         boolean quedanCuadras = soloLaZona && !coordsRepository.findByCalleCanonica(seVa).isEmpty();
         boolean tieneAlias = false;
         for (DireccionAlias alias : quedanCuadras ? List.<DireccionAlias>of() : aliasRepository.findByCalleCanonica(seVa)) {
+            aliasAntes.add(new AliasAntes(alias.getId(), alias.getCalleCanonica()));
             alias.setCalleCanonica(queda);
             aliasRepository.save(alias);
             tieneAlias |= alias.getVarianteNorm().equals(seVa);
@@ -264,6 +285,7 @@ public class UnionCallesService {
             alias.setLocalidad(localidad);
             alias.setCalleCanonica(queda);
             aliasRepository.save(alias);
+            aliasCreado = alias.getId();
         }
 
         CalleUnion registro = new CalleUnion();
@@ -277,10 +299,65 @@ public class UnionCallesService {
         registro.setFilasFusionadas(fusionadas);
         registro.setOrigen(origen);
         registro.setCuando(Instant.now());
+        try {
+            registro.setRespaldo(JSON.writeValueAsString(new Respaldo(filasAntes, aliasAntes, aliasCreado)));
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            log.warn("No se pudo guardar el respaldo de la unión de \"{}\" con \"{}\": no se va a poder deshacer.", seVa, queda);
+        }
         unionRepository.save(registro);
         log.info("Calles unidas ({}): \"{}\" pasa a ser \"{}\" (misma cuadra {} en {}, a {} m; {} cuadras movidas, {} fusionadas).",
                 origen, seVa, queda, cuadra, localidad, distanciaM, movidas, fusionadas);
         return new Union(seVa, queda, localidad, cuadra, distanciaM, movidas, fusionadas);
+    }
+
+    /**
+     * Deshace una unión (2026-10-07): cada cuadra y cada alias que tocó vuelve a como estaba. Lo que
+     * se aprendió después con el nombre que quedó no se toca.
+     */
+    @Transactional
+    public CalleUnion deshacer(String unionId) {
+        CalleUnion union = unionRepository.findById(unionId).orElseThrow(() -> new ResourceNotFoundException("Esa unión no existe."));
+        if (!union.isSePuedeDeshacer()) {
+            throw new BadRequestException("Esa unión no se puede deshacer: ya se deshizo o es anterior a que se guardara cómo estaba todo.");
+        }
+        Respaldo respaldo;
+        try {
+            respaldo = JSON.readValue(union.getRespaldo(), Respaldo.class);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new BadRequestException("No se pudo leer cómo estaba todo antes de esa unión.");
+        }
+        for (FilaAntes f : respaldo.filas()) {
+            CuadraCoords c = coordsRepository.findById(f.id()).orElseGet(CuadraCoords::new);
+            c.setId(f.id());
+            c.setCalleCanonica(f.calle());
+            c.setLocalidad(f.localidad());
+            c.setCuadra(f.cuadra());
+            c.setLat(f.lat());
+            c.setLng(f.lng());
+            c.setApproximate(f.approximate());
+            c.setProveedor(f.proveedor());
+            c.setConfirmaciones(f.confirmaciones());
+            c.setMuestras(f.muestras());
+            c.setCreadaEn(Instant.ofEpochMilli(f.creadaEn()));
+            coordsRepository.save(c);
+        }
+        for (AliasAntes a : respaldo.alias()) {
+            aliasRepository.findById(a.id()).ifPresent(alias -> {
+                alias.setCalleCanonica(a.calle());
+                aliasRepository.save(alias);
+            });
+        }
+        if (respaldo.aliasCreado() != null) aliasRepository.deleteById(respaldo.aliasCreado());
+        union.setDeshechaEn(Instant.now());
+        unionRepository.save(union);
+        log.info("Unión deshecha: \"{}\" vuelve a ser una calle aparte de \"{}\" ({} cuadras restauradas).",
+                union.getSeFue(), union.getQueda(), respaldo.filas().size());
+        return union;
+    }
+
+    private static FilaAntes antes(CuadraCoords c) {
+        return new FilaAntes(c.getId(), c.getCalleCanonica(), c.getLocalidad(), c.getCuadra(), c.getLat(), c.getLng(), c.isApproximate(),
+                c.getProveedor(), c.getConfirmaciones(), c.getMuestras(), c.getCreadaEn().toEpochMilli());
     }
 
     /** True si en alguna cuadra de la misma localidad los dos nombres están lejos: son calles distintas. */

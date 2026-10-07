@@ -52,6 +52,12 @@ public class CallesAdminController {
         return service.historial();
     }
 
+    /** Vuelve atrás una unión: las cuadras y los alias quedan como estaban antes. */
+    @PostMapping("/uniones/{id}/deshacer")
+    public CalleUnion deshacer(@PathVariable String id) {
+        return service.deshacer(id);
+    }
+
     /** Las dudas pendientes, primero las de las cuadras más usadas. */
     @GetMapping("/a-revisar")
     public List<CallesARevisarService.DudaVista> aRevisar() {

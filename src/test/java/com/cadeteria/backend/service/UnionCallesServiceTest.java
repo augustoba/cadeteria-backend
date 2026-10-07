@@ -54,6 +54,12 @@ class UnionCallesServiceTest {
                 tabla.stream().filter(c -> c.getLat() >= (double) i.getArgument(0) && c.getLat() <= (double) i.getArgument(1)
                         && c.getLng() >= (double) i.getArgument(2) && c.getLng() <= (double) i.getArgument(3)).toList());
         org.mockito.Mockito.doAnswer(i -> tabla.remove((CuadraCoords) i.getArgument(0))).when(coords).delete(any());
+        when(coords.findById(anyString())).thenAnswer(i -> tabla.stream().filter(c -> c.getId().equals(i.getArgument(0))).findFirst());
+        when(coords.save(any(CuadraCoords.class))).thenAnswer(i -> {
+            CuadraCoords c = i.getArgument(0);
+            if (!tabla.contains(c)) tabla.add(c);
+            return c;
+        });
         when(alias.findByVarianteNorm(anyString())).thenReturn(Optional.empty());
         when(alias.findByCalleCanonica(anyString())).thenReturn(List.of());
         service = new UnionCallesService(coords, alias, uniones);
@@ -131,6 +137,33 @@ class UnionCallesServiceTest {
         assertEquals(48, al700.getConfirmaciones());
         assertFalse(tabla.stream().anyMatch(c -> c.getCalleCanonica().equals("batalla de suipacha")));
         assertEquals(3, tabla.size());
+    }
+
+    @Test
+    void unaUnionSePuedeDeshacerYVuelveTodoComoEstaba() {
+        fila("suipacha", SMT, 700, LAT, LNG, "locationiq").setConfirmaciones(44);
+        fila("batalla de suipacha", SMT, 700, LAT_20M, LNG, "cadete_gps").setConfirmaciones(4);
+        fila("batalla de suipacha", SMT, 100, LAT_500M, LNG, "android_geocoder");
+        org.mockito.ArgumentCaptor<CalleUnion> hecha = org.mockito.ArgumentCaptor.forClass(CalleUnion.class);
+        service.duplicadas(true);
+        verify(uniones).save(hecha.capture());
+        CalleUnion registro = hecha.getValue();
+        assertTrue(registro.isSePuedeDeshacer());
+        when(uniones.findById(registro.getId())).thenReturn(Optional.of(registro));
+
+        service.deshacer(registro.getId());
+
+        assertEquals(3, tabla.size());
+        CuadraCoords suipacha = tabla.stream().filter(c -> c.getCalleCanonica().equals("suipacha")).findFirst().orElseThrow();
+        assertEquals("locationiq", suipacha.getProveedor());
+        assertEquals(LAT, suipacha.getLat());
+        assertEquals(44, suipacha.getConfirmaciones());
+        CuadraCoords batalla = tabla.stream().filter(c -> c.getCalleCanonica().equals("batalla de suipacha") && c.getCuadra() == 700).findFirst().orElseThrow();
+        assertEquals("cadete_gps", batalla.getProveedor());
+        assertEquals(LAT_20M, batalla.getLat());
+        assertEquals(4, batalla.getConfirmaciones());
+        assertTrue(tabla.stream().anyMatch(c -> c.getCalleCanonica().equals("batalla de suipacha") && c.getCuadra() == 100));
+        assertFalse(registro.isSePuedeDeshacer(), "no se deshace dos veces");
     }
 
     // --- Regla de forma (2026-10-07): casos reales del 6 de octubre ---

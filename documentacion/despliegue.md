@@ -195,7 +195,10 @@ teléfonos; **volver a producción antes de tener cadetes reales**.
       producción salen ~146 dudas (10 de nombre y 136 de ubicación, medido sobre la base del 2026-10-06).
       Sin variables ni claves nuevas. Desde este cambio, al aprender una cuadra con un nombre que es otra
       forma de escribir una calle que ya está cerca ("Avenida Camino del Perú" / "Camino del Perú"), se
-      guarda con el nombre que ya había (regla de forma, ver `UnionCallesService`).
+      guarda con el nombre que ya había (regla de forma, ver `UnionCallesService`). Las uniones nuevas
+      guardan cómo estaba todo antes (columnas nuevas `calle_union.respaldo` y `calle_union.deshecha_en`,
+      las crea Hibernate) y se vuelven atrás con "Deshacer" en "Ver uniones hechas"
+      (`POST .../calles/uniones/{id}/deshacer`); las anteriores y las hechas con un .sql no.
 - [ ] **Recordatorios al entrar a la app (2026-09-29)**: Configuración → App de cadetes → "Cartel de
       recordatorios al entrar". Revisar título y renglones (hasta 6 de 150 caracteres; sin tocar valen
       los 3 de siempre). Claves `recordatorios_entrar_activo`, `recordatorios_entrar_titulo` y

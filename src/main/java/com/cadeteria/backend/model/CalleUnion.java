@@ -51,6 +51,17 @@ public class CalleUnion {
     @Column(nullable = false)
     private Instant cuando = Instant.now();
 
+    /**
+     * Cómo estaba cada fila tocada antes de unir (JSON), para poder deshacerla (2026-10-07). Null en
+     * las uniones anteriores a esa fecha y en las hechas con un .sql: esas no se pueden deshacer.
+     */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @Column(columnDefinition = "LONGTEXT")
+    private String respaldo;
+
+    @Column(name = "deshecha_en")
+    private Instant deshechaEn;
+
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
     public String getSeFue() { return seFue; }
@@ -69,6 +80,11 @@ public class CalleUnion {
     public void setFilasFusionadas(int filasFusionadas) { this.filasFusionadas = filasFusionadas; }
     public String getOrigen() { return origen; }
     public void setOrigen(String origen) { this.origen = origen; }
+    public String getRespaldo() { return respaldo; }
+    public void setRespaldo(String respaldo) { this.respaldo = respaldo; }
+    public Instant getDeshechaEn() { return deshechaEn; }
+    public void setDeshechaEn(Instant deshechaEn) { this.deshechaEn = deshechaEn; }
+    public boolean isSePuedeDeshacer() { return respaldo != null && deshechaEn == null; }
     public Instant getCuando() { return cuando; }
     public void setCuando(Instant cuando) { this.cuando = cuando; }
 }
