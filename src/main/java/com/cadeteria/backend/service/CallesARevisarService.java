@@ -197,7 +197,13 @@ public class CallesARevisarService {
         if (TIPO_NOMBRE_VIEJO.equals(d.getTipo())) {
             return new Resultado(PENDIENTE, "Esta duda no se resuelve con un link: elegí si quitás la repetida o si son calles distintas.");
         }
-        return TIPO_NOMBRE.equals(d.getTipo()) ? nombreConLink(d, lat, lng, quien) : ubicacionConLink(d, lat, lng, r.direccion(), quien);
+        Resultado res = TIPO_NOMBRE.equals(d.getTipo()) ? nombreConLink(d, lat, lng, quien) : ubicacionConLink(d, lat, lng, r.direccion(), quien);
+        // Si el link no alcanzó, el motivo queda anotado en la duda: sirve para revisar después por qué no se decidió sola.
+        if (PENDIENTE.equals(res.estado())) {
+            d.setResultado(res.mensaje().length() > 500 ? res.mensaje().substring(0, 500) : res.mensaje());
+            dudaRepository.save(d);
+        }
+        return res;
     }
 
     /** Lo que elige la persona cuando no hay link o el link no alcanzó: MISMA, DISTINTAS, ESTA_BIEN o NO_EXISTE. */
@@ -335,7 +341,40 @@ public class CallesARevisarService {
         Set<String> deGoogle = new HashSet<>(CallesParecidas.palabrasClave(DireccionUtils.normalizar(DireccionUtils.expandirAbreviaturas(calleGoogle))));
         Set<String> propias = new HashSet<>(CallesParecidas.palabrasClave(calleCanonica));
         if (deGoogle.isEmpty() || deGoogle.containsAll(propias) || propias.containsAll(deGoogle)) return null;
+        // El mismo nombre escrito de otra manera (2026-10-07: "24 de Septiembre" y "24 de setiembre", "1 de Mayo" y
+        // "primero de mayo", "La Madrid" y "lamadrid", "Ejército del Nte." y "ejercito del norte") no es otra calle.
+        String google = comoSeCompara(DireccionUtils.normalizar(DireccionUtils.expandirAbreviaturas(calleGoogle))), propia = comoSeCompara(calleCanonica);
+        if (pegado(google).endsWith(String.join("", CallesParecidas.palabrasClave(propia)))
+                || pegado(propia).endsWith(String.join("", CallesParecidas.palabrasClave(google)))) return null;
+        // Con errores de dedo también, pero los números tienen que ser los mismos: "diagonal 1" no es "diagonal 2".
+        if (numeros(google).equals(numeros(propia))
+                && (CallesParecidas.puntaje(google, propia) != CallesParecidas.NO || CallesParecidas.puntaje(propia, google) != CallesParecidas.NO)) return null;
         return calleGoogle;
+    }
+
+    /** Un nombre normalizado con lo que Google escribe distinto llevado a una sola forma: "1°" y "primero" son "1", "nte" es "norte". */
+    private static String comoSeCompara(String nombreNorm) {
+        List<String> out = new ArrayList<>();
+        for (String p : nombreNorm.trim().split("\\s+")) {
+            String s = p.replaceAll("[^\\p{L}\\p{N}]", "");
+            if (s.matches("1(ro|ero|er)?") || s.equals("primero")) s = "1";
+            else if (s.equals("nte")) s = "norte";
+            if (!s.isEmpty()) out.add(s);
+        }
+        return String.join(" ", out);
+    }
+
+    /** Todas las palabras de oído y sin espacios, para que "la madrid" sea "lamadrid". */
+    private static String pegado(String nombreNorm) {
+        StringBuilder out = new StringBuilder();
+        for (String p : nombreNorm.split("\\s+")) out.append(CallesParecidas.clave(p).isEmpty() ? p : CallesParecidas.clave(p));
+        return out.toString();
+    }
+
+    private static Set<String> numeros(String nombreNorm) {
+        Set<String> out = new HashSet<>();
+        for (String p : nombreNorm.split("\\s+")) if (!p.isEmpty() && Character.isDigit(p.charAt(0))) out.add(p);
+        return out;
     }
 
     /** Las sospechas de ubicación sobre la base como está ahora, sin contar las repetidas con un nombre anterior. */

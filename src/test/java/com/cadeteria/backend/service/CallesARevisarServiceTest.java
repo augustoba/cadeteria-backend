@@ -237,6 +237,24 @@ class CallesARevisarServiceTest {
     }
 
     @Test
+    void alUnirUnaCalleLargaPasaEnteraAunqueLaOtraTengaUnaSolaCuadraEnLaPunta() {
+        // "Boulevard 9 de Julio" de Yerba Buena va de la 300 a la 2100 y "9 de Julio" ahí tiene solo la 2100:
+        // la 300 queda a 1800 m de ella, pero es la misma calle y pasa con las demás. La de Tafí Viejo no.
+        for (int i = 0; i <= 20; i++) fila("9 de julio", SMT, i * 100, LAT + 0.3 + i * M100, LNG, "osm");
+        fila("9 de julio", YB, 2100, LAT, LNG, "osm");
+        for (int c = 300; c <= 2100; c += 100) fila("boulevard 9 de julio", YB, c, LAT + (2100 - c) / 100 * M100, LNG + 0.0002, "osm");
+        fila("boulevard 9 de julio", TAFI, 300, LAT + 70 * M100, LNG, "osm");
+        service.actualizar();
+        CalleDuda d = dudas.stream().filter(x -> CallesARevisarService.TIPO_NOMBRE.equals(x.getTipo())).findFirst().orElseThrow();
+        google(LAT, LNG);
+
+        assertEquals(CallesARevisarService.UNIDA, service.resolverConLink(d.getId(), LINK, "admin").estado());
+
+        assertEquals(19, tabla.stream().filter(c -> c.getCalleCanonica().equals("9 de julio") && c.getLocalidad().equals(YB)).count());
+        assertEquals(List.of(TAFI), tabla.stream().filter(c -> c.getCalleCanonica().equals("boulevard 9 de julio")).map(CuadraCoords::getLocalidad).toList());
+    }
+
+    @Test
     void siGoogleLaUbicaLejosDeLaOtraYCercaDeLaPropiaSonDistintas() {
         fila("roca", TAFI, 300, LAT, LNG, "osm");
         fila("avenida roca", TAFI, 300, LAT + 10 * M100, LNG, "osm");
@@ -265,6 +283,9 @@ class CallesARevisarServiceTest {
         assertEquals(2, tabla.size());
         // El punto de Google queda anotado para mostrarlo en el mapa.
         assertEquals(LAT + 2 * M100, dudas.get(0).getLinkLat());
+        // Y el motivo también, para poder revisar después por qué no se decidió sola.
+        assertEquals(r.mensaje(), dudas.get(0).getResultado());
+        assertTrue(r.mensaje().startsWith("No alcanza para decidir"));
     }
 
     @Test
@@ -366,6 +387,7 @@ class CallesARevisarServiceTest {
         assertEquals(CallesARevisarService.PENDIENTE, r.estado());
         assertEquals(LAT + 10 * M100, mala.getLat());
         assertEquals(LNG, mala.getLng());
+        assertEquals(r.mensaje(), d.getResultado());
 
         // La persona mira el mapa y decide usar igual el punto de Google.
         assertEquals(CallesARevisarService.CORREGIDA, service.marcar(d.getId(), "USAR_GOOGLE", "admin").estado());
@@ -397,6 +419,25 @@ class CallesARevisarServiceTest {
         when(links.resolver(anyString())).thenReturn(new LinkGoogleMapsService.ResultadoLink(LAT + M100, LNG, null, "Av. Lavalle 250"));
 
         assertEquals(CallesARevisarService.CORREGIDA, service.resolverConLink(d.getId(), LINK, "admin").estado());
+    }
+
+    @Test
+    void elNombreDeGoogleEscritoDeOtraManeraEsLaMismaCalle() {
+        // Casos de la revisión del 2026-10-07: frenaban links buenos.
+        assertEquals(null, CallesARevisarService.otroNombreSegunGoogle("24 de setiembre", "Av. 24 de Septiembre 1250"));
+        assertEquals(null, CallesARevisarService.otroNombreSegunGoogle("primero de mayo", "1 de Mayo 550"));
+        assertEquals(null, CallesARevisarService.otroNombreSegunGoogle("primero de mayo", "1° de Mayo 550"));
+        assertEquals(null, CallesARevisarService.otroNombreSegunGoogle("lamadrid", "La Madrid 1050"));
+        assertEquals(null, CallesARevisarService.otroNombreSegunGoogle("avenida ejercito del norte", "Av. Ejército del Nte. 2450"));
+    }
+
+    @Test
+    void elNombreDeGoogleQueEsOtraCalleSigueFrenando() {
+        assertEquals("Virgen de la Merced", CallesARevisarService.otroNombreSegunGoogle("rivadavia", "Virgen de la Merced 250"));
+        assertEquals("Av. Juan Benjamín Terán", CallesARevisarService.otroNombreSegunGoogle("juan bautista teran", "Av. Juan Benjamín Terán 450"));
+        // Un número distinto es otra calle, aunque el resto sea igual.
+        assertEquals("Diagonal 2", CallesARevisarService.otroNombreSegunGoogle("diagonal 1", "Diagonal 2 300"));
+        assertEquals("25 de Mayo", CallesARevisarService.otroNombreSegunGoogle("primero de mayo", "25 de Mayo 550"));
     }
 
     // --- calles que cambiaron de nombre ---

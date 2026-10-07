@@ -223,8 +223,8 @@ public class UnionCallesService {
 
     /**
      * Unión decidida desde "calles a revisar" (2026-10-07), con un link de Google Maps o a mano. Solo
-     * pasan las cuadras de la zona: el mismo nombre puede ser otra calle en otra localidad ("Avenida
-     * Camino del Perú" de Tafí Viejo, a 7 km de la de San Miguel). Si quedan cuadras con el nombre
+     * pasan las cuadras de la zona (y las que les siguen en la misma localidad): el mismo nombre puede
+     * ser otra calle en otra localidad ("Avenida Camino del Perú" de Tafí Viejo, a 7 km de la de San Miguel). Si quedan cuadras con el nombre
      * que se va, sus formas de escribirlo no se tocan.
      */
     @Transactional
@@ -239,9 +239,22 @@ public class UnionCallesService {
         List<AliasAntes> aliasAntes = new ArrayList<>();
         String aliasCreado = null;
         List<CuadraCoords> deLaQueQueda = soloLaZona ? coordsRepository.findByCalleCanonica(queda) : List.of();
-        for (CuadraCoords fila : coordsRepository.findByCalleCanonica(seVa)) {
-            if (!deLaQueQueda.isEmpty() && deLaQueQueda.stream().noneMatch(q ->
-                    metros(fila.getLat(), fila.getLng(), q.getLat(), q.getLng()) <= ZONA_M)) continue;
+        List<CuadraCoords> deLaQueSeVa = coordsRepository.findByCalleCanonica(seVa);
+        // La zona avanza en cadena dentro de la localidad: una cuadra que pasa lleva a las que tiene cerca
+        // (2026-10-07: "Boulevard 9 de Julio" quedó partida porque "9 de Julio" tenía una sola cuadra en la punta).
+        Set<CuadraCoords> pasan = new HashSet<>();
+        for (CuadraCoords fila : deLaQueSeVa) {
+            if (deLaQueQueda.isEmpty() || deLaQueQueda.stream().anyMatch(q -> metros(fila.getLat(), fila.getLng(), q.getLat(), q.getLng()) <= ZONA_M)) pasan.add(fila);
+        }
+        for (boolean sumo = true; sumo; ) {
+            sumo = false;
+            for (CuadraCoords fila : deLaQueSeVa) {
+                if (!pasan.contains(fila) && pasan.stream().anyMatch(p -> p.getLocalidad().equals(fila.getLocalidad())
+                        && metros(fila.getLat(), fila.getLng(), p.getLat(), p.getLng()) <= ZONA_M)) sumo |= pasan.add(fila);
+            }
+        }
+        for (CuadraCoords fila : deLaQueSeVa) {
+            if (!pasan.contains(fila)) continue;
             Optional<CuadraCoords> yaEsta = coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra(queda, fila.getLocalidad(), fila.getCuadra());
             if (yaEsta.isEmpty()) {
                 filasAntes.add(antes(fila));
