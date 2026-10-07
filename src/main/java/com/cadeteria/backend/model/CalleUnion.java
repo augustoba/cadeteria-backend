@@ -55,8 +55,9 @@ public class CalleUnion {
      * Cómo estaba cada fila tocada antes de unir (JSON), para poder deshacerla (2026-10-07). Null en
      * las uniones anteriores a esa fecha y en las hechas con un .sql: esas no se pueden deshacer.
      */
+    /* Sin columnDefinition: con los nombres entre comillas (globally_quoted_identifiers) el tipo sale como `LONGTEXT` y el ALTER falla. */
     @com.fasterxml.jackson.annotation.JsonIgnore
-    @Column(columnDefinition = "LONGTEXT")
+    @Column(length = 2_000_000)
     private String respaldo;
 
     @Column(name = "deshecha_en")
