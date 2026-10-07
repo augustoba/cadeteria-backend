@@ -1,8 +1,10 @@
 package com.cadeteria.backend.service;
 
 import com.cadeteria.backend.model.CalleDuda;
+import com.cadeteria.backend.model.CalleNombreAnterior;
 import com.cadeteria.backend.model.CuadraCoords;
 import com.cadeteria.backend.repository.CalleDudaRepository;
+import com.cadeteria.backend.repository.CalleNombreAnteriorRepository;
 import com.cadeteria.backend.repository.CalleUnionRepository;
 import com.cadeteria.backend.repository.CuadraCoordsRepository;
 import com.cadeteria.backend.repository.DireccionAliasRepository;
@@ -35,6 +37,7 @@ class CallesARevisarServiceTest {
 
     private final List<CuadraCoords> tabla = new ArrayList<>();
     private final List<CalleDuda> dudas = new ArrayList<>();
+    private final List<CalleNombreAnterior> nombresAnteriores = new ArrayList<>();
     private LinkGoogleMapsService links;
     private CallesARevisarService service;
 
@@ -65,7 +68,9 @@ class CallesARevisarServiceTest {
             return d;
         });
         UnionCallesService union = new UnionCallesService(coords, alias, mock(CalleUnionRepository.class));
-        service = new CallesARevisarService(coords, dudasRepo, union, links);
+        CalleNombreAnteriorRepository anteriores = mock(CalleNombreAnteriorRepository.class);
+        when(anteriores.findAll()).thenAnswer(i -> List.copyOf(nombresAnteriores));
+        service = new CallesARevisarService(coords, dudasRepo, union, links, anteriores);
     }
 
     // --- qué entra a la lista ---
@@ -283,6 +288,116 @@ class CallesARevisarServiceTest {
         assertEquals(LAT + 10 * M100, mala.getLat());
     }
 
+    // --- cuándo no se le cree a Google (2026-10-07, por Rivadavia: Google numera mal después de Sarmiento) ---
+
+    @Test
+    void siGoogleCaeSobreOtraAlturaDeLaMismaCalleNoSeAplica() {
+        fila("lavalle", SMT, 100, LAT, LNG, "osm");
+        CuadraCoords mala = fila("lavalle", SMT, 200, LAT + 10 * M100, LNG, "nominatim");
+        fila("lavalle", SMT, 600, LAT + 5 * M100, LNG, "osm");
+        service.actualizar();
+        CalleDuda d = dudas.stream().filter(x -> x.getCuadra() == 200).findFirst().orElseThrow();
+        google(LAT + 5 * M100 + 0.0002, LNG);   // encima de la 600
+
+        CallesARevisarService.Resultado r = service.resolverConLink(d.getId(), LINK, "admin");
+
+        assertEquals(CallesARevisarService.PENDIENTE, r.estado());
+        assertTrue(r.mensaje().contains("600"), r.mensaje());
+        assertEquals(LAT + 10 * M100, mala.getLat());
+    }
+
+    @Test
+    void siConElPuntoDeGoogleSigueSinCerrarConLasVecinasNoSeAplicaSolo() {
+        fila("lavalle", SMT, 100, LAT, LNG, "osm");
+        CuadraCoords mala = fila("lavalle", SMT, 200, LAT + 10 * M100, LNG, "nominatim");
+        fila("lavalle", SMT, 300, LAT + 2 * M100, LNG, "osm");
+        service.actualizar();
+        CalleDuda d = dudas.stream().filter(x -> x.getCuadra() == 200).findFirst().orElseThrow();
+        google(LAT + M100, LNG + 0.004);   // 400 m al costado de donde iría
+
+        CallesARevisarService.Resultado r = service.resolverConLink(d.getId(), LINK, "admin");
+
+        assertEquals(CallesARevisarService.PENDIENTE, r.estado());
+        assertEquals(LAT + 10 * M100, mala.getLat());
+        assertEquals(LNG, mala.getLng());
+
+        // La persona mira el mapa y decide usar igual el punto de Google.
+        assertEquals(CallesARevisarService.CORREGIDA, service.marcar(d.getId(), "USAR_GOOGLE", "admin").estado());
+        assertEquals(LAT + M100, mala.getLat());
+        assertEquals(LNG + 0.004, mala.getLng());
+    }
+
+    @Test
+    void siGoogleLeDiceOtroNombreAEsaDireccionNoDecide() {
+        fila("lavalle", SMT, 100, LAT, LNG, "osm");
+        CuadraCoords mala = fila("lavalle", SMT, 200, LAT + 10 * M100, LNG, "nominatim");
+        service.actualizar();
+        CalleDuda d = dudas.stream().filter(x -> x.getCuadra() == 200).findFirst().orElseThrow();
+        when(links.resolver(anyString())).thenReturn(new LinkGoogleMapsService.ResultadoLink(LAT + M100, LNG, null, "Virgen de la Merced 250"));
+
+        CallesARevisarService.Resultado r = service.resolverConLink(d.getId(), LINK, "admin");
+
+        assertEquals(CallesARevisarService.PENDIENTE, r.estado());
+        assertTrue(r.mensaje().contains("Virgen de la Merced"), r.mensaje());
+        assertEquals(LAT + 10 * M100, mala.getLat());
+    }
+
+    @Test
+    void elMismoNombreEscritoComoLoPoneGoogleNoFrena() {
+        fila("avenida lavalle", SMT, 100, LAT, LNG, "osm");
+        fila("avenida lavalle", SMT, 200, LAT + 10 * M100, LNG, "nominatim");
+        service.actualizar();
+        CalleDuda d = dudas.stream().filter(x -> x.getCuadra() == 200).findFirst().orElseThrow();
+        when(links.resolver(anyString())).thenReturn(new LinkGoogleMapsService.ResultadoLink(LAT + M100, LNG, null, "Av. Lavalle 250"));
+
+        assertEquals(CallesARevisarService.CORREGIDA, service.resolverConLink(d.getId(), LINK, "admin").estado());
+    }
+
+    // --- calles que cambiaron de nombre ---
+
+    @Test
+    void anotaLaCuadraRepetidaConElNombreAnteriorYNoLaJuzgaPorUbicacion() {
+        // Rivadavia se llama Virgen de la Merced hasta Sarmiento: "Rivadavia 500" es la misma cuadra con el nombre viejo.
+        nombreAnterior("rivadavia", "virgen de la merced");
+        fila("virgen de la merced", SMT, 500, LAT, LNG, "osm");
+        fila("rivadavia", SMT, 500, LAT + 0.0003, LNG, "osm");
+        fila("rivadavia", SMT, 600, LAT + 10 * M100, LNG, "osm");   // sin el nombre viejo, las dos serían "punta"
+
+        assertEquals(1, service.actualizar());
+
+        CalleDuda d = dudas.get(0);
+        assertEquals(CallesARevisarService.TIPO_NOMBRE_VIEJO, d.getTipo());
+        assertEquals("rivadavia", d.getCalleCanonica());
+        assertEquals(500, d.getCuadra());
+        assertEquals("virgen de la merced", d.getOtraCalle());
+    }
+
+    @Test
+    void elNombreAnteriorLejosDeLaCalleDeHoyNoEsUnaDuda() {
+        // Después de Sarmiento la calle sigue siendo Rivadavia.
+        nombreAnterior("rivadavia", "virgen de la merced");
+        fila("virgen de la merced", SMT, 900, LAT, LNG, "osm");
+        fila("rivadavia", SMT, 1000, LAT + M100, LNG, "osm");
+        fila("rivadavia", SMT, 1100, LAT + 2 * M100, LNG, "osm");
+
+        assertEquals(0, service.actualizar());
+    }
+
+    @Test
+    void quitarLaRepetidaDejaLaCuadraConElNombreDeHoy() {
+        nombreAnterior("rivadavia", "virgen de la merced");
+        fila("virgen de la merced", SMT, 500, LAT, LNG, "osm").setConfirmaciones(2);
+        fila("rivadavia", SMT, 500, LAT + 0.0003, LNG, "osm").setConfirmaciones(3);
+        service.actualizar();
+
+        CallesARevisarService.Resultado r = service.marcar(dudas.get(0).getId(), "QUITAR", "admin");
+
+        assertEquals(CallesARevisarService.QUITADA, r.estado());
+        assertEquals(1, tabla.size());
+        assertEquals("virgen de la merced", tabla.get(0).getCalleCanonica());
+        assertEquals(5, tabla.get(0).getConfirmaciones());
+    }
+
     // --- elegir a mano ---
 
     @Test
@@ -305,6 +420,14 @@ class CallesARevisarServiceTest {
 
         assertEquals(CallesARevisarService.UNIDA, service.marcar(dudas.get(0).getId(), "MISMA", "admin").estado());
         assertTrue(tabla.stream().allMatch(c -> c.getCalleCanonica().equals("bascari")));
+    }
+
+    private void nombreAnterior(String viejo, String deHoy) {
+        CalleNombreAnterior n = new CalleNombreAnterior();
+        n.setId(viejo + "|" + deHoy);
+        n.setNombreNorm(viejo);
+        n.setCalleCanonica(deHoy);
+        nombresAnteriores.add(n);
     }
 
     private void google(double lat, double lng) {

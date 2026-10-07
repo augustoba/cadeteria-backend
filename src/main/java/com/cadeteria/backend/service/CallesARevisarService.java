@@ -3,8 +3,10 @@ package com.cadeteria.backend.service;
 import com.cadeteria.backend.common.BadRequestException;
 import com.cadeteria.backend.common.ResourceNotFoundException;
 import com.cadeteria.backend.model.CalleDuda;
+import com.cadeteria.backend.model.CalleNombreAnterior;
 import com.cadeteria.backend.model.CuadraCoords;
 import com.cadeteria.backend.repository.CalleDudaRepository;
+import com.cadeteria.backend.repository.CalleNombreAnteriorRepository;
 import com.cadeteria.backend.repository.CuadraCoordsRepository;
 import com.cadeteria.backend.util.CallesParecidas;
 import com.cadeteria.backend.util.DireccionUtils;
@@ -46,9 +48,9 @@ public class CallesARevisarService {
 
     private static final Logger log = LoggerFactory.getLogger(CallesARevisarService.class);
 
-    public static final String TIPO_NOMBRE = "NOMBRE", TIPO_UBICACION = "UBICACION";
+    public static final String TIPO_NOMBRE = "NOMBRE", TIPO_UBICACION = "UBICACION", TIPO_NOMBRE_VIEJO = "NOMBRE_VIEJO";
     public static final String PENDIENTE = "PENDIENTE", UNIDA = "UNIDA", DISTINTAS = "DISTINTAS",
-            CORREGIDA = "CORREGIDA", ESTA_BIEN = "ESTA_BIEN", NO_EXISTE = "NO_EXISTE", YA_CIERRA = "YA_CIERRA";
+            CORREGIDA = "CORREGIDA", ESTA_BIEN = "ESTA_BIEN", NO_EXISTE = "NO_EXISTE", YA_CIERRA = "YA_CIERRA", QUITADA = "QUITADA";
 
     /** El punto de Google a menos de esto de una cuadra: es esa cuadra. */
     static final int LINK_MISMA_M = 80;
@@ -56,6 +58,10 @@ public class CallesARevisarService {
     static final int LINK_LEJOS_M = 300;
     /** A más de esto de todas las cuadras de su calle: Google encontró otra cosa. */
     static final int LINK_FUERA_DE_LA_CALLE_M = 2000;
+    /** El punto de Google a menos de esto de OTRA cuadra de la misma calle: Google numera distinto. */
+    static final int LINK_OTRA_ALTURA_M = 60;
+    /** Una cuadra a menos de esto de la misma altura de la calle que la tiene como nombre anterior: es la repetida. */
+    static final int NOMBRE_VIEJO_M = 60;
 
     public record Punto(int cuadra, String localidad, double lat, double lng) {}
 
@@ -71,9 +77,12 @@ public class CallesARevisarService {
     private final CalleDudaRepository dudaRepository;
     private final UnionCallesService unionCalles;
     private final LinkGoogleMapsService linkGoogleMaps;
+    private final CalleNombreAnteriorRepository nombreAnteriorRepository;
 
     public CallesARevisarService(CuadraCoordsRepository coordsRepository, CalleDudaRepository dudaRepository,
-                                 UnionCallesService unionCalles, LinkGoogleMapsService linkGoogleMaps) {
+                                 UnionCallesService unionCalles, LinkGoogleMapsService linkGoogleMaps,
+                                 CalleNombreAnteriorRepository nombreAnteriorRepository) {
+        this.nombreAnteriorRepository = nombreAnteriorRepository;
         this.coordsRepository = coordsRepository;
         this.dudaRepository = dudaRepository;
         this.unionCalles = unionCalles;
@@ -105,7 +114,18 @@ public class CallesARevisarService {
                 nuevas++;
             }
         }
-        Map<CuadraCoords, String> sospechas = sospechas(filas);
+        Map<CuadraCoords, CuadraCoords> repetidas = conNombreViejo(filas);
+        for (Map.Entry<CuadraCoords, CuadraCoords> r : repetidas.entrySet()) {
+            CuadraCoords c = r.getKey(), deHoy = r.getValue();
+            if (conocidas.add(clave(TIPO_NOMBRE_VIEJO, c.getCalleCanonica(), c.getLocalidad(), c.getCuadra(), deHoy.getCalleCanonica()))) {
+                dudaRepository.save(nueva(TIPO_NOMBRE_VIEJO, c.getCalleCanonica(), c.getLocalidad(), c.getCuadra(), deHoy.getCalleCanonica(),
+                        "Es el nombre anterior de \"" + DireccionUtils.nombreParaMostrar(deHoy.getCalleCanonica()) + "\", que ya tiene esta cuadra a "
+                                + Math.round(metros(c, deHoy)) + " m: está repetida."));
+                nuevas++;
+            }
+        }
+        // Las repetidas con el nombre viejo no se juzgan por ubicación ni sirven de vecinas.
+        Map<CuadraCoords, String> sospechas = sospechas(filas.stream().filter(c -> !repetidas.containsKey(c)).toList());
         for (Map.Entry<CuadraCoords, String> s : sospechas.entrySet()) {
             CuadraCoords c = s.getKey();
             if (conocidas.add(clave(TIPO_UBICACION, c.getCalleCanonica(), c.getLocalidad(), c.getCuadra(), ""))) {
@@ -124,7 +144,7 @@ public class CallesARevisarService {
         for (CalleDuda d : dudaRepository.findByEstado(PENDIENTE)) {
             CuadraCoords fila = coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra(d.getCalleCanonica(), d.getLocalidad(), d.getCuadra()).orElse(null);
             List<Punto> cercanas = new ArrayList<>();
-            if (TIPO_NOMBRE.equals(d.getTipo())) {
+            if (!TIPO_UBICACION.equals(d.getTipo())) {
                 for (CuadraCoords c : deAlturaParecida(d.getOtraCalle(), d.getCuadra())) cercanas.add(punto(c));
             } else {
                 // La anterior y la siguiente de su calle.
@@ -156,33 +176,59 @@ public class CallesARevisarService {
         d.setLinkLat(lat);
         d.setLinkLng(lng);
         dudaRepository.save(d);
-        return TIPO_NOMBRE.equals(d.getTipo()) ? nombreConLink(d, lat, lng, quien) : ubicacionConLink(d, lat, lng, quien);
+        if (TIPO_NOMBRE_VIEJO.equals(d.getTipo())) {
+            return new Resultado(PENDIENTE, "Esta duda no se resuelve con un link: elegí si quitás la repetida o si son calles distintas.");
+        }
+        return TIPO_NOMBRE.equals(d.getTipo()) ? nombreConLink(d, lat, lng, quien) : ubicacionConLink(d, lat, lng, r.direccion(), quien);
     }
 
     /** Lo que elige la persona cuando no hay link o el link no alcanzó: MISMA, DISTINTAS, ESTA_BIEN o NO_EXISTE. */
     @Transactional
     public Resultado marcar(String id, String decision, String quien) {
         CalleDuda d = pendiente(id);
-        boolean deNombre = TIPO_NOMBRE.equals(d.getTipo());
+        boolean deNombre = TIPO_NOMBRE.equals(d.getTipo()), deUbicacion = TIPO_UBICACION.equals(d.getTipo());
         switch (decision == null ? "" : decision) {
+            case "QUITAR" -> {
+                if (!TIPO_NOMBRE_VIEJO.equals(d.getTipo())) throw new BadRequestException("Esa opción es solo para las repetidas con un nombre anterior.");
+                CuadraCoords repetida = fila(d).orElse(null);
+                if (repetida != null) {
+                    coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra(d.getOtraCalle(), d.getLocalidad(), d.getCuadra()).ifPresent(deHoy -> {
+                        deHoy.setConfirmaciones(deHoy.getConfirmaciones() + repetida.getConfirmaciones());
+                        coordsRepository.save(deHoy);
+                    });
+                    coordsRepository.delete(repetida);
+                }
+                Resultado res = cerrar(d, QUITADA, "Repetida quitada: la cuadra queda como \"" + DireccionUtils.nombreParaMostrar(d.getOtraCalle())
+                        + "\" y el nombre anterior la sigue encontrando.", quien);
+                cerrarLasQueYaCierran(sospechasDeHoy());
+                return res;
+            }
+            case "USAR_GOOGLE" -> {
+                if (!deUbicacion) throw new BadRequestException("Esa opción es solo para las dudas de ubicación.");
+                if (d.getLinkLat() == null || d.getLinkLng() == null) throw new BadRequestException("Primero pegá el link de Google Maps.");
+                corregirPunto(d.getCalleCanonica(), d.getLocalidad(), d.getCuadra(), d.getLinkLat(), d.getLinkLng());
+                Resultado res = cerrar(d, CORREGIDA, "Cuadra corrida a mano al punto de Google.", quien);
+                cerrarLasQueYaCierran(sospechasDeHoy());
+                return res;
+            }
             case "MISMA" -> {
                 if (!deNombre) throw new BadRequestException("Esa opción es solo para las dudas de nombre.");
                 unionCalles.unirPorRevision(d.getCalleCanonica(), d.getOtraCalle(), d.getLocalidad(), d.getCuadra(), 0);
                 return cerrar(d, UNIDA, "Unidas a mano: \"" + d.getCalleCanonica() + "\" pasa a ser \"" + d.getOtraCalle() + "\".", quien);
             }
             case "DISTINTAS" -> {
-                if (!deNombre) throw new BadRequestException("Esa opción es solo para las dudas de nombre.");
+                if (deUbicacion) throw new BadRequestException("Esa opción es solo para las dudas de nombre.");
                 return cerrar(d, DISTINTAS, "Marcadas a mano como calles distintas.", quien);
             }
             case "ESTA_BIEN" -> {
-                if (deNombre) throw new BadRequestException("Esa opción es solo para las dudas de ubicación.");
+                if (!deUbicacion) throw new BadRequestException("Esa opción es solo para las dudas de ubicación.");
                 return cerrar(d, ESTA_BIEN, "Marcada a mano: la cuadra está bien ubicada.", quien);
             }
             case "NO_EXISTE" -> {
-                if (deNombre) throw new BadRequestException("Esa opción es solo para las dudas de ubicación.");
+                if (!deUbicacion) throw new BadRequestException("Esa opción es solo para las dudas de ubicación.");
                 fila(d).ifPresent(coordsRepository::delete);
                 Resultado res = cerrar(d, NO_EXISTE, "Cuadra borrada: no existe.", quien);
-                cerrarLasQueYaCierran(sospechas(coordsRepository.findAll().stream().filter(c -> !c.isApproximate()).toList()));
+                cerrarLasQueYaCierran(sospechasDeHoy());
                 return res;
             }
             default -> throw new BadRequestException("Decisión desconocida: " + decision);
@@ -209,9 +255,16 @@ public class CallesARevisarService {
                 + distancia(aLaPropia) + " del punto que había. Mirá el mapa y elegí.");
     }
 
-    private Resultado ubicacionConLink(CalleDuda d, double lat, double lng, String quien) {
+    private Resultado ubicacionConLink(CalleDuda d, double lat, double lng, String direccionDeGoogle, String quien) {
         CuadraCoords fila = fila(d).orElse(null);
         if (fila == null) return cerrar(d, YA_CIERRA, "Esa cuadra ya no está en la base.", quien);
+        // Antes que nada: si Google le dice otro nombre a esa dirección, puede ser una calle que cambió de
+        // nombre (Rivadavia / Virgen de la Merced) y coincidir en el lugar confirmaría la repetida.
+        String otroNombre = otroNombreSegunGoogle(fila.getCalleCanonica(), direccionDeGoogle);
+        if (otroNombre != null) {
+            return new Resultado(PENDIENTE, "Google le dice \"" + otroNombre + "\" a esa dirección, no \""
+                    + DireccionUtils.nombreParaMostrar(fila.getCalleCanonica()) + "\": puede haber cambiado de nombre o ser otra calle. No se cambió nada; mirá el mapa y elegí.");
+        }
         double alPunto = metros(lat, lng, fila.getLat(), fila.getLng());
         if (alPunto <= LINK_MISMA_M) {
             corregirPunto(fila.getCalleCanonica(), fila.getLocalidad(), fila.getCuadra(), lat, lng);
@@ -227,11 +280,77 @@ public class CallesARevisarService {
         if (aLaCalle != Double.MAX_VALUE && aLaCalle > LINK_FUERA_DE_LA_CALLE_M) {
             return new Resultado(PENDIENTE, "Google la ubica a " + distancia(aLaCalle) + " de la cuadra más cercana de esa calle: parece otra dirección. Revisá el link.");
         }
+        // Google a veces numera distinto (2026-10-07: cuenta Rivadavia desde 0 después de Sarmiento, cuando sigue
+        // la numeración de Virgen de la Merced): si el punto cae encima de otra altura de la misma calle, no se le cree.
+        List<CuadraCoords> deLaCalle = coordsRepository.findByCalleCanonica(fila.getCalleCanonica()).stream().filter(c -> !c.isApproximate()).toList();
+        for (CuadraCoords c : deLaCalle) {
+            double aEsa = metros(lat, lng, c.getLat(), c.getLng());
+            if (c != fila && aEsa <= LINK_OTRA_ALTURA_M) {
+                return new Resultado(PENDIENTE, "Google la ubica encima de la cuadra " + c.getCuadra() + " de esta misma calle (a " + Math.round(aEsa)
+                        + " m): parece que numera distinto. No se cambió nada; mirá el mapa y elegí.");
+            }
+        }
+        // Y con el punto nuevo tiene que cerrar con sus vecinas: si no, se cambia un error por otro.
+        double latAntes = fila.getLat(), lngAntes = fila.getLng();
+        fila.setLat(lat);
+        fila.setLng(lng);
+        String sigue = sospechas(deLaCalle.stream().filter(c -> c.getLocalidad().equals(fila.getLocalidad())).toList()).get(fila);
+        fila.setLat(latAntes);
+        fila.setLng(lngAntes);
+        if (sigue != null) {
+            return new Resultado(PENDIENTE, "Con el punto de Google la cuadra sigue sin cerrar con sus vecinas: " + sigue.substring(0, 1).toLowerCase()
+                    + sigue.substring(1) + " No se cambió nada; si igual es el lugar correcto, elegí usar el punto de Google.");
+        }
         corregirPunto(fila.getCalleCanonica(), fila.getLocalidad(), fila.getCuadra(), lat, lng);
         Resultado res = cerrar(d, CORREGIDA, "Cuadra corrida " + distancia(alPunto) + " al punto de Google.", quien);
         // Una cuadra mal puesta hace dudar de sus vecinas: con esta corregida, las que ya cierran salen de la lista.
-        cerrarLasQueYaCierran(sospechas(coordsRepository.findAll().stream().filter(c -> !c.isApproximate()).toList()));
+        cerrarLasQueYaCierran(sospechasDeHoy());
         return res;
+    }
+
+    /** El nombre de calle que trae el link de Google si no es el de la cuadra (ni uno contiene al otro); null si coincide o no trae. */
+    private static String otroNombreSegunGoogle(String calleCanonica, String direccionDeGoogle) {
+        if (direccionDeGoogle == null) return null;
+        String calleGoogle = direccionDeGoogle.replaceFirst("\\s+\\d+$", "").trim();
+        Set<String> deGoogle = new HashSet<>(CallesParecidas.palabrasClave(DireccionUtils.normalizar(DireccionUtils.expandirAbreviaturas(calleGoogle))));
+        Set<String> propias = new HashSet<>(CallesParecidas.palabrasClave(calleCanonica));
+        if (deGoogle.isEmpty() || deGoogle.containsAll(propias) || propias.containsAll(deGoogle)) return null;
+        return calleGoogle;
+    }
+
+    /** Las sospechas de ubicación sobre la base como está ahora, sin contar las repetidas con un nombre anterior. */
+    private Map<CuadraCoords, String> sospechasDeHoy() {
+        List<CuadraCoords> filas = coordsRepository.findAll().stream().filter(c -> !c.isApproximate()).toList();
+        Map<CuadraCoords, CuadraCoords> repetidas = conNombreViejo(filas);
+        return sospechas(filas.stream().filter(c -> !repetidas.containsKey(c)).toList());
+    }
+
+    /**
+     * Cuadras guardadas con el nombre anterior de una calle (tabla calle_nombre_anterior) que están en
+     * el mismo lugar que esa altura de la calle de hoy: la misma cuadra dos veces. Devuelve repetida -> la de hoy.
+     */
+    private Map<CuadraCoords, CuadraCoords> conNombreViejo(List<CuadraCoords> filas) {
+        List<CalleNombreAnterior> anteriores = nombreAnteriorRepository.findAll();
+        Map<CuadraCoords, CuadraCoords> out = new LinkedHashMap<>();
+        if (anteriores.isEmpty()) return out;
+        Map<String, CuadraCoords> porLugar = new java.util.HashMap<>();
+        for (CuadraCoords c : filas) porLugar.put(c.getCalleCanonica() + "|" + c.getLocalidad() + "|" + c.getCuadra(), c);
+        Map<String, Set<String>> palabras = new java.util.HashMap<>();
+        for (CuadraCoords c : filas) {
+            Set<String> propias = palabras.computeIfAbsent(c.getCalleCanonica(), k -> new HashSet<>(CallesParecidas.palabrasClave(k)));
+            if (propias.isEmpty() || (propias.size() == 1 && propias.iterator().next().length() < 4)) continue;
+            for (CalleNombreAnterior n : anteriores) {
+                if (n.getCalleCanonica().equals(c.getCalleCanonica())) continue;
+                Set<String> delViejo = palabras.computeIfAbsent("viejo:" + n.getNombreNorm(), k -> new HashSet<>(CallesParecidas.palabrasClave(n.getNombreNorm())));
+                if (!delViejo.containsAll(propias)) continue;
+                CuadraCoords deHoy = porLugar.get(n.getCalleCanonica() + "|" + c.getLocalidad() + "|" + c.getCuadra());
+                if (deHoy != null && metros(c, deHoy) <= NOMBRE_VIEJO_M) {
+                    out.put(c, deHoy);
+                    break;
+                }
+            }
+        }
+        return out;
     }
 
     /** Deja el punto de Google como el de esa cuadra, salvo que ahí haya un GPS de un cadete (más confiable). */
