@@ -133,6 +133,59 @@ class UnionCallesServiceTest {
         assertEquals(3, tabla.size());
     }
 
+    // --- Regla de forma (2026-10-07): casos reales del 6 de octubre ---
+
+    @Test
+    void conLaMismaFormaSeGuardaConElNombreQueYaEstabaAunqueNoCaigaEnElMismoPunto() {
+        // "Alberti Manuel M 400" del teléfono quedó a 62 m de "Manuel Alberti 400": por 2 m abrió otra calle.
+        fila("manuel alberti", SMT, 400, LAT, LNG, "nominatim");
+
+        assertEquals("manuel alberti", service.alAprender("alberti manuel m", SMT, 400, LAT + 0.00056, LNG));
+        // No se mueve ni se fusiona nada: solo se guarda lo nuevo con el nombre que ya había.
+        verify(uniones, never()).save(any());
+        assertEquals(1, tabla.size());
+    }
+
+    @Test
+    void laMismaFormaValeConUnaAlturaVecinaYEnLaLocalidadDeAlLado() {
+        // Camino del Perú es el límite entre San Miguel y Yerba Buena: la 1100 solo estaba del otro lado.
+        fila("camino del peru", "Yerba Buena", 1000, LAT, LNG, "osm");
+
+        assertEquals("camino del peru", service.alAprender("avenida camino del peru", SMT, 1100, LAT + 0.0011, LNG));
+    }
+
+    @Test
+    void siElNombreNuevoYaTieneCuadrasPropiasCercaEsOtraCalle() {
+        // "Boulevard 9 de Julio" de Yerba Buena tiene sus 21 cuadras: no se le saca una para "9 de Julio".
+        fila("9 de julio", "Yerba Buena", 100, LAT, LNG, "osm");
+        fila("boulevard 9 de julio", "Yerba Buena", 0, LAT + 0.0018, LNG, "osm");
+
+        assertEquals("boulevard 9 de julio", service.alAprender("boulevard 9 de julio", "Yerba Buena", 100, LAT + 0.0009, LNG));
+    }
+
+    @Test
+    void laMismaFormaLejosOConOtraAlturaEsOtraCalle() {
+        fila("sarmiento", "Yerba Buena", 100, LAT_500M, LNG, "osm");
+        fila("sarmiento", "Yerba Buena", 900, LAT_20M, LNG, "osm");
+
+        assertEquals("avenida sarmiento", service.alAprender("avenida sarmiento", SMT, 100, LAT, LNG));
+    }
+
+    @Test
+    void unNumeroDistintoNoEsLaMismaForma() {
+        fila("diagonal 1", SMT, 1000, LAT, LNG, "osm");
+
+        assertEquals("diagonal 2", service.alAprender("diagonal 2", SMT, 1000, LAT + 0.0009, LNG));
+    }
+
+    @Test
+    void conDosCallesDeLaMismaFormaCercaNoSeAdivina() {
+        fila("mitre", SMT, 400, LAT, LNG, "osm");
+        fila("pasaje mitre", SMT, 400, LAT + 0.0009, LNG, "osm");
+
+        assertEquals("avenida mitre", service.alAprender("avenida mitre", SMT, 400, LAT + 0.0005, LNG));
+    }
+
     private CuadraCoords fila(String calle, String localidad, int cuadra, double lat, double lng, String proveedor) {
         CuadraCoords c = new CuadraCoords();
         c.setId(calle + "|" + localidad + "|" + cuadra);

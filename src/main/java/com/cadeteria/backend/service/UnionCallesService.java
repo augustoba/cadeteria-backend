@@ -47,8 +47,13 @@ public class UnionCallesService {
 
     static final int RADIO_MISMA_CALLE_M = 60;
     static final int CONTRADICCION_M = 300;
+    static final int FORMA_CERCA_M = 300;
+    static final int FORMA_ALTURA = 200;
     public static final String ORIGEN_AL_APRENDER = "al aprender";
     public static final String ORIGEN_REVISION = "revisión de duplicadas";
+    public static final String ORIGEN_A_REVISAR = "calles a revisar";
+    /** Al unir desde "calles a revisar" solo pasan las cuadras a menos de esto de la calle que queda. */
+    static final int ZONA_M = 1500;
 
     /** Lo que se unió o se uniría: {@code seFue} deja de existir como nombre propio. */
     public record Union(String seFue, String queda, String localidad, int cuadra, int distanciaM,
@@ -73,6 +78,12 @@ public class UnionCallesService {
     @Transactional
     public String alAprender(String canonica, String localidad, int cuadra, double lat, double lng) {
         if (coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra(canonica, localidad, cuadra).isPresent()) return canonica;
+        String porForma = mismaFormaCerca(canonica, cuadra, lat, lng);
+        if (porForma != null) {
+            log.info("Calle \"{}\" {} guardada como \"{}\": mismo nombre escrito de otra forma y cuadras de esa calle cerca.",
+                    canonica, cuadra, porForma);
+            return porForma;
+        }
         Set<String> palabras = palabras(canonica);
         if (noDistingue(palabras)) return canonica;
 
@@ -94,8 +105,34 @@ public class UnionCallesService {
         // Queda el nombre con menos palabras; a igualdad, el que ya estaba.
         boolean quedaLaNueva = palabras.size() < palabras(otra).size();
         String queda = quedaLaNueva ? canonica : otra, seVa = quedaLaNueva ? otra : canonica;
-        unir(seVa, queda, localidad, cuadra, candidatas.get(otra), ORIGEN_AL_APRENDER);
+        unir(seVa, queda, localidad, cuadra, candidatas.get(otra), ORIGEN_AL_APRENDER, false);
         return queda;
+    }
+
+    /**
+     * Regla de forma (2026-10-07): el nombre con el que hay que guardar una cuadra cuando el que llega
+     * es otra manera de escribir una calle que ya está ahí ("Avenida Camino del Perú" del teléfono y
+     * "Camino del Perú" de la base), o null si no aplica. No mueve ni fusiona nada: solo evita abrir
+     * una calle nueva. El lugar es el control, no un requisito exacto: alcanza con una cuadra de esa
+     * calle con altura parecida (hasta {@value #FORMA_ALTURA}) a menos de {@value #FORMA_CERCA_M} m,
+     * en cualquier localidad (hay calles que son el límite entre dos). No aplica si el nombre que
+     * llega ya tiene cuadras propias en la zona (es otra calle: "Boulevard 9 de Julio" y "9 de
+     * Julio") ni si hay dos candidatas.
+     */
+    private String mismaFormaCerca(String canonica, int cuadra, double lat, double lng) {
+        String forma = CallesParecidas.forma(canonica);
+        if (forma.isEmpty()) return null;
+        double dLat = FORMA_CERCA_M / 111_320d;
+        double dLng = FORMA_CERCA_M / (111_320d * Math.cos(Math.toRadians(lat)));
+        Set<String> candidatas = new HashSet<>();
+        for (CuadraCoords c : coordsRepository.findByLatBetweenAndLngBetween(lat - dLat, lat + dLat, lng - dLng, lng + dLng)) {
+            if (c.isApproximate() || metros(lat, lng, c.getLat(), c.getLng()) > FORMA_CERCA_M) continue;
+            if (c.getCalleCanonica().equals(canonica)) return null;
+            if (Math.abs(c.getCuadra() - cuadra) <= FORMA_ALTURA && forma.equals(CallesParecidas.forma(c.getCalleCanonica()))) {
+                candidatas.add(c.getCalleCanonica());
+            }
+        }
+        return candidatas.size() == 1 ? candidatas.iterator().next() : null;
     }
 
     /**
@@ -138,7 +175,7 @@ public class UnionCallesService {
             String queda = elegir(a, b, filasPorCalle), seVa = queda.equals(a) ? b : a;
             int distancia = (int) Math.round(metros(par[0].getLat(), par[0].getLng(), par[1].getLat(), par[1].getLng()));
             if (aplicar) {
-                uniones.add(unir(seVa, queda, par[0].getLocalidad(), par[0].getCuadra(), distancia, ORIGEN_REVISION));
+                uniones.add(unir(seVa, queda, par[0].getLocalidad(), par[0].getCuadra(), distancia, ORIGEN_REVISION, false));
                 ahoraSeLlama.put(seVa, queda);
                 filasPorCalle.merge(queda, filasPorCalle.getOrDefault(seVa, 0), Integer::sum);
             } else {
@@ -170,10 +207,24 @@ public class UnionCallesService {
         return a.length() <= b.length() ? a : b;
     }
 
-    /** Pasa todo lo de {@code seVa} a {@code queda}: las cuadras y las formas de escribirla. */
-    private Union unir(String seVa, String queda, String localidad, int cuadra, int distanciaM, String origen) {
+    /**
+     * Unión decidida desde "calles a revisar" (2026-10-07), con un link de Google Maps o a mano. Solo
+     * pasan las cuadras de la zona: el mismo nombre puede ser otra calle en otra localidad ("Avenida
+     * Camino del Perú" de Tafí Viejo, a 7 km de la de San Miguel). Si quedan cuadras con el nombre
+     * que se va, sus formas de escribirlo no se tocan.
+     */
+    @Transactional
+    public Union unirPorRevision(String seVa, String queda, String localidad, int cuadra, int distanciaM) {
+        return unir(seVa, queda, localidad, cuadra, distanciaM, ORIGEN_A_REVISAR, true);
+    }
+
+    /** Pasa lo de {@code seVa} a {@code queda}: las cuadras (todas, o solo las de la zona) y las formas de escribirla. */
+    private Union unir(String seVa, String queda, String localidad, int cuadra, int distanciaM, String origen, boolean soloLaZona) {
         int movidas = 0, fusionadas = 0;
+        List<CuadraCoords> deLaQueQueda = soloLaZona ? coordsRepository.findByCalleCanonica(queda) : List.of();
         for (CuadraCoords fila : coordsRepository.findByCalleCanonica(seVa)) {
+            if (!deLaQueQueda.isEmpty() && deLaQueQueda.stream().noneMatch(q ->
+                    metros(fila.getLat(), fila.getLng(), q.getLat(), q.getLng()) <= ZONA_M)) continue;
             Optional<CuadraCoords> yaEsta = coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra(queda, fila.getLocalidad(), fila.getCuadra());
             if (yaEsta.isEmpty()) {
                 fila.setCalleCanonica(queda);
@@ -198,14 +249,15 @@ public class UnionCallesService {
             coordsRepository.delete(fila);
             fusionadas++;
         }
+        boolean quedanCuadras = soloLaZona && !coordsRepository.findByCalleCanonica(seVa).isEmpty();
         boolean tieneAlias = false;
-        for (DireccionAlias alias : aliasRepository.findByCalleCanonica(seVa)) {
+        for (DireccionAlias alias : quedanCuadras ? List.<DireccionAlias>of() : aliasRepository.findByCalleCanonica(seVa)) {
             alias.setCalleCanonica(queda);
             aliasRepository.save(alias);
             tieneAlias |= alias.getVarianteNorm().equals(seVa);
         }
         // Que el nombre que se fue siga llevando a la calle: quien lo escriba la encuentra igual.
-        if (!tieneAlias && aliasRepository.findByVarianteNorm(seVa).isEmpty()) {
+        if (!quedanCuadras && !tieneAlias && aliasRepository.findByVarianteNorm(seVa).isEmpty()) {
             DireccionAlias alias = new DireccionAlias();
             alias.setId(UUID.randomUUID().toString());
             alias.setVarianteNorm(seVa);

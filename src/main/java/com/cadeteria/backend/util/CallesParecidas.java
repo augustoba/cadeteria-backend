@@ -48,6 +48,23 @@ public final class CallesParecidas {
         return palabras(nombreNorm);
     }
 
+    /**
+     * La "forma" de un nombre (2026-10-07): sus palabras propias de oído, en orden alfabético y sin
+     * las iniciales sueltas. Dos nombres con la misma forma son dos maneras de escribir lo mismo
+     * ("avenida camino del peru" y "camino del peru", "alberti manuel m" y "manuel alberti"); una
+     * palabra de más ya es otra forma ("adolfo alsina" no es "alsina"). Un número suelto sí cuenta
+     * ("diagonal 1" no es "diagonal 2"). Vacía si no alcanza para distinguir una calle.
+     */
+    public static String forma(String nombreNorm) {
+        List<String> out = new ArrayList<>();
+        for (String p : palabras(nombreNorm)) {
+            if (p.length() > 1 || Character.isDigit(p.charAt(0))) out.add(p);
+        }
+        if (out.isEmpty() || (out.size() == 1 && out.get(0).length() < 4)) return "";
+        java.util.Collections.sort(out);
+        return String.join(" ", out);
+    }
+
     private static List<String> palabras(String nombreNorm) {
         List<String> out = new ArrayList<>();
         if (nombreNorm == null) return out;

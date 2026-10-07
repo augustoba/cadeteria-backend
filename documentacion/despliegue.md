@@ -188,6 +188,14 @@ teléfonos; **volver a producción antes de tener cadetes reales**.
       `avisos_calle_ya_no_esta_para_bajar` (**2** cadetes distintos). Tablas nuevas `aviso_calle` y
       `aviso_calle_voto` y columna `aviso_calle.bajado_en`: las crea Hibernate. Explicarles a los
       cadetes para qué es y que queda registrado quién avisa.
+- [ ] **Calles a revisar (2026-10-07)**: Configuración → "Calles a revisar". Tabla nueva `calle_duda`
+      (la crea Hibernate) y rutas `GET /api/admin/configuracion/calles/a-revisar`, `POST .../a-revisar/actualizar`,
+      `POST .../a-revisar/{id}/link` y `POST .../a-revisar/{id}/marcar` (permiso "configuracion"). La lista se
+      arma sola todas las noches a las 4:45 y con el botón "Actualizar la lista"; la primera vez en
+      producción salen ~146 dudas (10 de nombre y 136 de ubicación, medido sobre la base del 2026-10-06).
+      Sin variables ni claves nuevas. Desde este cambio, al aprender una cuadra con un nombre que es otra
+      forma de escribir una calle que ya está cerca ("Avenida Camino del Perú" / "Camino del Perú"), se
+      guarda con el nombre que ya había (regla de forma, ver `UnionCallesService`).
 - [ ] **Recordatorios al entrar a la app (2026-09-29)**: Configuración → App de cadetes → "Cartel de
       recordatorios al entrar". Revisar título y renglones (hasta 6 de 150 caracteres; sin tocar valen
       los 3 de siempre). Claves `recordatorios_entrar_activo`, `recordatorios_entrar_titulo` y
