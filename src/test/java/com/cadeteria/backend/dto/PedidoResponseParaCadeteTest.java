@@ -70,6 +70,24 @@ class PedidoResponseParaCadeteTest {
     }
 
     @Test
+    void elReclamoLeViajaAlCadeteSoloMientrasEstaAbierto() {
+        // 2026-10-10: la app muestra el recuadro con solo tener el texto, y quedaba pegado.
+        Pedido p = pedido("EN_CURSO", Instant.now());
+        p.setReclamoDetalle("El cliente reclama demora en el retiro del pedido N° 1.");
+        p.setUltimoReclamoEn(Instant.now());
+        p.setReclamoTipo("DEMORA_RETIRO");
+        p.setReclamoEstado("ABIERTO");
+        assertEquals("El cliente reclama demora en el retiro del pedido N° 1.", PedidoResponse.paraCadete(p).reclamoDetalle());
+
+        p.setReclamoEstado("CERRADO");
+        assertNull(PedidoResponse.paraCadete(p).reclamoDetalle());
+        assertNull(PedidoResponse.paraCadete(p).reclamoEn());
+        // el panel lo sigue viendo, con su estado
+        assertEquals("El cliente reclama demora en el retiro del pedido N° 1.", PedidoResponse.from(p).reclamoDetalle());
+        assertEquals("CERRADO", PedidoResponse.from(p).reclamoEstado());
+    }
+
+    @Test
     void elPanelLoVeSiempre() {
         PedidoResponse r = PedidoResponse.from(pedido("PENDIENTE", null));
         assertEquals("Sobre con documentos", r.detalle());

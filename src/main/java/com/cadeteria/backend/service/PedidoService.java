@@ -285,7 +285,7 @@ public class PedidoService {
      * Botón de reclamo de la página de seguimiento (2026-09-25). El tipo lo decide el estado del
      * pedido, no lo que mande la página: en camino sin retirar = demora en el retiro; retirado =
      * demora en la entrega; entregado = problema con la entrega. Avisa al cadete (app + push), deja
-     * un comentario en el pedido y una alerta en el panel. Uno cada 10 minutos por pedido.
+     * un comentario en el pedido y una alerta en el panel. Uno cada 10 minutos por pedido y por tipo.
      */
     @Transactional
     public ReclamoResultado reclamoDelCliente(String token) {
@@ -324,7 +324,10 @@ public class PedidoService {
             throw new ConflictException("Este pedido no tiene un cadete asignado.");
         }
         String paraCliente = "Se está informando al cadete sobre la novedad. Pronto se comunicará con usted.";
-        if (pedido.getUltimoReclamoEn() != null
+        // La espera vale para el mismo reclamo repetido: si el pedido cambió de etapa (retiró, entregó)
+        // el reclamo es otro y se avisa aunque el anterior sea de hace un minuto (2026-10-10: el de
+        // demora en la entrega y el de problema con la entrega se perdían detrás del de retiro).
+        if (tipo.equals(pedido.getReclamoTipo()) && pedido.getUltimoReclamoEn() != null
                 && pedido.getUltimoReclamoEn().plus(ESPERA_ENTRE_RECLAMOS).isAfter(Instant.now())) {
             // Mismo texto que el primer aviso: "ya le avisamos hace unos minutos" confundía al cliente.
             // Al cadete no se le vuelve a mandar nada (ya tiene el aviso de hace menos de 10 minutos).

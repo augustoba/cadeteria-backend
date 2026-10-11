@@ -130,7 +130,7 @@ public final class PedidoDtos {
             String finalizadoPorAdmin, String finalizadoAdminMotivo
     ) {
         public static PedidoResponse from(Pedido p) {
-            return from(p, true, false);
+            return from(p, true, false, false);
         }
 
         /**
@@ -150,7 +150,7 @@ public final class PedidoDtos {
             String estado = p.getEstado() == null ? null : p.getEstado().getId();
             boolean sinAceptar = p.getAceptadoEn() == null || estado == null
                     || java.util.Set.of("PENDIENTE", "SIN_ASIGNAR", "PROGRAMADO").contains(estado);
-            return from(p, incluirParadas, sinAceptar);
+            return from(p, incluirParadas, sinAceptar, true);
         }
 
         /**
@@ -161,10 +161,14 @@ public final class PedidoDtos {
          * {@link #from(Pedido)}, que sí las incluye.
          */
         public static PedidoResponse fromResumen(Pedido p) {
-            return from(p, false, false);
+            return from(p, false, false, false);
         }
 
-        private static PedidoResponse from(Pedido p, boolean incluirParadas, boolean ocultarDetalle) {
+        private static PedidoResponse from(Pedido p, boolean incluirParadas, boolean ocultarDetalle, boolean paraCadete) {
+            // Al cadete el reclamo le viaja solo mientras está abierto (2026-10-10): la app muestra el
+            // recuadro con solo tener el texto, y "demora en el retiro" le quedaba con el pedido ya
+            // retirado. El panel lo sigue viendo siempre, con su estado.
+            boolean sinReclamo = paraCadete && "CERRADO".equals(p.getReclamoEstado());
             return new PedidoResponse(
                     p.getId(), p.getNumero(), p.getClienteTelefono(), p.getClienteNombre(),
                     p.getOrigenDireccion(), p.getOrigenLat(), p.getOrigenLng(),
@@ -190,7 +194,7 @@ public final class PedidoDtos {
                             : List.of(),
                     p.getAsignadoPorUsername(), p.getCanceladoPorUsername(), p.isPrioritario(),
                     p.getOrigenCarga(), p.getCreadoPorUsername(),
-                    p.getReclamoDetalle(), p.getUltimoReclamoEn(),
+                    sinReclamo ? null : p.getReclamoDetalle(), sinReclamo ? null : p.getUltimoReclamoEn(),
                     p.getReclamoTipo(), p.getReclamoEstado(), p.getClienteAvisadoEn(),
                     p.getRetiroFueraZona(), p.getRetiroDistanciaM(), p.getEntregaFueraZona(), p.getEntregaDistanciaM(),
                     p.getUbicacionSimulada(), p.getUbicacionImprecisa(),

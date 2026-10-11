@@ -142,6 +142,34 @@ class PedidoServiceSeguimientoTest {
     }
 
     @Test
+    void siElPedidoCambioDeEtapaElReclamoNuevoAvisaAunqueElAnteriorSeaReciente() {
+        // 2026-10-10: reclamó el retiro, el cadete retiró y entregó, y los reclamos siguientes se perdían.
+        Pedido p = conCadete(pedido("EN_CURSO", null));
+        tokenDe(p);
+        service.reclamoDelCliente("tok");
+
+        p.setRetiradoEn(Instant.now());
+        var demoraEntrega = service.reclamoDelCliente("tok");
+
+        org.junit.jupiter.api.Assertions.assertTrue(demoraEntrega.avisado());
+        org.junit.jupiter.api.Assertions.assertEquals("DEMORA_ENTREGA", p.getReclamoTipo());
+        org.mockito.Mockito.verify(fcm).enviar(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.contains("demora en la entrega"), org.mockito.ArgumentMatchers.any());
+
+        EstadoPedido finalizado = new EstadoPedido();
+        finalizado.setId("FINALIZADO");
+        p.setEstado(finalizado);
+        p.setFinalizadoEn(Instant.now());
+        var problema = service.reclamoDelCliente("tok", "Llegó el paquete abierto");
+
+        org.junit.jupiter.api.Assertions.assertTrue(problema.avisado());
+        org.junit.jupiter.api.Assertions.assertEquals("PROBLEMA_ENTREGA", p.getReclamoTipo());
+        org.mockito.Mockito.verify(incidenciaRepo).save(org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.verify(fcm, org.mockito.Mockito.times(3)).enviar(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void problemaConLaEntregaAbreUnIncidenteGraveQueBloqueaAlCadete() {
         Pedido entregado = conCadete(pedido("FINALIZADO", Instant.now()));
         tokenDe(entregado);
