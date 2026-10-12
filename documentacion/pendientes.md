@@ -1,6 +1,6 @@
 # Pendientes
 
-Última actualización: 2026-09-29 (noche).
+Última actualización: 2026-10-11.
 
 > El backlog largo (las 11 rondas de propuestas) vive en `MEJORAS-PROPUESTAS.md`, en la raíz
 > del proyecto. **Ese archivo está fuera de cualquier repo git**, así que no viaja con el
@@ -9,6 +9,23 @@
 Todo el trabajo nuevo va en la rama **`develop`** de los 3 repos (`cadeteria`, `admin-front`,
 `cadete-app`). Lo del 2026-09-24 al 26 ya está en `develop` (pusheado el 2026-09-26), salvo la
 rama `aviso-whatsapp-web` (backend + panel, aviso "en camino"), sin pushear al 2026-09-28.
+
+## Sesión 2026-10-11 (Claude): cobro a los cadetes — sin probar
+
+Pedido del dueño: el cadete recién dado de alta ya podía entrar y tener viajes sin pagar, y en
+**Pagos** no había forma de deshabilitar por falta de pago (solo dar de baja). Backend y panel en
+`develop`; la APK no se tocó (ya muestra el mensaje del servidor al rechazar el login).
+
+| Qué | Dónde | Probar |
+| --- | --- | --- |
+| **Alta sin habilitar**: el cadete nuevo (alta del panel o solicitud aprobada) y el reincorporado arrancan con `habilitadoPago=false` — antes nacía habilitado y trabajaba gratis hasta el lunes | back | Aprobar una solicitud → el cadete no puede loguearse hasta registrar el pago (semanal) o cargarle crédito (porcentaje) |
+| **Login exige estar al día** según cómo paga: SEMANAL habilitado esta semana, PORCENTAJE con crédito > 0 (`CadeteService.motivoSinPago`) | back | Cadete porcentaje con $0 → "no tenés crédito para trabajar". **Ojo: los porcentaje que hoy estén en $0 quedan afuera hasta cargarles crédito** |
+| **Deshabilitar por falta de pago** sin dar de baja: `POST /api/admin/cadetes/{id}/pago-semanal/deshabilitar` (solo SEMANAL). Deja de recibir viajes; si no tiene viajes sin terminar se le cierra la sesión al toque, si tiene los termina. Push al cadete | back + panel | Pagos → cadete al día → "Deshabilitar por falta de pago" → confirmar. Con y sin viaje en curso |
+| **Pasar de porcentaje a semanal** lo deja sin habilitar hasta que pague la semana (desde Pagos o desde el form del cadete) | back | Cambiar la modalidad y ver que queda "Debe la semana" |
+| **Permiso `pagos`**: registrar pago, cargar crédito, cambiar modalidad y deshabilitar ahora lo exigen (antes cualquier admin podía) | back | Admin sin permiso Pagos → 403 |
+| **Pantalla Pagos rehecha**: lista solo de activos, primero los que no pueden trabajar, con etiqueta (Al día / Pago parcial / Debe la semana / Sin crédito / $ crédito); detalle con "Puede / No puede trabajar", estado de la semana explicado, botón de deshabilitar con confirmación, "Guardar pago y habilitar"; cambiar modalidad queda plegado; "Monto cobrado por semana" abajo y cerrado | panel | Recorrerla con un semanal y un porcentaje |
+
+Test nuevo: `CadeteServiceMotivoSinPagoTest`.
 
 ## Sesión 2026-09-29 (Claude): lo que se hizo y lo que falta probar — seguir desde acá
 

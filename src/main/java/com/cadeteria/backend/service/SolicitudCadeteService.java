@@ -329,6 +329,10 @@ public class SolicitudCadeteService {
         if (s.getFotoTarjetaVerdeUrl() != null) c.setFotoTarjetaVerdeUrl(s.getFotoTarjetaVerdeUrl());
         if (s.getFotoTarjetaVerdeDorsoUrl() != null) c.setFotoTarjetaVerdeDorsoUrl(s.getFotoTarjetaVerdeDorsoUrl());
         if (modalidadPago != null && !modalidadPago.isBlank()) c.setModalidadPago(modalidadPago);
+        // Vuelve como un alta nueva: sin trabajar hasta que se registre el pago de la semana.
+        c.setHabilitadoPago(false);
+        c.setPagoSemanalMontoPagado(null);
+        c.setPagoSemanalVenceEn(null);
         cadeteRepo.save(c);
         cadeteService.setActivo(c.getId(), true, "Reincorporado por una solicitud de alta nueva", adminUsername);
         String passwordTemporal = cadeteService.reenviarPasswordTemporal(c.getId());

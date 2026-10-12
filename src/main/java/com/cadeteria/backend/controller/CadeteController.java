@@ -151,6 +151,12 @@ public class CadeteController {
         return CadeteResponse.from(service.habilitarPagoSemanal(id, req.montoPagado(), req.venceEn(), req.montoSemanal()));
     }
 
+    /** Lo deshabilita por falta de pago sin darlo de baja (2026-10-11). */
+    @PostMapping("/api/admin/cadetes/{id}/pago-semanal/deshabilitar")
+    public CadeteResponse deshabilitarPagoSemanal(@PathVariable String id) {
+        return CadeteResponse.from(service.deshabilitarPagoSemanal(id));
+    }
+
     /** Carga crédito a un cadete PORCENTAJE tras recibir su transferencia (ronda 7). */
     @PostMapping("/api/admin/cadetes/{id}/credito")
     public CadeteResponse acreditar(@PathVariable String id, @Valid @RequestBody AcreditarRequest req, Authentication auth) {

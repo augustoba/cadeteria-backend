@@ -188,6 +188,9 @@ public class CadeteService {
         c.setMayorEdadDeclaradaEn(Instant.now());
         c.setMayorEdadDeclaradaPor(declaradoPor);
         apply(c, req);
+        // Arranca sin poder trabajar hasta que se registre el pago de la semana (o se le cargue crédito
+        // si es PORCENTAJE) — antes nacía habilitado y trabajaba gratis hasta el lunes siguiente.
+        c.setHabilitadoPago(false);
         return repo.save(c);
     }
 
@@ -569,8 +572,57 @@ public class CadeteService {
             throw new BadRequestException("Modalidad de pago inválida: " + modalidadPago);
         }
         Cadete c = get(id);
-        c.setModalidadPago(modalidadPago);
+        aplicarModalidadPago(c, modalidadPago);
         return repo.save(c);
+    }
+
+    /**
+     * Si pasa de PORCENTAJE a SEMANAL queda sin habilitar hasta que pague la semana: el
+     * habilitadoPago que tenía de antes no corresponde a ningún pago de esta semana.
+     */
+    private static void aplicarModalidadPago(Cadete c, String nueva) {
+        if ("SEMANAL".equals(nueva) && !"SEMANAL".equals(c.getModalidadPago())) {
+            c.setHabilitadoPago(false);
+            c.setPagoSemanalMontoPagado(null);
+            c.setPagoSemanalVenceEn(null);
+        }
+        c.setModalidadPago(nueva);
+    }
+
+    /**
+     * El admin lo deshabilita por falta de pago (2026-10-11) sin darlo de baja: no entra a la app ni
+     * recibe viajes hasta que se registre el pago. Si no tiene viajes sin terminar se le cierra la
+     * sesión al toque; si tiene, termina esos y ya no le llegan nuevos.
+     */
+    public Cadete deshabilitarPagoSemanal(String id) {
+        Cadete c = get(id);
+        if (!"SEMANAL".equals(c.getModalidadPago())) {
+            throw new BadRequestException("Solo se deshabilita a mano a un cadete semanal: el de porcentaje deja de recibir viajes cuando se queda sin crédito.");
+        }
+        c.setHabilitadoPago(false);
+        c.setPagoSemanalVenceEn(null);
+        if (pedidoRepo.countByCadeteAsignadoIdAndEstadoIdIn(c.getId(), List.of("PENDIENTE", "EN_CURSO")) == 0) {
+            c.setSessionToken(UUID.randomUUID().toString());
+        }
+        repo.save(c);
+        fcmService.enviar(c.getFcmToken(), "Pago semanal pendiente",
+                "La cadetería te deshabilitó por falta de pago de la cuota semanal — pagala para volver a recibir viajes.",
+                Map.of("tipo", "PAGO_SEMANAL_PENDIENTE"));
+        return c;
+    }
+
+    /**
+     * Por qué no puede trabajar por el cobro, o null si está al día: SEMANAL sin habilitar esta
+     * semana, o PORCENTAJE sin crédito. Lo usa el login de la app.
+     */
+    public static String motivoSinPago(Cadete c) {
+        if ("SEMANAL".equals(c.getModalidadPago())) {
+            return c.isHabilitadoPago() ? null : "No podés ingresar: falta pagar la cuota semanal. Comunicate con la cadetería.";
+        }
+        if ("PORCENTAJE".equals(c.getModalidadPago()) && c.getCreditoDisponible().signum() <= 0) {
+            return "No podés ingresar: no tenés crédito para trabajar. Cargá crédito con la cadetería.";
+        }
+        return null;
     }
 
     /** El admin carga crédito a un cadete PORCENTAJE tras recibir su transferencia. */
@@ -689,7 +741,7 @@ public class CadeteService {
         c.setMaxViajesSemanales(req.maxViajesSemanales());
         c.setTurnoInicio(req.turnoInicio());
         c.setTurnoFin(req.turnoFin());
-        c.setModalidadPago(req.modalidadPago() == null || req.modalidadPago().isBlank() ? "SEMANAL" : req.modalidadPago());
+        aplicarModalidadPago(c, req.modalidadPago() == null || req.modalidadPago().isBlank() ? "SEMANAL" : req.modalidadPago());
         c.setNotasInternas(blankToNull(req.notasInternas()));
     }
 

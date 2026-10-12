@@ -127,8 +127,9 @@ public class AuthService {
             cadete.setDebeCambiarPassword(false);
             cadete.setPasswordTemporalExpira(null);
         }
-        if ("SEMANAL".equals(cadete.getModalidadPago()) && !cadete.isHabilitadoPago()) {
-            throw new ForbiddenException("No podés ingresar: falta pagar la cuota semanal. Comunicate con la cadetería.");
+        String sinPago = CadeteService.motivoSinPago(cadete);
+        if (sinPago != null) {
+            throw new ForbiddenException(sinPago);
         }
         // Un celular por cadete (2026-09-29): desde otro celular no entra (ForbiddenException, queda anotado).
         celularCadeteService.controlarAlLoguear(cadete, celularId, celularModelo);
