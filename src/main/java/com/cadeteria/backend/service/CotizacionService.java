@@ -32,6 +32,9 @@ import java.util.Optional;
  * Si el cadete tiene que volver al origen (2026-09-25), se suma
  * {@code recargo_retorno_origen_porcentaje} (default 50) del precio del viaje — sobre el tramo
  * por distancia, no sobre el recargo por dinero. En 0 no hay recargo.
+ * <p>
+ * El total se redondea para arriba a los $100 (2026-10-14): sin centavos ni pesos sueltos, porque
+ * el cadete no tiene cambio. El precio que el admin tipea a mano no se toca.
  */
 @Service
 public class CotizacionService {
@@ -89,10 +92,17 @@ public class CotizacionService {
         BigDecimal distanciaMinimaKm = configuracionService.getBigDecimal("distancia_minima_km", BigDecimal.valueOf(2));
         double kmAdicionales = Math.max(0, km - distanciaMinimaKm.doubleValue());
         BigDecimal viaje = precioBase.add(precioPorKm.multiply(BigDecimal.valueOf(kmAdicionales)));
-        return viaje
+        return redondearParaCobrar(viaje
                 .add(retornaAlOrigen ? recargoRetorno(viaje) : BigDecimal.ZERO)
-                .add(recargoPorDinero(montoDeclarado))
-                .setScale(0, RoundingMode.HALF_UP);
+                .add(recargoPorDinero(montoDeclarado)));
+    }
+
+    /** De a cuánto se redondea el precio sugerido: el cadete no tiene cambio chico (2026-10-14). */
+    static final BigDecimal REDONDEO_PRECIO = BigDecimal.valueOf(100);
+
+    /** Redondea para arriba a los 100 pesos: 2134,45 → 2200, 2200 → 2200, 2201 → 2300. */
+    static BigDecimal redondearParaCobrar(BigDecimal precio) {
+        return precio.divide(REDONDEO_PRECIO, 0, RoundingMode.CEILING).multiply(REDONDEO_PRECIO);
     }
 
     /**

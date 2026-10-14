@@ -311,7 +311,7 @@ public class SolicitudPedidoService {
                 precio, montoDeclarado, s.isLlevaValores(), s.getMontoValores(), detalle.length() == 0 ? null : detalle.toString().trim(),
                 s.getOrigenPiso(), s.getOrigenDepto(), s.getOrigenObservaciones(),
                 s.getDestinoPiso(), s.getDestinoDepto(), s.getDestinoObservaciones(),
-                requiereMoto, false, null, null, s.getOrigenFuente(), s.getDestinoFuente());
+                requiereMoto, false, null, null, s.getOrigenFuente(), s.getDestinoFuente(), s.isRetornaAlOrigen());
         Pedido pedido = pedidoService.crear(req, PedidoService.ORIGEN_WEB, null);
         // El pin del cliente se aprende recién acá, con la solicitud ya revisada por el admin:
         // desde /pedir cualquiera podría mandar un pin mal puesto a propósito. Y entra sin confirmar

@@ -70,6 +70,13 @@ public class Pedido {
     private boolean llevaValores = false;
 
     /**
+     * El cadete tiene que volver al origen después de entregar (2026-10-14). Antes viajaba solo como
+     * texto en el detalle, que el cadete no ve hasta aceptar: ahora le llega siempre, también en la oferta.
+     */
+    @Column(nullable = false)
+    private boolean retornaAlOrigen = false;
+
+    /**
      * Cuánto valen los objetos de valor declarados (2026-09-24), igual que montoDeclarado para el
      * dinero. Solo informativo (no cuenta para el tope de 5.2). Null si no transporta valores.
      */
@@ -389,6 +396,14 @@ public class Pedido {
 
     public void setLlevaValores(boolean llevaValores) {
         this.llevaValores = llevaValores;
+    }
+
+    public boolean isRetornaAlOrigen() {
+        return retornaAlOrigen;
+    }
+
+    public void setRetornaAlOrigen(boolean retornaAlOrigen) {
+        this.retornaAlOrigen = retornaAlOrigen;
     }
 
     public String getDetalle() {

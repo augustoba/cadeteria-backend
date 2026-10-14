@@ -88,6 +88,15 @@ class PedidoResponseParaCadeteTest {
     }
 
     @Test
+    void laVueltaAlOrigenLeLlegaAlCadeteAntesDeAceptar() {
+        // 2026-10-14: antes viajaba solo en el detalle, oculto en la oferta.
+        Pedido p = pedido("PENDIENTE", null);
+        p.setRetornaAlOrigen(true);
+        assertEquals(true, PedidoResponse.paraCadete(p).retornaAlOrigen());
+        assertEquals(false, PedidoResponse.paraCadete(pedido("PENDIENTE", null)).retornaAlOrigen());
+    }
+
+    @Test
     void elPanelLoVeSiempre() {
         PedidoResponse r = PedidoResponse.from(pedido("PENDIENTE", null));
         assertEquals("Sobre con documentos", r.detalle());

@@ -58,7 +58,9 @@ public final class PedidoDtos {
              * "google_link" (link de Google Maps pegado) se aprenden en la cache de direcciones
              * (GeocodingProxyService#aprenderPin); el nombre de un buscador o null, no.
              */
-            String origenFuente, String destinoFuente
+            String origenFuente, String destinoFuente,
+            /** El cadete vuelve al origen después de entregar (2026-10-14) — ver Pedido.retornaAlOrigen. */
+            boolean retornaAlOrigen
     ) {}
 
     /** Una parada intermedia al cargar el pedido (spec: repartos con varias entregas en una vuelta). */
@@ -127,7 +129,9 @@ public final class PedidoDtos {
             Boolean retiroFueraZona, Integer retiroDistanciaM, Boolean entregaFueraZona, Integer entregaDistanciaM,
             Boolean ubicacionSimulada, Boolean ubicacionImprecisa,
             /** Finalizado a mano desde el panel: quién y por qué (null si lo cerró el cadete). */
-            String finalizadoPorAdmin, String finalizadoAdminMotivo
+            String finalizadoPorAdmin, String finalizadoAdminMotivo,
+            /** Tiene que volver al origen (2026-10-14): al cadete le llega también antes de aceptar, para decidir. */
+            boolean retornaAlOrigen
     ) {
         public static PedidoResponse from(Pedido p) {
             return from(p, true, false, false);
@@ -198,7 +202,7 @@ public final class PedidoDtos {
                     p.getReclamoTipo(), p.getReclamoEstado(), p.getClienteAvisadoEn(),
                     p.getRetiroFueraZona(), p.getRetiroDistanciaM(), p.getEntregaFueraZona(), p.getEntregaDistanciaM(),
                     p.getUbicacionSimulada(), p.getUbicacionImprecisa(),
-                    p.getFinalizadoPorAdmin(), p.getFinalizadoAdminMotivo());
+                    p.getFinalizadoPorAdmin(), p.getFinalizadoAdminMotivo(), p.isRetornaAlOrigen());
         }
     }
 

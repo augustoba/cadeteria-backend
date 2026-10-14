@@ -51,10 +51,10 @@ class CotizacionServiceTest {
 
     @Test
     void elExcedenteSeCobraPorKm() {
-        // 5 km -> 2000 + 3 x 320 = 2960
-        assertEquals(new BigDecimal("2960"), precioPara(5000));
-        // 3,5 km -> 2000 + 1,5 x 320 = 2480
-        assertEquals(new BigDecimal("2480"), precioPara(3500));
+        // 5 km -> 2000 + 3 x 320 = 2960, redondeado a 3000
+        assertEquals(new BigDecimal("3000"), precioPara(5000));
+        // 3,5 km -> 2000 + 1,5 x 320 = 2480, redondeado a 2500
+        assertEquals(new BigDecimal("2500"), precioPara(3500));
     }
 
     @Test
@@ -62,10 +62,10 @@ class CotizacionServiceTest {
         when(config.getBigDecimal(eq("recargo_retorno_origen_porcentaje"), any())).thenReturn(BigDecimal.valueOf(50));
         when(ruta.resumenSiDisponible(anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyString()))
                 .thenReturn(Optional.of(new RutaService.Resumen(5000, 10)));
-        // 5 km -> 2960 + 50% = 4440
-        assertEquals(new BigDecimal("4440"), service.cotizar(-26.83, -65.20, -26.80, -65.25, null, true).orElseThrow().precioSugerido());
+        // 5 km -> 2960 + 50% = 4440, redondeado a 4500
+        assertEquals(new BigDecimal("4500"), service.cotizar(-26.83, -65.20, -26.80, -65.25, null, true).orElseThrow().precioSugerido());
         // sin volver, igual que siempre
-        assertEquals(new BigDecimal("2960"), service.cotizar(-26.83, -65.20, -26.80, -65.25, null, false).orElseThrow().precioSugerido());
+        assertEquals(new BigDecimal("3000"), service.cotizar(-26.83, -65.20, -26.80, -65.25, null, false).orElseThrow().precioSugerido());
     }
 
     @Test
@@ -81,6 +81,14 @@ class CotizacionServiceTest {
     void conPorcentajeEnCeroVolverNoCuestaMas() {
         when(config.getBigDecimal(eq("recargo_retorno_origen_porcentaje"), any())).thenReturn(BigDecimal.ZERO);
         assertEquals(new BigDecimal("2000"), service.precioParaKm(2, null, true));
+    }
+
+    @Test
+    void elPrecioSeRedondeaParaArribaALosCienPesos() {
+        assertEquals(new BigDecimal("2200"), CotizacionService.redondearParaCobrar(new BigDecimal("2134.45")));
+        assertEquals(new BigDecimal("2200"), CotizacionService.redondearParaCobrar(new BigDecimal("2200")));
+        assertEquals(new BigDecimal("2300"), CotizacionService.redondearParaCobrar(new BigDecimal("2201")));
+        assertEquals(new BigDecimal("2300"), CotizacionService.redondearParaCobrar(new BigDecimal("2200.01")));
     }
 
     @Test

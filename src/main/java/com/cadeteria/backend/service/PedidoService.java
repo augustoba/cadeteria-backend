@@ -560,6 +560,7 @@ public class PedidoService {
         p.setMontoDeclarado(req.montoDeclarado() == null ? BigDecimal.ZERO : req.montoDeclarado());
         p.setLlevaValores(req.llevaValores());
         p.setMontoValores(req.llevaValores() ? montoPositivoONull(req.montoValores()) : null);
+        p.setRetornaAlOrigen(req.retornaAlOrigen());
         p.setDetalle(req.detalle());
         p.setOrigenPiso(textoOpcional(req.origenPiso()));
         p.setOrigenDepto(textoOpcional(req.origenDepto()));
@@ -618,7 +619,7 @@ public class PedidoService {
                 original.getOrigenPiso(), original.getOrigenDepto(), original.getOrigenObservaciones(),
                 original.getDestinoPiso(), original.getDestinoDepto(), original.getDestinoObservaciones(),
                 original.isRequiereMoto(),
-                false, null, null, null, null);
+                false, null, null, null, null, original.isRetornaAlOrigen());
         return crear(req, ORIGEN_WEB, null);
     }
 
@@ -981,7 +982,7 @@ public class PedidoService {
         publisher.publicarEventoViaje(cadete.getId(), "VIAJE_ASIGNADO", PedidoResponse.paraCadete(pedido));
         publisher.publicarPedido(PedidoResponse.from(pedido));
         fcmService.enviar(cadete.getFcmToken(), "Nuevo viaje",
-                "Tenes un viaje nuevo asignado", Map.of("tipo", "VIAJE_ASIGNADO", "pedidoId", pedido.getId()));
+                pedido.isRetornaAlOrigen() ? "Tenes un viaje nuevo asignado, con vuelta al origen" : "Tenes un viaje nuevo asignado", Map.of("tipo", "VIAJE_ASIGNADO", "pedidoId", pedido.getId()));
     }
 
     /**
