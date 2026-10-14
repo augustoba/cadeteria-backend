@@ -97,6 +97,15 @@ class PedidoResponseParaCadeteTest {
     }
 
     @Test
+    void elDineroADisponerLeLlegaAlCadeteAntesDeAceptar() {
+        // 2026-10-14: tiene que saber si necesita plata encima antes de aceptar.
+        Pedido p = pedido("PENDIENTE", null);
+        p.setMontoDisponer(new BigDecimal("15000"));
+        assertEquals(new BigDecimal("15000"), PedidoResponse.paraCadete(p).montoDisponer());
+        assertNull(PedidoResponse.paraCadete(pedido("PENDIENTE", null)).montoDisponer());
+    }
+
+    @Test
     void elPanelLoVeSiempre() {
         PedidoResponse r = PedidoResponse.from(pedido("PENDIENTE", null));
         assertEquals("Sobre con documentos", r.detalle());

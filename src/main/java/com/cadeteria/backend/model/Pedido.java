@@ -77,6 +77,14 @@ public class Pedido {
     private boolean retornaAlOrigen = false;
 
     /**
+     * Plata propia que el cadete tiene que tener encima para el viaje (2026-10-14: hay clientes que
+     * le piden pagar algo al retirar). Null si no hace falta. Suma recargo igual que el dinero y los
+     * valores, pero no cuenta para el tope de 5.2 (no es plata del cliente).
+     */
+    @Column(precision = 12, scale = 2)
+    private BigDecimal montoDisponer;
+
+    /**
      * Cuánto valen los objetos de valor declarados (2026-09-24), igual que montoDeclarado para el
      * dinero. Solo informativo (no cuenta para el tope de 5.2). Null si no transporta valores.
      */
@@ -404,6 +412,14 @@ public class Pedido {
 
     public void setRetornaAlOrigen(boolean retornaAlOrigen) {
         this.retornaAlOrigen = retornaAlOrigen;
+    }
+
+    public BigDecimal getMontoDisponer() {
+        return montoDisponer;
+    }
+
+    public void setMontoDisponer(BigDecimal montoDisponer) {
+        this.montoDisponer = montoDisponer;
     }
 
     public String getDetalle() {

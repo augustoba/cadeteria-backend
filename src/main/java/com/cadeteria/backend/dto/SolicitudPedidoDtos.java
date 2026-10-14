@@ -50,7 +50,10 @@ public final class SolicitudPedidoDtos {
              * "google_link" (link de Google Maps pegado) se aprenden en la cache de direcciones
              * (GeocodingProxyService#aprenderPin); el nombre de un buscador o null, no.
              */
-            String origenFuente, String destinoFuente
+            String origenFuente, String destinoFuente,
+            /** Plata propia que el cadete tiene que tener encima (2026-10-14), null o 0 si no hace falta. */
+            @PositiveOrZero(message = "El dinero a disponer no puede ser negativo.")
+            @Digits(integer = 10, fraction = 2, message = "El dinero a disponer no es válido.") BigDecimal montoDisponer
     ) {}
 
     public record SolicitudPedidoResponse(
@@ -61,6 +64,7 @@ public final class SolicitudPedidoDtos {
             boolean llevaValores,
             BigDecimal montoValores,
             boolean retornaAlOrigen,
+            BigDecimal montoDisponer,
             String clienteNombre, String clienteTelefono,
             String detalle,
             String origenPiso, String origenDepto, String origenObservaciones,
@@ -83,7 +87,7 @@ public final class SolicitudPedidoDtos {
             return new SolicitudPedidoResponse(
                     s.getId(), s.getOrigenDireccion(), s.getOrigenLat(), s.getOrigenLng(),
                     s.getDestinoDireccion(), s.getDestinoLat(), s.getDestinoLng(),
-                    s.isLlevaDinero(), s.getMontoDeclarado(), s.isLlevaValores(), s.getMontoValores(), s.isRetornaAlOrigen(),
+                    s.isLlevaDinero(), s.getMontoDeclarado(), s.isLlevaValores(), s.getMontoValores(), s.isRetornaAlOrigen(), s.getMontoDisponer(),
                     s.getClienteNombre(), s.getClienteTelefono(), s.getDetalle(),
                     s.getOrigenPiso(), s.getOrigenDepto(), s.getOrigenObservaciones(),
                     s.getDestinoPiso(), s.getDestinoDepto(), s.getDestinoObservaciones(), s.getEstado(),

@@ -60,7 +60,10 @@ public final class PedidoDtos {
              */
             String origenFuente, String destinoFuente,
             /** El cadete vuelve al origen después de entregar (2026-10-14) — ver Pedido.retornaAlOrigen. */
-            boolean retornaAlOrigen
+            boolean retornaAlOrigen,
+            /** Plata propia que el cadete tiene que tener encima (2026-10-14), null o 0 si no hace falta. */
+            @PositiveOrZero(message = "El dinero a disponer no puede ser negativo.")
+            @Digits(integer = 10, fraction = 2, message = "El dinero a disponer no es válido.") BigDecimal montoDisponer
     ) {}
 
     /** Una parada intermedia al cargar el pedido (spec: repartos con varias entregas en una vuelta). */
@@ -131,7 +134,9 @@ public final class PedidoDtos {
             /** Finalizado a mano desde el panel: quién y por qué (null si lo cerró el cadete). */
             String finalizadoPorAdmin, String finalizadoAdminMotivo,
             /** Tiene que volver al origen (2026-10-14): al cadete le llega también antes de aceptar, para decidir. */
-            boolean retornaAlOrigen
+            boolean retornaAlOrigen,
+            /** Cuánto tiene que tener encima el cadete (2026-10-14): le llega también en la oferta. */
+            BigDecimal montoDisponer
     ) {
         public static PedidoResponse from(Pedido p) {
             return from(p, true, false, false);
@@ -202,7 +207,7 @@ public final class PedidoDtos {
                     p.getReclamoTipo(), p.getReclamoEstado(), p.getClienteAvisadoEn(),
                     p.getRetiroFueraZona(), p.getRetiroDistanciaM(), p.getEntregaFueraZona(), p.getEntregaDistanciaM(),
                     p.getUbicacionSimulada(), p.getUbicacionImprecisa(),
-                    p.getFinalizadoPorAdmin(), p.getFinalizadoAdminMotivo(), p.isRetornaAlOrigen());
+                    p.getFinalizadoPorAdmin(), p.getFinalizadoAdminMotivo(), p.isRetornaAlOrigen(), p.getMontoDisponer());
         }
     }
 

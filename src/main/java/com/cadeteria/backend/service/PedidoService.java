@@ -561,6 +561,7 @@ public class PedidoService {
         p.setLlevaValores(req.llevaValores());
         p.setMontoValores(req.llevaValores() ? montoPositivoONull(req.montoValores()) : null);
         p.setRetornaAlOrigen(req.retornaAlOrigen());
+        p.setMontoDisponer(montoPositivoONull(req.montoDisponer()));
         p.setDetalle(req.detalle());
         p.setOrigenPiso(textoOpcional(req.origenPiso()));
         p.setOrigenDepto(textoOpcional(req.origenDepto()));
@@ -619,7 +620,7 @@ public class PedidoService {
                 original.getOrigenPiso(), original.getOrigenDepto(), original.getOrigenObservaciones(),
                 original.getDestinoPiso(), original.getDestinoDepto(), original.getDestinoObservaciones(),
                 original.isRequiereMoto(),
-                false, null, null, null, null, original.isRetornaAlOrigen());
+                false, null, null, null, null, original.isRetornaAlOrigen(), original.getMontoDisponer());
         return crear(req, ORIGEN_WEB, null);
     }
 
@@ -982,7 +983,20 @@ public class PedidoService {
         publisher.publicarEventoViaje(cadete.getId(), "VIAJE_ASIGNADO", PedidoResponse.paraCadete(pedido));
         publisher.publicarPedido(PedidoResponse.from(pedido));
         fcmService.enviar(cadete.getFcmToken(), "Nuevo viaje",
-                pedido.isRetornaAlOrigen() ? "Tenes un viaje nuevo asignado, con vuelta al origen" : "Tenes un viaje nuevo asignado", Map.of("tipo", "VIAJE_ASIGNADO", "pedidoId", pedido.getId()));
+                textoViajeNuevo(pedido), Map.of("tipo", "VIAJE_ASIGNADO", "pedidoId", pedido.getId()));
+    }
+
+    /**
+     * Texto del push "Nuevo viaje": la vuelta al origen y el dinero a disponer van acá también
+     * (2026-10-14), así le llegan antes de aceptar aunque tenga una APK que no los muestra.
+     */
+    static String textoViajeNuevo(Pedido pedido) {
+        StringBuilder texto = new StringBuilder("Tenes un viaje nuevo asignado");
+        if (pedido.isRetornaAlOrigen()) texto.append(", con vuelta al origen");
+        if (pedido.getMontoDisponer() != null && pedido.getMontoDisponer().signum() > 0) {
+            texto.append(", debes disponer de $").append(pedido.getMontoDisponer().stripTrailingZeros().toPlainString());
+        }
+        return texto.toString();
     }
 
     /**
