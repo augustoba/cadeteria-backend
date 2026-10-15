@@ -38,7 +38,7 @@ class CotizacionServiceTest {
     }
 
     private BigDecimal precioPara(double metros) {
-        when(ruta.resumenSiDisponible(anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyString()))
+        when(ruta.resumenParaCotizar(anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyString()))
                 .thenReturn(Optional.of(new RutaService.Resumen(metros, 10)));
         return service.cotizar(-26.83, -65.20, -26.80, -65.25, null).orElseThrow().precioSugerido();
     }
@@ -60,7 +60,7 @@ class CotizacionServiceTest {
     @Test
     void volverAlOrigenSumaElPorcentajeDelViaje() {
         when(config.getBigDecimal(eq("recargo_retorno_origen_porcentaje"), any())).thenReturn(BigDecimal.valueOf(50));
-        when(ruta.resumenSiDisponible(anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyString()))
+        when(ruta.resumenParaCotizar(anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyString()))
                 .thenReturn(Optional.of(new RutaService.Resumen(5000, 10)));
         // 5 km -> 2960 + 50% = 4440, redondeado a 4500
         assertEquals(new BigDecimal("4500"), service.cotizar(-26.83, -65.20, -26.80, -65.25, null, true).orElseThrow().precioSugerido());
@@ -99,7 +99,7 @@ class CotizacionServiceTest {
 
     @Test
     void sinRutaUsaLineaRectaPorElFactor() {
-        when(ruta.resumenSiDisponible(anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyString()))
+        when(ruta.resumenParaCotizar(anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyString()))
                 .thenReturn(Optional.empty());
         double recta = GeocodingService.distanciaKm(-26.83, -65.20, -26.80, -65.25);
         var c = service.cotizar(-26.83, -65.20, -26.80, -65.25, null).orElseThrow();

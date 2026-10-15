@@ -10,7 +10,8 @@ import java.util.Optional;
  * Sugiere un precio de viaje sin que el admin tenga que tipearlo, a partir de origen y destino.
  * <p>
  * **Solo por distancia** (2026-09-24 — la cadetería ya no trabaja por zonas, ni para asignar ni
- * para cobrar): se calcula la distancia real por calle (via {@link RutaService}, perfil moto) — o
+ * para cobrar): se calcula la distancia real por calle (via {@link RutaService#resumenParaCotizar},
+ * medida en bici desde 2026-10-15 porque el auto daba la vuelta por avenidas) — o
  * en línea recta (Haversine) × {@code factor_linea_recta} (default 1,4) si el servicio falla, para
  * no romper la sugerencia por eso — la línea recta sola cobraba de menos: medido en 12 viajes de
  * Tucumán (2026-09-24), la distancia por calle es en promedio 1,38 veces la recta. Sobre
@@ -66,7 +67,7 @@ public class CotizacionService {
         if (configuracionService.getBigDecimal("precio_por_km", BigDecimal.ZERO).signum() <= 0) {
             return Optional.empty();
         }
-        Optional<RutaService.Resumen> ruta = rutaService.resumenSiDisponible(origenLat, origenLng, destinoLat, destinoLng, "MOTO");
+        Optional<RutaService.Resumen> ruta = rutaService.resumenParaCotizar(origenLat, origenLng, destinoLat, destinoLng, "MOTO");
         double km;
         String metodo;
         if (ruta.isPresent()) {

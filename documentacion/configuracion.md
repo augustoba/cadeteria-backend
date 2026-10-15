@@ -94,7 +94,9 @@ editable a mano.
 
 ## Panel → Configuración: rutas (distancia real por calle)
 
-Para que "precio por km" cotice con distancia real (no en línea recta), se prueban en este
+Para que "precio por km" cotice con distancia real (no en línea recta), primero se mide **en
+bici** (routing.openstreetmap.de, gratis, sin key): el OSRM de abajo solo calcula en auto y va por
+avenidas, así que cobraba de más (desde 2026-10-15). Si la bici no responde, se prueban en este
 orden:
 
 1. **OSRM** — gratis, sin cuenta ni API key, siempre activo. No hay nada que cargar.

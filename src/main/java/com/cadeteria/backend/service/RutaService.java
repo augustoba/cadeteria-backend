@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
@@ -35,12 +36,19 @@ import java.util.Optional;
  * <p>
  * Si las tres fallan (o ninguna key está cargada, o todas sin cupo), quien llama cae a la
  * línea recta — ninguna de estas fuentes bloquea el flujo si no responde.
+ * <p>
+ * Para **cobrar** ({@link #resumenParaCotizar}, 2026-10-15) antes de las tres se mide en bici
+ * (OSRM de FOSSGIS, routing.openstreetmap.de): el OSRM demo solo tiene perfil auto y devuelve la
+ * ruta más rápida por avenidas, no la más corta — un viaje de 3,2 km en moto salía 4,2 km. La
+ * bici anda a velocidad pareja por cualquier calle y hace tramos cortos a contramano, como la
+ * moto. Contra: no usa autopista. El tiempo de llegada al cliente sigue con las tres de siempre.
  */
 @Service
 public class RutaService {
 
     private static final Logger log = LoggerFactory.getLogger(RutaService.class);
     private static final String OSRM_URL = "https://router.project-osrm.org";
+    private static final String OSRM_BICI_URL = "https://routing.openstreetmap.de/routed-bike";
     private static final String GRAPHHOPPER_URL = "https://graphhopper.com/api/1/route";
     public static final String PROVEEDOR_GRAPHHOPPER = "graphhopper";
     public static final String PROVEEDOR_ORS = "openrouteservice";
@@ -53,6 +61,14 @@ public class RutaService {
     private final ConfiguracionService configuracionService;
     private final ApiKeyPoolService apiKeyPool;
     private final RestClient restClient = RestClient.create();
+    /**
+     * Servidor comunitario sin garantía: tiempos cortos para que si no responde la cotización
+     * pase rápido a las otras fuentes; su política de uso pide identificarse.
+     */
+    private final RestClient restClientBici = RestClient.builder()
+            .requestFactory(conTiempos(3000, 5000))
+            .defaultHeader(HttpHeaders.USER_AGENT, "Cadem-cadeteria/1.0 (cademcadeteria.com.ar)")
+            .build();
 
     /** Distancia/tiempo estimado, en metros/minutos — resumen liviano de {@link #calcularRuta}. */
     public record Resumen(double distanciaM, int duracionMin) {}
@@ -118,6 +134,42 @@ public class RutaService {
         return intentarOsrm(origenLat, origenLng, destinoLat, destinoLng)
                 .or(() -> intentarGraphHopper(origenLat, origenLng, destinoLat, destinoLng, tipoVehiculoId))
                 .or(() -> intentarOpenRouteServiceSilencioso(origenLat, origenLng, destinoLat, destinoLng, tipoVehiculoId));
+    }
+
+    /**
+     * Distancia para cobrar: primero en bici (ver la clase), si no responde las mismas fuentes que
+     * {@link #resumenSiDisponible}. La duración que devuelve la bici es a velocidad de bici — para
+     * cobrar solo se usa la distancia.
+     */
+    public Optional<Resumen> resumenParaCotizar(double origenLat, double origenLng,
+                                                 double destinoLat, double destinoLng, String tipoVehiculoId) {
+        return intentarOsrmBici(origenLat, origenLng, destinoLat, destinoLng)
+                .or(() -> resumenSiDisponible(origenLat, origenLng, destinoLat, destinoLng, tipoVehiculoId));
+    }
+
+    @SuppressWarnings("unchecked")
+    private Optional<Resumen> intentarOsrmBici(double origenLat, double origenLng, double destinoLat, double destinoLng) {
+        try {
+            String uri = String.format(
+                    "%s/route/v1/bike/%s,%s;%s,%s?overview=false",
+                    OSRM_BICI_URL, origenLng, origenLat, destinoLng, destinoLat);
+            Map<String, Object> resp = restClientBici.get().uri(uri).retrieve().body(Map.class);
+            List<Map<String, Object>> rutas = (List<Map<String, Object>>) resp.get("routes");
+            Map<String, Object> ruta = rutas.get(0);
+            double distanciaM = ((Number) ruta.get("distance")).doubleValue();
+            double duracionSeg = ((Number) ruta.get("duration")).doubleValue();
+            return Optional.of(new Resumen(distanciaM, (int) Math.ceil(duracionSeg / 60)));
+        } catch (Exception e) {
+            log.debug("OSRM en bici no disponible para calcular distancia: {}", e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    private static SimpleClientHttpRequestFactory conTiempos(int conexionMs, int lecturaMs) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(conexionMs);
+        factory.setReadTimeout(lecturaMs);
+        return factory;
     }
 
     /** Demo pública, sin key — solo perfil "driving" disponible en el servidor comunitario. */

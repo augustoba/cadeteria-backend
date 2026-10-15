@@ -252,6 +252,7 @@ usan en producción.
 | Geoapify / LocationIQ | Buscador de direcciones | Panel → Configuración |
 | Google Cloud (opcional) | "Buscar de nuevo" con Google | Panel → Configuración |
 | GraphHopper / OpenRouteService (opcional) | Distancia real por calle | Panel → Configuración |
+| routing.openstreetmap.de (sin cuenta) | Distancia en bici para cotizar (desde 2026-10-15); servidor comunitario sin garantía — si crece el uso, pasarlo al OSRM propio | nada que cargar (fijo en `RutaService`) |
 | Firebase (opcional) | Push a la app | variable `FCM_CREDENTIALS_PATH` |
 | Chip de WhatsApp / celular con SMS gateway | Códigos y avisos a clientes | gateway + variables |
 
