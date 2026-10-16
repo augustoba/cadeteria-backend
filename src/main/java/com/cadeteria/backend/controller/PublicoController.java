@@ -5,13 +5,11 @@ import jakarta.validation.Valid;
 import com.cadeteria.backend.common.BadRequestException;
 import com.cadeteria.backend.dto.PublicoDtos.CalificarRequest;
 import com.cadeteria.backend.dto.PublicoDtos.SeguimientoResponse;
-import com.cadeteria.backend.model.Cadete;
 import com.cadeteria.backend.model.Pedido;
 import com.cadeteria.backend.service.PdfComprobanteService;
 import com.cadeteria.backend.service.PedidoService;
 import com.cadeteria.backend.service.ConfiguracionService;
 import com.cadeteria.backend.service.ReclamoService;
-import com.cadeteria.backend.service.RutaService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -32,32 +30,21 @@ public class PublicoController {
 
     private final PedidoService service;
     private final PdfComprobanteService pdfService;
-    private final RutaService rutaService;
     private final ReclamoService reclamoService;
     private final ConfiguracionService configuracionService;
 
-    public PublicoController(PedidoService service, PdfComprobanteService pdfService, RutaService rutaService,
+    public PublicoController(PedidoService service, PdfComprobanteService pdfService,
                              ReclamoService reclamoService, ConfiguracionService configuracionService) {
         this.reclamoService = reclamoService;
         this.configuracionService = configuracionService;
         this.service = service;
         this.pdfService = pdfService;
-        this.rutaService = rutaService;
     }
 
     @GetMapping
     public SeguimientoResponse seguimiento(@PathVariable String token) {
         Pedido pedido = service.getPorToken(token);
-        Cadete cadete = pedido.getCadeteAsignado();
-        Integer etaMinutos = null;
-        if ("EN_CURSO".equals(pedido.getEstado().getId()) && cadete != null
-                && cadete.getLat() != null && cadete.getLng() != null) {
-            etaMinutos = rutaService.resumenSiDisponible(
-                    cadete.getLat(), cadete.getLng(), pedido.getDestinoLat(), pedido.getDestinoLng(),
-                    cadete.getTipoVehiculo().getId()
-            ).map(RutaService.Resumen::duracionMin).orElse(null);
-        }
-        return SeguimientoResponse.from(pedido, etaMinutos,
+        return SeguimientoResponse.from(pedido,
                 configuracionService.getString(ReclamoService.CONFIG_WHATSAPP_ATENCION, ""),
                 reclamoService.cierreAutomaticoDe(pedido).orElse(null));
     }

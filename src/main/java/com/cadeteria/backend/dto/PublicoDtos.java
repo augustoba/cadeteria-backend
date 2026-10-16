@@ -28,13 +28,20 @@ public final class PublicoDtos {
             boolean puedeCalificar,
             Integer calificacionEstrellas,
             String calificacionComentario,
-            /** Solo mientras el pedido está EN_CURSO (ronda 4, punto 12) — tracking en vivo estilo Uber. */
-            Double cadeteLat,
-            Double cadeteLng,
+            /** Dinero propio que el cadete tiene que llevar encima (2026-10-14) — null si no hace falta. */
+            BigDecimal montoDisponer,
+            /** El cadete vuelve al origen después de entregar (2026-10-14). */
+            boolean retornaAlOrigen,
+            /** Detalle que cargó el cliente o el operador al pedir — puede ser null. */
+            String detalle,
+            /**
+             * Origen y destino para el mapa (2026-10-16). La ubicación del cadete y el tiempo de llegada
+             * no se mandan: el cadete puede llevar otros pedidos y no se sabe cuál hace primero.
+             */
+            Double origenLat,
+            Double origenLng,
             Double destinoLat,
             Double destinoLng,
-            /** Minutos estimados de llegada (ronda 4, punto 30) — null si ORS no está configurado o falló. */
-            Integer etaMinutos,
             /** El cadete ya retiró el pedido en el origen (2026-09-25): "va a buscarlo" vs "va hacia el destino". */
             boolean retirado,
             /** Foto que sacó el cadete al retirar — desde que retiró (2026-09-25). */
@@ -49,18 +56,14 @@ public final class PublicoDtos {
             java.time.Instant reclamoCierraEn
     ) {
         public static SeguimientoResponse from(Pedido p) {
-            return from(p, null, "");
+            return from(p, "");
         }
 
-        public static SeguimientoResponse from(Pedido p, Integer etaMinutos) {
-            return from(p, etaMinutos, "");
+        public static SeguimientoResponse from(Pedido p, String whatsappAtencion) {
+            return from(p, whatsappAtencion, null);
         }
 
-        public static SeguimientoResponse from(Pedido p, Integer etaMinutos, String whatsappAtencion) {
-            return from(p, etaMinutos, whatsappAtencion, null);
-        }
-
-        public static SeguimientoResponse from(Pedido p, Integer etaMinutos, String whatsappAtencion,
+        public static SeguimientoResponse from(Pedido p, String whatsappAtencion,
                                                java.time.Instant reclamoCierraEn) {
             boolean finalizado = "FINALIZADO".equals(p.getEstado().getId());
             boolean enCurso = "EN_CURSO".equals(p.getEstado().getId());
@@ -81,11 +84,13 @@ public final class PublicoDtos {
                     finalizado && p.getCalificadoEn() == null,
                     p.getCalificacionEstrellas(),
                     p.getCalificacionComentario(),
-                    enCurso && cadete != null ? cadete.getLat() : null,
-                    enCurso && cadete != null ? cadete.getLng() : null,
-                    enCurso ? p.getDestinoLat() : null,
-                    enCurso ? p.getDestinoLng() : null,
-                    enCurso ? etaMinutos : null,
+                    p.getMontoDisponer() != null && p.getMontoDisponer().signum() > 0 ? p.getMontoDisponer() : null,
+                    p.isRetornaAlOrigen(),
+                    p.getDetalle(),
+                    p.getOrigenLat(),
+                    p.getOrigenLng(),
+                    p.getDestinoLat(),
+                    p.getDestinoLng(),
                     p.getRetiradoEn() != null,
                     p.getRetiradoEn() != null ? p.getFotoRecepcionUrl() : null,
                     finalizado ? p.getFirmaReceptorUrl() : null,
