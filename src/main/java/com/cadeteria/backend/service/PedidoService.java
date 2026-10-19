@@ -2,6 +2,7 @@ package com.cadeteria.backend.service;
 
 import com.cadeteria.backend.common.GoneException;
 import com.cadeteria.backend.common.ConflictException;
+import com.cadeteria.backend.common.CreditoInsuficienteException;
 import com.cadeteria.backend.common.BadRequestException;
 import com.cadeteria.backend.common.ResourceNotFoundException;
 import com.cadeteria.backend.common.UbicacionSimuladaException;
@@ -849,8 +850,16 @@ public class PedidoService {
                 if (semana >= cadete.getMaxViajesSemanales()) return false;
             }
         }
-        if ("PORCENTAJE".equals(cadete.getModalidadPago()) && cadete.getCreditoDisponible().compareTo(comisionDe(nuevoPedido)) < 0) {
-            return false;
+        if ("PORCENTAJE".equals(cadete.getModalidadPago())) {
+            // 2026-10-19: también las comisiones de lo que ya tiene ofrecido sin aceptar (todavía no se
+            // descontaron). Antes, con $100 y varias ofertas de $90 cada una, aceptaba todas y quedaba en negativo.
+            BigDecimal comprometido = activos.stream()
+                    .filter(p -> "PENDIENTE".equals(p.getEstado().getId()) && !p.getId().equals(nuevoPedido.getId()))
+                    .map(this::comisionDe)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            if (cadete.getCreditoDisponible().compareTo(comprometido.add(comisionDe(nuevoPedido))) < 0) {
+                return false;
+            }
         }
         return true;
     }
@@ -1163,6 +1172,7 @@ public class PedidoService {
 
     // --- Acciones del cadete ---
 
+    @Transactional(noRollbackFor = CreditoInsuficienteException.class)
     public Pedido aceptar(String pedidoId, String cadeteUsername) {
         Pedido pedido = getParaActualizar(pedidoId);
         Cadete cadete = cadeteDelUsername(cadeteUsername);
@@ -1176,12 +1186,27 @@ public class PedidoService {
         if (oferta.getExpiraEn().isBefore(Instant.now())) {
             throw new ConflictException("El tiempo para aceptar este viaje ya venció.");
         }
+        boolean porcentaje = "PORCENTAJE".equals(cadete.getModalidadPago());
+        if (porcentaje) {
+            bloquear(cadete);
+            // 2026-10-19: se vuelve a mirar al aceptar (entre la oferta y el toque pudo aceptar otro
+            // viaje o pudieron anularle una carga). Sin crédito no lo toma: el viaje pasa a otro cadete.
+            if (cadete.getCreditoDisponible().compareTo(comisionDe(pedido)) < 0) {
+                oferta.setResultado(resultado("RECHAZADO"));
+                oferta.setMotivoRechazo("Sin crédito suficiente para la comisión");
+                oferta.setRespondidoEn(Instant.now());
+                ofertaRepo.save(oferta);
+                liberarYReasignar(pedido, cadete, false);
+                throw new CreditoInsuficienteException("No te alcanza el crédito para la comisión de este viaje ($"
+                        + comisionDe(pedido).stripTrailingZeros().toPlainString() + "). Cargá crédito con la cadetería; "
+                        + "el viaje pasó a otro cadete.");
+            }
+        }
         oferta.setResultado(resultado("ACEPTADO"));
         oferta.setRespondidoEn(Instant.now());
         ofertaRepo.save(oferta);
 
-        if ("PORCENTAJE".equals(cadete.getModalidadPago())) {
-            bloquear(cadete);
+        if (porcentaje) {
             BigDecimal comision = comisionDe(pedido);
             cadete.setCreditoDisponible(cadete.getCreditoDisponible().subtract(comision));
             pedido.setComisionDescontada(comision);
