@@ -237,7 +237,10 @@ public class PedidoService {
                 + " → $" + precioNuevo.stripTrailingZeros().toPlainString();
         registrarMovimientoCredito(cadete, diferencia.signum() > 0 ? "AJUSTE_RESTA" : "AJUSTE_SUMA", diferencia.abs(),
                 pedido.getId(), pedido.getNumero(), motivo, adminUsername);
-        if (diferencia.signum() > 0) avisarCreditoBajoSiCorresponde(cadete);
+        if (diferencia.signum() > 0) {
+            avisarCreditoBajoSiCorresponde(cadete);
+            ocuparSiNoLeAlcanzaParaOtro(cadete);
+        }
     }
 
     /** Mejora 93 — marcar/desmarcar un pedido como prioritario/urgente, solo visual en el dashboard. */
@@ -930,6 +933,24 @@ public class PedidoService {
         }
     }
 
+    /**
+     * La comisión de un viaje que ya tiene lo dejó por debajo del viaje mínimo (2026-10-19): si estaba
+     * Libre pasa a Ocupado al toque, así termina lo que tiene y en el panel no figura disponible.
+     * Para volver a Libre tiene que cargar crédito (CadeteService.actualizarEstado lo controla).
+     */
+    private void ocuparSiNoLeAlcanzaParaOtro(Cadete cadete) {
+        if (cadete.getEstado() == null || !"LIBRE".equals(cadete.getEstado().getId())
+                || CadeteService.motivoSinCreditoParaLibre(cadete, configuracionService) == null) return;
+        cadete.setEstado(estadoCadeteRepo.findById("OCUPADO")
+                .orElseThrow(() -> new IllegalStateException("Falta seedear estado_cadete.OCUPADO")));
+        cadeteRepo.save(cadete);
+        publisher.publicarUbicacion(cadete);
+        fcmService.enviar(cadete.getFcmToken(), "Sin crédito para más viajes",
+                "Te pusimos Ocupado: con tu crédito no alcanza para otro viaje. Terminá el que tenés y cargá crédito "
+                        + "con la cadetería para volver a estar disponible.",
+                Map.of("tipo", "SIN_CREDITO"));
+    }
+
     // --- Asignacion (admin) ---
 
     /** El admin confirma un candidato (sugerido o elegido a mano) — dispara la primera oferta. */
@@ -1213,6 +1234,7 @@ public class PedidoService {
             cadeteRepo.save(cadete);
             registrarMovimientoCredito(cadete, "COMISION", comision, pedido.getId(), pedido.getNumero());
             avisarCreditoBajoSiCorresponde(cadete);
+            ocuparSiNoLeAlcanzaParaOtro(cadete);
         }
 
         pedido.setEstado(estado("EN_CURSO"));

@@ -253,6 +253,11 @@ public class CadeteService {
      */
     public Cadete marcarLibre(String id) {
         Cadete c = get(id);
+        String sinCredito = motivoSinCreditoParaLibre(c, configuracionService);
+        if (sinCredito != null) {
+            throw new ConflictException("No se lo puede poner Libre: su crédito no alcanza para el viaje mínimo ("
+                    + pesos(creditoMinimo(configuracionService)) + "). Cargale crédito desde Pagos.");
+        }
         boolean estabaDesconectado = "DESCONECTADO".equals(c.getEstado().getId());
         c.setEstado(estadoLibre());
         c.setOrdenColaEspera(Instant.now());
@@ -290,6 +295,10 @@ public class CadeteService {
         if ("LIBRE".equals(estadoId) && "DESCONECTADO".equals(anterior)) {
             validarDocumentacionCompleta(c);
         }
+        if ("LIBRE".equals(estadoId)) {
+            String sinCredito = motivoSinCreditoParaLibre(c, configuracionService);
+            if (sinCredito != null) throw new BadRequestException(sinCredito);
+        }
         c.setEstado(estado);
         if ("LIBRE".equals(estadoId)) {
             c.setOrdenColaEspera(Instant.now());
@@ -301,6 +310,50 @@ public class CadeteService {
         if (pasaADesconectado) sesionService.cerrar(guardado);
         if (saleDeDesconectado) sesionService.abrir(guardado);
         return guardado;
+    }
+
+    /**
+     * Crédito mínimo para estar disponible (2026-10-19): la comisión del viaje más barato, o sea el
+     * precio base × el % de comisión (2000 × 25% = 500). Con menos no le alcanza para ningún viaje, y
+     * en el panel aparecía Libre como si se le pudiera asignar.
+     */
+    public static BigDecimal creditoMinimo(ConfiguracionService config) {
+        BigDecimal precioBase = config.getBigDecimal("precio_base_viaje", BigDecimal.valueOf(2000));
+        BigDecimal pct = config.getBigDecimal("comision_porcentaje", BigDecimal.TEN);
+        return precioBase.multiply(pct).divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+    }
+
+    /** Por qué un cadete PORCENTAJE no puede ponerse Libre, o null si puede (o si paga por semana). */
+    public static String motivoSinCreditoParaLibre(Cadete c, ConfiguracionService config) {
+        if (!"PORCENTAJE".equals(c.getModalidadPago())) return null;
+        BigDecimal minimo = creditoMinimo(config);
+        if (c.getCreditoDisponible().compareTo(minimo) >= 0) return null;
+        return "Tu crédito (" + pesos(c.getCreditoDisponible()) + ") no alcanza para el viaje mínimo (" + pesos(minimo)
+                + "). Cargá crédito con la cadetería para ponerte disponible.";
+    }
+
+    static String pesos(BigDecimal monto) {
+        return "$" + monto.setScale(0, java.math.RoundingMode.HALF_UP).toPlainString();
+    }
+
+    /**
+     * Le bajaron el crédito desde el panel (ajuste o anulación) y ya no le alcanza (2026-10-19): si
+     * estaba Libre se lo saca al toque. Con viajes sin terminar queda Ocupado (los termina); sin
+     * viajes, Desconectado. Se le avisa por push.
+     */
+    private void sacarDeLibreSiNoLeAlcanza(Cadete c) {
+        if (c.getEstado() == null || !"LIBRE".equals(c.getEstado().getId()) || motivoSinCreditoParaLibre(c, configuracionService) == null) return;
+        boolean conViajes = pedidoRepo.countByCadeteAsignadoIdAndEstadoIdIn(c.getId(), List.of("PENDIENTE", "EN_CURSO")) > 0;
+        String nuevo = conViajes ? "OCUPADO" : "DESCONECTADO";
+        c.setEstado(estadoCadeteRepo.findById(nuevo)
+                .orElseThrow(() -> new IllegalStateException("Falta seedear estado_cadete." + nuevo)));
+        Cadete guardado = repo.save(c);
+        if (!conViajes) sesionService.cerrar(guardado);
+        publisher.publicarUbicacion(guardado);
+        fcmService.enviar(c.getFcmToken(), "Sin crédito para más viajes",
+                "Tu crédito (" + pesos(c.getCreditoDisponible()) + ") no alcanza para el viaje mínimo ("
+                        + pesos(creditoMinimo(configuracionService)) + "). Cargá crédito con la cadetería para ponerte disponible.",
+                Map.of("tipo", "SIN_CREDITO"));
     }
 
     /**
@@ -767,6 +820,7 @@ public class CadeteService {
         movimientoCreditoRepo.save(anulacion);
         original.setAnuladoPorId(anulacion.getId());
         movimientoCreditoRepo.save(original);
+        sacarDeLibreSiNoLeAlcanza(c);
         return c;
     }
 
@@ -782,6 +836,7 @@ public class CadeteService {
         MovimientoCredito m = nuevoMovimiento(c, sumar ? "AJUSTE_SUMA" : "AJUSTE_RESTA", monto, null, null, adminUsername);
         m.setMotivo(motivo.trim());
         movimientoCreditoRepo.save(m);
+        if (!sumar) sacarDeLibreSiNoLeAlcanza(c);
         return c;
     }
 
@@ -846,6 +901,18 @@ public class CadeteService {
                     "No completaste el pago de la cuota semanal a tiempo — te deshabilitamos hasta que la pagues.",
                     java.util.Map.of("tipo", "PAGO_SEMANAL_PENDIENTE"));
         }
+    }
+
+    /**
+     * Por si quedó alguno Libre sin crédito para el viaje mínimo (2026-10-19): los que ya estaban al
+     * desplegar, o si se sube la comisión o el precio base en Configuración.
+     */
+    @Scheduled(fixedDelay = 300_000)
+    public void revisarLibresSinCredito() {
+        repo.findAll().stream()
+                .filter(c -> "PORCENTAJE".equals(c.getModalidadPago()))
+                .filter(c -> c.getEstado() != null && "LIBRE".equals(c.getEstado().getId()))
+                .forEach(this::sacarDeLibreSiNoLeAlcanza);
     }
 
     private EstadoCadete estadoLibre() {
