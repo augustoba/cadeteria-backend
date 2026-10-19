@@ -220,13 +220,20 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void seedResultadoOferta() {
-        if (resultadoOfertaRepo.count() > 0) return;
-        resultadoOfertaRepo.save(lookup(new ResultadoOferta(), "PENDIENTE", "Pendiente"));
-        resultadoOfertaRepo.save(lookup(new ResultadoOferta(), "ACEPTADO", "Aceptado"));
-        resultadoOfertaRepo.save(lookup(new ResultadoOferta(), "RECHAZADO", "Rechazado"));
-        resultadoOfertaRepo.save(lookup(new ResultadoOferta(), "EXPIRADO", "Expirado"));
-        resultadoOfertaRepo.save(lookup(new ResultadoOferta(), "QUITADO_ADMIN", "Quitado por el admin"));
-        log.info("Seed: resultado_oferta cargado.");
+        if (resultadoOfertaRepo.count() == 0) {
+            resultadoOfertaRepo.save(lookup(new ResultadoOferta(), "PENDIENTE", "Pendiente"));
+            resultadoOfertaRepo.save(lookup(new ResultadoOferta(), "ACEPTADO", "Aceptado"));
+            resultadoOfertaRepo.save(lookup(new ResultadoOferta(), "RECHAZADO", "Rechazado"));
+            resultadoOfertaRepo.save(lookup(new ResultadoOferta(), "EXPIRADO", "Expirado"));
+            resultadoOfertaRepo.save(lookup(new ResultadoOferta(), "QUITADO_ADMIN", "Quitado por el admin"));
+            log.info("Seed: resultado_oferta cargado.");
+        }
+        // Fuera del "count == 0" para que las bases ya seedeadas también lo reciban (2026-10-19): quiso
+        // aceptar sin crédito para la comisión; no cuenta como rechazo ni como no aceptado.
+        if (resultadoOfertaRepo.findById("SIN_CREDITO").isEmpty()) {
+            resultadoOfertaRepo.save(lookup(new ResultadoOferta(), "SIN_CREDITO", "Sin crédito para la comisión"));
+            log.info("Seed: resultado_oferta SIN_CREDITO agregado.");
+        }
     }
 
     private void seedAutorMensaje() {

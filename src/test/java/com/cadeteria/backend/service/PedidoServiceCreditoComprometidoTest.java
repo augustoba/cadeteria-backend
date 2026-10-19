@@ -72,7 +72,7 @@ class PedidoServiceCreditoComprometidoTest {
             estados.put(id, e);
             when(estadoRepo.findById(id)).thenReturn(Optional.of(e));
         }
-        for (String id : new String[]{"PENDIENTE", "ACEPTADO", "RECHAZADO"}) {
+        for (String id : new String[]{"PENDIENTE", "ACEPTADO", "RECHAZADO", "SIN_CREDITO"}) {
             ResultadoOferta r = new ResultadoOferta();
             r.setId(id);
             resultados.put(id, r);
@@ -143,7 +143,7 @@ class PedidoServiceCreditoComprometidoTest {
 
         assertThrows(CreditoInsuficienteException.class, () -> service.aceptar("p1", "30111222"));
 
-        assertEquals("RECHAZADO", oferta.getResultado().getId());
+        assertEquals("SIN_CREDITO", oferta.getResultado().getId(), "no cuenta como rechazo");
         assertEquals(new BigDecimal("50.00"), cadete.getCreditoDisponible(), "no se le descontó nada");
         verify(movimientoRepo, never()).save(any());
     }

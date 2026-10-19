@@ -1191,9 +1191,9 @@ public class PedidoService {
             bloquear(cadete);
             // 2026-10-19: se vuelve a mirar al aceptar (entre la oferta y el toque pudo aceptar otro
             // viaje o pudieron anularle una carga). Sin crédito no lo toma: el viaje pasa a otro cadete.
+            // Queda como SIN_CREDITO, que no cuenta como rechazo ni como no aceptado (no lo penaliza).
             if (cadete.getCreditoDisponible().compareTo(comisionDe(pedido)) < 0) {
-                oferta.setResultado(resultado("RECHAZADO"));
-                oferta.setMotivoRechazo("Sin crédito suficiente para la comisión");
+                oferta.setResultado(resultado("SIN_CREDITO"));
                 oferta.setRespondidoEn(Instant.now());
                 ofertaRepo.save(oferta);
                 liberarYReasignar(pedido, cadete, false);
