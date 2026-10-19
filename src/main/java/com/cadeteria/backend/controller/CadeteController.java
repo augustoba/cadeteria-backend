@@ -150,8 +150,27 @@ public class CadeteController {
 
     /** Habilita a un cadete SEMANAL para trabajar esta semana, con pago completo o parcial (ronda 7). */
     @PostMapping("/api/admin/cadetes/{id}/pago-semanal/habilitar")
-    public CadeteResponse habilitarPagoSemanal(@PathVariable String id, @Valid @RequestBody HabilitarPagoSemanalRequest req) {
-        return CadeteResponse.from(service.habilitarPagoSemanal(id, req.montoPagado(), req.venceEn(), req.montoSemanal()));
+    public CadeteResponse habilitarPagoSemanal(@PathVariable String id, @Valid @RequestBody HabilitarPagoSemanalRequest req,
+                                               Authentication auth) {
+        return CadeteResponse.from(service.habilitarPagoSemanal(id, req.montoPagado(), req.venceEn(), req.montoSemanal(), auth.getName()));
+    }
+
+    /** Pagos de la cuota de esta semana, con los anulados (2026-10-19). */
+    @GetMapping("/api/admin/cadetes/{id}/pago-semanal/movimientos")
+    public List<com.cadeteria.backend.dto.CadeteDtos.PagoSemanalMovimientoResponse> pagosSemanales(@PathVariable String id) {
+        return service.pagosSemanalesDeEstaSemana(id).stream()
+                .map(m -> new com.cadeteria.backend.dto.CadeteDtos.PagoSemanalMovimientoResponse(
+                        m.getId(), m.getMonto(), m.getCreadoEn(), m.getCreadoPorUsername(),
+                        m.getAnuladoEn(), m.getAnuladoPorUsername(), m.getMotivoAnulacion()))
+                .toList();
+    }
+
+    /** Anula un pago de esta semana cargado por error y recalcula si puede trabajar (2026-10-19). */
+    @PostMapping("/api/admin/cadetes/{id}/pago-semanal/{movimientoId}/anular")
+    public CadeteResponse anularPagoSemanal(@PathVariable String id, @PathVariable String movimientoId,
+                                            @Valid @RequestBody com.cadeteria.backend.dto.CadeteDtos.AnularPagoSemanalRequest req,
+                                            Authentication auth) {
+        return CadeteResponse.from(service.anularPagoSemanal(id, movimientoId, req.motivo(), req.venceEn(), auth.getName()));
     }
 
     /** Lo deshabilita por falta de pago sin darlo de baja (2026-10-11). */

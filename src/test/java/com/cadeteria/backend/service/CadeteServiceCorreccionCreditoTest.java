@@ -42,7 +42,7 @@ class CadeteServiceCorreccionCreditoTest {
                 mock(PedidoUbicacionRepository.class), mock(AvisoGeneralRepository.class),
                 mock(AvisoGeneralLecturaRepository.class), mock(ConfiguracionService.class),
                 mock(CadeteEstadoLogRepository.class), movimientoRepo, mock(MetricasService.class),
-                mock(IncidenciaService.class));
+                mock(IncidenciaService.class), mock(PagoSemanalMovimientoRepository.class));
 
         cadete = new Cadete();
         cadete.setId("c1");

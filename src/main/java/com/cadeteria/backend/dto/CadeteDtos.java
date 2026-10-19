@@ -198,6 +198,16 @@ public final class CadeteDtos {
             Instant venceEn,
             @PositiveOrZero(message = "La cuota semanal no puede ser negativa.") BigDecimal montoSemanal) {}
 
+    /** Anular un pago semanal equivocado (2026-10-19); venceEn solo si queda un pago parcial sin vencimiento. */
+    public record AnularPagoSemanalRequest(
+            @NotBlank(message = "Contá por qué se anula.")
+            @Size(max = 255, message = "El motivo puede tener hasta 255 caracteres.") String motivo,
+            Instant venceEn) {}
+
+    public record PagoSemanalMovimientoResponse(
+            String id, BigDecimal monto, Instant creadoEn, String creadoPorUsername,
+            Instant anuladoEn, String anuladoPorUsername, String motivoAnulacion) {}
+
     /** Cargar crédito a un cadete PORCENTAJE tras recibir su transferencia (ronda 7). */
     public record AcreditarRequest(
             @NotNull(message = "Falta el monto.") @Positive(message = "El monto tiene que ser mayor a 0.")

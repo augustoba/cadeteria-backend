@@ -21,7 +21,18 @@ vez). Ver los puntos nuevos en `despliegue.md` §3.
 | **3p-2. Corregir el crédito.** En Pagos (cadete a porcentaje): "Últimos movimientos" con **Anular** en cada carga (pide motivo, resta con un movimiento `ANULACION` y la carga queda tachada) y **Ajustar el crédito a mano** (sumar/restar con motivo). Puede quedar en negativo; sin límite de tiempo. Permiso `pagos`. `POST /api/admin/cadetes/{id}/credito/{movimientoId}/anular` y `.../credito/ajuste` | back + panel | Cargar 5000, anularla, ver el saldo y el historial (también en la ficha del cadete) |
 | **3p-3. Historial de Configuración.** Tabla `configuracion_cambio`: quién cambió cada opción, de qué a qué y cuándo (las que tienen key/password/secret/token en el nombre quedan "(oculto)"). Configuración → "Historial de cambios" (los últimos 300; lo técnico solo lo ve el superadmin). `GET /api/admin/configuracion/historial` | back + panel | Cambiar la comisión, guardar y abrir el historial |
 | **3p-4. Editar el precio de un pedido aceptado ajusta la comisión** con el mismo % que se cobró al aceptar (no el de Configuración): movimiento `AJUSTE_RESTA`/`AJUSTE_SUMA` con el número de pedido y "Cambio de precio…" | back | Cadete a porcentaje acepta un pedido de 800, subirlo a 2000 desde el panel: le resta la diferencia |
+| **Pago semanal: "Registrar otro pago" suma y se puede anular.** Antes reemplazaba el monto (2000 + 3000 quedaba en 3000) y no quedaba quién ni cuándo. Cada pago va a `pago_semanal_movimiento`; lo pagado en la semana es la suma de los no anulados (lo pagado antes del despliegue entra como un primer pago "(antes del historial)"). En Pagos → "Pagos de esta semana", **Anular** con motivo, solo los de la semana actual: si llega a la cuota sigue al día, si queda una parte pasa a parcial (pide vencimiento si no tenía), si queda en 0 se deshabilita y termina el viaje en curso. `GET /api/admin/cadetes/{id}/pago-semanal/movimientos` y `POST .../pago-semanal/{movimientoId}/anular` | back + panel | Cuota 5000: pagar 2000 con vencimiento, después 3000 → "Al día"; anular el de 3000 → parcial; anular el otro → deshabilitado |
 | **Radio del control en el lugar** en Configuración → Pedidos (`en_lugar_radio_m`, 20 a 1000 m, 150 si está vacío) | panel | Cambiarlo y ver que la app frena con el radio nuevo al abrir el viaje |
+
+### 3p-5. Crédito: se le pueden ofrecer más viajes de los que puede pagar (sin programar)
+
+Reportado el 2026-10-19. La comisión se descuenta **al aceptar** (`PedidoService.aceptar`), no al
+finalizar, pero el control de crédito (`dentroDeTopes`) compara el saldo solo contra la comisión del
+pedido nuevo: no cuenta los pedidos que ya tiene ofrecidos sin aceptar (PENDIENTE), y `aceptar` no
+vuelve a mirar el saldo. Con $100 de saldo y tope de varios viajes (o un lote), se le pueden ofrecer
+varios de $90 de comisión; acepta todos y queda en negativo. Propuesta: al ofrecer, que el saldo
+alcance para la comisión del nuevo **más** la de los ofrecidos sin aceptar; y al aceptar, volver a
+controlar (si no le alcanza: "No te alcanza el crédito", y la oferta pasa a otro cadete).
 
 Lo del 2026-10-19 que originó esto: el 25% de comisión se guardó entre las 13:56 y las 15:01 (antes
 regía el 10%), así que faltan cobrar **300** a Cristian Enrique (pedido 1500108) y **495** a

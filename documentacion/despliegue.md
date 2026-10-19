@@ -185,7 +185,8 @@ teléfonos; **volver a producción antes de tener cadetes reales**.
       "Distancia para marcar Retirado y Entregado (metros)" (`en_lugar_radio_m`, default **150**,
       entre 20 y 1000). La app lo toma al abrir el viaje.
 - [ ] **Corregir crédito e historial (2026-10-19)**: tabla nueva `configuracion_cambio` y columnas
-      `motivo`, `anulado_por_id` y `anula_movimiento_id` en `movimiento_credito`; las crea Hibernate.
+      `motivo`, `anulado_por_id` y `anula_movimiento_id` en `movimiento_credito`, y tabla
+      `pago_semanal_movimiento` (pagos semanales: se suman y se anulan); las crea Hibernate.
       El historial de Configuración arranca vacío el día del despliegue. Después de desplegar, cobrar
       desde Pagos → "Ajustar el crédito a mano" la comisión que faltó del 2026-10-19: **300** a
       Cristian Enrique (pedido 1500108) y **495** a Guillermo Axel (pedido 1500104).

@@ -15,6 +15,7 @@ import com.cadeteria.backend.model.Cadete;
 import com.cadeteria.backend.model.CadeteEstadoLog;
 import com.cadeteria.backend.model.EstadoCadete;
 import com.cadeteria.backend.model.MovimientoCredito;
+import com.cadeteria.backend.model.PagoSemanalMovimiento;
 import com.cadeteria.backend.model.Pedido;
 import com.cadeteria.backend.model.PedidoUbicacion;
 import com.cadeteria.backend.model.TipoVehiculo;
@@ -24,6 +25,7 @@ import com.cadeteria.backend.repository.CadeteEstadoLogRepository;
 import com.cadeteria.backend.repository.CadeteRepository;
 import com.cadeteria.backend.repository.EstadoCadeteRepository;
 import com.cadeteria.backend.repository.MovimientoCreditoRepository;
+import com.cadeteria.backend.repository.PagoSemanalMovimientoRepository;
 import com.cadeteria.backend.repository.PedidoRepository;
 import com.cadeteria.backend.repository.PedidoUbicacionRepository;
 import com.cadeteria.backend.repository.TipoVehiculoRepository;
@@ -61,6 +63,7 @@ public class CadeteService {
     private final MovimientoCreditoRepository movimientoCreditoRepo;
     private final MetricasService metricasService;
     private final IncidenciaService incidenciaService;
+    private final PagoSemanalMovimientoRepository pagoSemanalMovimientoRepo;
 
     public CadeteService(CadeteRepository repo, TipoVehiculoRepository tipoVehiculoRepo,
                           EstadoCadeteRepository estadoCadeteRepo, PasswordEncoder passwordEncoder,
@@ -70,7 +73,8 @@ public class CadeteService {
                           AvisoGeneralRepository avisoRepo, AvisoGeneralLecturaRepository avisoLecturaRepo,
                           ConfiguracionService configuracionService, CadeteEstadoLogRepository estadoLogRepo,
                           MovimientoCreditoRepository movimientoCreditoRepo, MetricasService metricasService,
-                          IncidenciaService incidenciaService) {
+                          IncidenciaService incidenciaService, PagoSemanalMovimientoRepository pagoSemanalMovimientoRepo) {
+        this.pagoSemanalMovimientoRepo = pagoSemanalMovimientoRepo;
         this.repo = repo;
         this.tipoVehiculoRepo = tipoVehiculoRepo;
         this.estadoCadeteRepo = estadoCadeteRepo;
@@ -547,23 +551,123 @@ public class CadeteService {
      * o parcial. Si paga menos del monto configurado, hace falta un `venceEn` — si no
      * completa el resto para esa fecha/hora, {@link #revisarVencimientosPagoSemanal} lo
      * vuelve a deshabilitar solo.
+     *
+     * <p>2026-10-19: `montoPagado` es lo que paga ahora y se SUMA a lo ya pagado en la semana (antes
+     * lo reemplazaba: 2000 + 3000 quedaba en 3000). Cada pago queda en {@link PagoSemanalMovimiento}
+     * con quién lo registró. En un parcial, sin `venceEn` sigue el vencimiento que ya tenía.
      */
-    public Cadete habilitarPagoSemanal(String id, BigDecimal montoPagado, Instant venceEn, BigDecimal montoSemanalNuevo) {
+    public Cadete habilitarPagoSemanal(String id, BigDecimal montoPagado, Instant venceEn, BigDecimal montoSemanalNuevo,
+                                       String adminUsername) {
         Cadete c = get(id);
         if (montoSemanalNuevo != null) {
             c.setMontoSemanalActual(montoSemanalNuevo);
         }
-        BigDecimal montoSemanal = c.getMontoSemanalActual() != null
+        List<PagoSemanalMovimiento> pagos = pagosDeEstaSemana(c);
+        if (montoPagado.signum() > 0) {
+            PagoSemanalMovimiento m = nuevoPagoSemanal(c, montoPagado, adminUsername);
+            pagoSemanalMovimientoRepo.save(m);
+            pagos.add(m);
+        }
+        aplicarTotalSemanal(c, totalVigente(pagos), venceEn, false);
+        return repo.save(c);
+    }
+
+    /** Pagos de la semana actual, el más nuevo primero, para la pantalla Pagos (2026-10-19). */
+    @Transactional(readOnly = true)
+    public List<PagoSemanalMovimiento> pagosSemanalesDeEstaSemana(String id) {
+        return pagoSemanalMovimientoRepo.findByCadeteIdAndSemanaInicioOrderByCreadoEnDesc(id, lunesDeEstaSemana());
+    }
+
+    /**
+     * Anula un pago de la semana actual cargado por error (2026-10-19): queda tachado con el motivo y
+     * se recalcula el estado. Llega a la cuota → sigue al día; queda una parte → pago parcial (hace
+     * falta el vencimiento si no tenía); queda en 0 → se deshabilita como "falta de pago" (si tiene
+     * un viaje en curso lo termina).
+     */
+    public Cadete anularPagoSemanal(String id, String movimientoId, String motivo, Instant venceEn, String adminUsername) {
+        Cadete c = get(id);
+        if (!"SEMANAL".equals(c.getModalidadPago())) {
+            throw new BadRequestException("El cadete no paga por semana.");
+        }
+        List<PagoSemanalMovimiento> pagos = pagosDeEstaSemana(c);
+        PagoSemanalMovimiento pago = pagos.stream().filter(m -> m.getId().equals(movimientoId)).findFirst()
+                .orElseThrow(() -> new BadRequestException("Solo se pueden anular los pagos de esta semana."));
+        if (pago.isAnulado()) {
+            throw new ConflictException("Ese pago ya está anulado.");
+        }
+        pago.setAnuladoEn(Instant.now());
+        pago.setAnuladoPorUsername(adminUsername);
+        pago.setMotivoAnulacion(motivo.trim());
+        pagoSemanalMovimientoRepo.save(pago);
+        BigDecimal total = totalVigente(pagos);
+        if (total.signum() == 0) {
+            c.setPagoSemanalMontoPagado(null);
+            repo.save(c);
+            return deshabilitarPagoSemanal(id);
+        }
+        aplicarTotalSemanal(c, total, venceEn, true);
+        return repo.save(c);
+    }
+
+    /**
+     * Lo pagado en la semana pasa a ser la suma de los pagos. Completo → habilitado sin vencimiento;
+     * parcial → habilitado hasta `venceEn` (o el que ya tenía). `soloSiSigueHabilitado`: al anular no
+     * se habilita a alguien que ya estaba deshabilitado.
+     */
+    private void aplicarTotalSemanal(Cadete c, BigDecimal total, Instant venceEn, boolean soloSiSigueHabilitado) {
+        boolean completo = total.compareTo(cuotaSemanal(c)) >= 0;
+        Instant vence = venceEn != null ? venceEn : c.getPagoSemanalVenceEn();
+        if (!completo && vence == null) {
+            throw new BadRequestException(soloSiSigueHabilitado
+                    ? "Queda un pago parcial: poné hasta cuándo tiene para completarlo."
+                    : "Si el pago es parcial, hace falta poner hasta cuándo tiene para completarlo.");
+        }
+        c.setPagoSemanalMontoPagado(total);
+        c.setPagoSemanalVenceEn(completo ? null : vence);
+        if (!soloSiSigueHabilitado || c.isHabilitadoPago()) c.setHabilitadoPago(true);
+    }
+
+    private BigDecimal cuotaSemanal(Cadete c) {
+        return c.getMontoSemanalActual() != null
                 ? c.getMontoSemanalActual()
                 : configuracionService.getBigDecimal("pago_semanal_monto", BigDecimal.valueOf(5000));
-        boolean pagoCompleto = montoPagado.compareTo(montoSemanal) >= 0;
-        if (!pagoCompleto && venceEn == null) {
-            throw new BadRequestException("Si el pago es parcial, hace falta poner hasta cuándo tiene para completarlo.");
+    }
+
+    /**
+     * Los pagos de esta semana. Si todavía no hay ninguno pero el cadete tiene un monto pagado (lo
+     * registrado antes de que existiera el historial), se lo guarda como un primer pago para que la
+     * suma no lo pierda.
+     */
+    private List<PagoSemanalMovimiento> pagosDeEstaSemana(Cadete c) {
+        List<PagoSemanalMovimiento> pagos = new java.util.ArrayList<>(
+                pagoSemanalMovimientoRepo.findByCadeteIdAndSemanaInicioOrderByCreadoEnDesc(c.getId(), lunesDeEstaSemana()));
+        if (pagos.isEmpty() && c.getPagoSemanalMontoPagado() != null && c.getPagoSemanalMontoPagado().signum() > 0) {
+            PagoSemanalMovimiento previo = nuevoPagoSemanal(c, c.getPagoSemanalMontoPagado(), null);
+            pagoSemanalMovimientoRepo.save(previo);
+            pagos.add(previo);
         }
-        c.setPagoSemanalMontoPagado(montoPagado);
-        c.setPagoSemanalVenceEn(pagoCompleto ? null : venceEn);
-        c.setHabilitadoPago(true);
-        return repo.save(c);
+        return pagos;
+    }
+
+    private PagoSemanalMovimiento nuevoPagoSemanal(Cadete c, BigDecimal monto, String adminUsername) {
+        PagoSemanalMovimiento m = new PagoSemanalMovimiento();
+        m.setId(UUID.randomUUID().toString());
+        m.setCadeteId(c.getId());
+        m.setSemanaInicio(lunesDeEstaSemana());
+        m.setMonto(monto);
+        m.setCreadoEn(Instant.now());
+        m.setCreadoPorUsername(adminUsername);
+        return m;
+    }
+
+    private static BigDecimal totalVigente(List<PagoSemanalMovimiento> pagos) {
+        return pagos.stream().filter(m -> !m.isAnulado()).map(PagoSemanalMovimiento::getMonto)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private static java.time.LocalDate lunesDeEstaSemana() {
+        return java.time.LocalDate.now(java.time.ZoneId.of("America/Argentina/Buenos_Aires"))
+                .with(java.time.DayOfWeek.MONDAY);
     }
 
     /** Mejora: cambiar el modelo de cobro desde la pantalla "Pagos" unificada, sin pasar por el form completo de edición. */
