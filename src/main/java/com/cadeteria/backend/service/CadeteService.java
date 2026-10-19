@@ -639,8 +639,54 @@ public class CadeteService {
         return c;
     }
 
+    /**
+     * Anula una acreditación cargada por error (2026-10-19): no se edita ni se borra (los saldos de
+     * los movimientos de después quedarían mal), se resta con un movimiento ANULACION que la apunta.
+     * Puede dejar el crédito en negativo: con eso no entra a la app hasta que cargue.
+     */
+    public Cadete anularAcreditacion(String id, String movimientoId, String motivo, String adminUsername) {
+        Cadete c = repo.findByIdParaActualizar(id).orElseThrow(() -> ResourceNotFoundException.of("Cadete", id));
+        MovimientoCredito original = movimientoCreditoRepo.findById(movimientoId)
+                .filter(m -> m.getCadeteId().equals(id))
+                .orElseThrow(() -> ResourceNotFoundException.of("Movimiento de crédito", movimientoId));
+        if (!"ACREDITACION".equals(original.getTipo())) {
+            throw new BadRequestException("Solo se puede anular una carga de crédito.");
+        }
+        if (original.getAnuladoPorId() != null) {
+            throw new ConflictException("Esa carga de crédito ya está anulada.");
+        }
+        c.setCreditoDisponible(c.getCreditoDisponible().subtract(original.getMonto()));
+        repo.save(c);
+        MovimientoCredito anulacion = nuevoMovimiento(c, "ANULACION", original.getMonto(), null, null, adminUsername);
+        anulacion.setMotivo(motivo.trim());
+        anulacion.setAnulaMovimientoId(original.getId());
+        movimientoCreditoRepo.save(anulacion);
+        original.setAnuladoPorId(anulacion.getId());
+        movimientoCreditoRepo.save(original);
+        return c;
+    }
+
+    /** Suma o resta crédito a mano, con motivo (2026-10-19): ej. la diferencia de una comisión mal cobrada. */
+    public Cadete ajustarCredito(String id, BigDecimal monto, boolean sumar, String motivo, String adminUsername) {
+        if (monto == null || monto.signum() <= 0) {
+            throw new BadRequestException("El monto del ajuste tiene que ser mayor a cero.");
+        }
+        Cadete c = repo.findByIdParaActualizar(id).orElseThrow(() -> ResourceNotFoundException.of("Cadete", id));
+        c.setCreditoDisponible(sumar ? c.getCreditoDisponible().add(monto) : c.getCreditoDisponible().subtract(monto));
+        if (sumar) c.setAlertaCreditoBajoEnviada(false);
+        repo.save(c);
+        MovimientoCredito m = nuevoMovimiento(c, sumar ? "AJUSTE_SUMA" : "AJUSTE_RESTA", monto, null, null, adminUsername);
+        m.setMotivo(motivo.trim());
+        movimientoCreditoRepo.save(m);
+        return c;
+    }
+
     /** Registro del historial de crédito (ronda 10, punto 94) — llamado también desde PedidoService al descontar comisión. */
     public void registrarMovimientoCredito(Cadete c, String tipo, BigDecimal monto, String pedidoId, Long pedidoNumero, String creadoPorUsername) {
+        movimientoCreditoRepo.save(nuevoMovimiento(c, tipo, monto, pedidoId, pedidoNumero, creadoPorUsername));
+    }
+
+    private MovimientoCredito nuevoMovimiento(Cadete c, String tipo, BigDecimal monto, String pedidoId, Long pedidoNumero, String creadoPorUsername) {
         MovimientoCredito m = new MovimientoCredito();
         m.setId(UUID.randomUUID().toString());
         m.setCadeteId(c.getId());
@@ -651,7 +697,7 @@ public class CadeteService {
         m.setPedidoNumero(pedidoNumero);
         m.setCreadoEn(Instant.now());
         m.setCreadoPorUsername(creadoPorUsername);
-        movimientoCreditoRepo.save(m);
+        return m;
     }
 
     /**

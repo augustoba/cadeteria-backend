@@ -1,6 +1,8 @@
 package com.cadeteria.backend.service;
 
 import com.cadeteria.backend.model.Configuracion;
+import com.cadeteria.backend.model.ConfiguracionCambio;
+import com.cadeteria.backend.repository.ConfiguracionCambioRepository;
 import com.cadeteria.backend.repository.ConfiguracionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,9 +17,46 @@ import java.util.Map;
 public class ConfiguracionService {
 
     private final ConfiguracionRepository repo;
+    private final ConfiguracionCambioRepository cambioRepo;
 
-    public ConfiguracionService(ConfiguracionRepository repo) {
+    public ConfiguracionService(ConfiguracionRepository repo, ConfiguracionCambioRepository cambioRepo) {
         this.repo = repo;
+        this.cambioRepo = cambioRepo;
+    }
+
+    /**
+     * Lo que se guarda desde la pantalla Configuración (2026-10-19): además deja el cambio en el
+     * historial, si de verdad cambió. Los secretos quedan anotados sin el valor.
+     */
+    public void setDesdePanel(String clave, String valor, String autor) {
+        String anterior = repo.findById(clave).map(Configuracion::getValor).orElse(null);
+        set(clave, valor);
+        if (java.util.Objects.equals(anterior, valor)) return;
+        ConfiguracionCambio cambio = new ConfiguracionCambio();
+        cambio.setId(java.util.UUID.randomUUID().toString());
+        cambio.setClave(clave);
+        boolean secreto = esSecreto(clave);
+        cambio.setValorAnterior(secreto && anterior != null ? OCULTO : recortar(anterior));
+        cambio.setValorNuevo(secreto ? OCULTO : recortar(valor));
+        cambio.setCambiadoPorUsername(autor == null ? "" : autor);
+        cambio.setCambiadoEn(java.time.Instant.now());
+        cambioRepo.save(cambio);
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<ConfiguracionCambio> historial() {
+        return cambioRepo.findTop300ByOrderByCambiadoEnDesc();
+    }
+
+    static final String OCULTO = "(oculto)";
+
+    static boolean esSecreto(String clave) {
+        String c = clave.toLowerCase(java.util.Locale.ROOT);
+        return c.contains("key") || c.contains("password") || c.contains("secret") || c.contains("token");
+    }
+
+    private static String recortar(String valor) {
+        return valor == null || valor.length() <= 500 ? valor : valor.substring(0, 497) + "...";
     }
 
     @Transactional(readOnly = true)

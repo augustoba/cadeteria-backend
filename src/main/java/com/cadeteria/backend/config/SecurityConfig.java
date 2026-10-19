@@ -60,7 +60,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/metricas/**").hasAuthority("PERM_metricas")
                         .requestMatchers("/api/admin/pagos/**", "/api/admin/cadetes/*/pagos/**",
                                 "/api/admin/cadetes/*/pago-semanal/**", "/api/admin/cadetes/*/credito",
-                                "/api/admin/cadetes/*/modalidad-pago").hasAuthority("PERM_pagos")
+                                "/api/admin/cadetes/*/credito/**", "/api/admin/cadetes/*/modalidad-pago").hasAuthority("PERM_pagos")
                         .requestMatchers("/api/admin/seguridad/**").hasAuthority("PERM_seguridad")
                         .requestMatchers("/api/admin/usuarios/**").hasAuthority("PERM_usuarios")
                         .requestMatchers("/api/admin/whatsapp/**").hasAuthority("PERM_whatsapp")

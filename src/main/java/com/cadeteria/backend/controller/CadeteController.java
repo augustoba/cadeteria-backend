@@ -2,6 +2,8 @@ package com.cadeteria.backend.controller;
 
 import com.cadeteria.backend.dto.CadeteDtos.AcreditarRequest;
 import com.cadeteria.backend.dto.CadeteDtos.ActivoRequest;
+import com.cadeteria.backend.dto.CadeteDtos.AjusteCreditoRequest;
+import com.cadeteria.backend.dto.CadeteDtos.AnularMovimientoRequest;
 import com.cadeteria.backend.dto.CadeteDtos.AvisoGeneralRequest;
 import com.cadeteria.backend.dto.CadeteDtos.AvisoGeneralResponse;
 import com.cadeteria.backend.dto.CadeteDtos.CadeteEstadoLogResponse;
@@ -121,7 +123,8 @@ public class CadeteController {
         return service.historialCredito(id).stream()
                 .map(m -> new MovimientoCreditoResponse(
                         m.getId(), m.getTipo(), m.getMonto(), m.getSaldoResultante(),
-                        m.getPedidoNumero(), m.getCreadoEn(), m.getCreadoPorUsername()))
+                        m.getPedidoNumero(), m.getCreadoEn(), m.getCreadoPorUsername(),
+                        m.getMotivo(), m.getAnuladoPorId(), m.getAnulaMovimientoId()))
                 .toList();
     }
 
@@ -161,6 +164,19 @@ public class CadeteController {
     @PostMapping("/api/admin/cadetes/{id}/credito")
     public CadeteResponse acreditar(@PathVariable String id, @Valid @RequestBody AcreditarRequest req, Authentication auth) {
         return CadeteResponse.from(service.acreditar(id, req.monto(), auth.getName()));
+    }
+
+    /** Anula una acreditación equivocada con un movimiento contrario; no se borra ni se edita (2026-10-19). */
+    @PostMapping("/api/admin/cadetes/{id}/credito/{movimientoId}/anular")
+    public CadeteResponse anularAcreditacion(@PathVariable String id, @PathVariable String movimientoId,
+                                             @Valid @RequestBody AnularMovimientoRequest req, Authentication auth) {
+        return CadeteResponse.from(service.anularAcreditacion(id, movimientoId, req.motivo(), auth.getName()));
+    }
+
+    /** Suma o resta crédito a mano con motivo (ej. diferencia de comisión) (2026-10-19). */
+    @PostMapping("/api/admin/cadetes/{id}/credito/ajuste")
+    public CadeteResponse ajustarCredito(@PathVariable String id, @Valid @RequestBody AjusteCreditoRequest req, Authentication auth) {
+        return CadeteResponse.from(service.ajustarCredito(id, req.monto(), "SUMAR".equals(req.operacion()), req.motivo(), auth.getName()));
     }
 
     /** Cambiar el modelo de cobro desde la pantalla "Pagos" unificada. */

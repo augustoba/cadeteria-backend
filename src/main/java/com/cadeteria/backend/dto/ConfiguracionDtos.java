@@ -13,6 +13,10 @@ public final class ConfiguracionDtos {
     /** valor puede ser vacío (2026-09-26): así el superadmin puede borrar la última API key de una lista. */
     public record ConfiguracionUpdateRequest(@NotBlank String clave, @jakarta.validation.constraints.NotNull String valor) {}
 
+    /** Un renglón del historial de Configuración (2026-10-19); valorAnterior null = no estaba cargada. */
+    public record ConfiguracionCambioResponse(
+            String clave, String valorAnterior, String valorNuevo, String cambiadoPorUsername, java.time.Instant cambiadoEn) {}
+
     /** Subconjunto de configuración que necesita la app de cadetes (el resto es solo para el panel admin). */
     public record CadeteConfigResponse(
             int frecuenciaUbicacionSeg, String cloudinaryCloudName, String cloudinaryUploadPreset,

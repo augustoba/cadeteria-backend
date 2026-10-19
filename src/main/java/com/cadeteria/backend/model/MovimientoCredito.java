@@ -23,7 +23,11 @@ public class MovimientoCredito {
     @Column(nullable = false)
     private String cadeteId;
 
-    /** "ACREDITACION" (el admin le carga plata) | "COMISION" (se descuenta al aceptar un viaje). */
+    /**
+     * "ACREDITACION" (el admin le carga plata) | "COMISION" (se descuenta al aceptar un viaje) |
+     * "REEMBOLSO" (vuelve la comisión de un viaje que no se hizo) | "ANULACION" (resta una
+     * acreditación equivocada) | "AJUSTE_SUMA" / "AJUSTE_RESTA" (corrección a mano, 2026-10-19).
+     */
     @Column(nullable = false)
     private String tipo;
 
@@ -41,8 +45,41 @@ public class MovimientoCredito {
     @Column(nullable = false)
     private Instant creadoEn = Instant.now();
 
-    /** Solo para tipo=ACREDITACION (quién la cargó). */
+    /** Quién lo hizo, en lo que hace el admin (ACREDITACION, ANULACION, AJUSTE_*). */
     private String creadoPorUsername;
+
+    /** Por qué, en ANULACION y AJUSTE_* (obligatorio ahí). */
+    private String motivo;
+
+    /** En una ACREDITACION anulada: el movimiento ANULACION que la anuló. */
+    private String anuladoPorId;
+
+    /** En una ANULACION: la ACREDITACION que anula. */
+    private String anulaMovimientoId;
+
+    public String getMotivo() {
+        return motivo;
+    }
+
+    public void setMotivo(String motivo) {
+        this.motivo = motivo;
+    }
+
+    public String getAnuladoPorId() {
+        return anuladoPorId;
+    }
+
+    public void setAnuladoPorId(String anuladoPorId) {
+        this.anuladoPorId = anuladoPorId;
+    }
+
+    public String getAnulaMovimientoId() {
+        return anulaMovimientoId;
+    }
+
+    public void setAnulaMovimientoId(String anulaMovimientoId) {
+        this.anulaMovimientoId = anulaMovimientoId;
+    }
 
     public String getId() {
         return id;

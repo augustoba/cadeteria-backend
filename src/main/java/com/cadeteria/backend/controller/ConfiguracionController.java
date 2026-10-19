@@ -1,5 +1,6 @@
 package com.cadeteria.backend.controller;
 
+import com.cadeteria.backend.dto.ConfiguracionDtos.ConfiguracionCambioResponse;
 import com.cadeteria.backend.dto.ConfiguracionDtos.ConfiguracionResponse;
 import com.cadeteria.backend.dto.ConfiguracionDtos.ConfiguracionUpdateRequest;
 import com.cadeteria.backend.service.ApiKeyPoolService;
@@ -11,6 +12,7 @@ import com.cadeteria.backend.service.ConfiguracionSistema;
 import com.cadeteria.backend.service.GeocodingProxyService;
 import com.cadeteria.backend.service.RutaService;
 import jakarta.validation.Valid;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -34,7 +36,7 @@ public class ConfiguracionController {
     }
 
     @PutMapping
-    public ConfiguracionResponse set(@Valid @RequestBody ConfiguracionUpdateRequest req) {
+    public ConfiguracionResponse set(@Valid @RequestBody ConfiguracionUpdateRequest req, Authentication auth) {
         if (!PermisosActuales.esSuperadmin()) {
             // Superadmin (2026-09-26): lo técnico no lo cambia un admin, aunque arme el pedido a mano.
             if (ConfiguracionSistema.esDeSistema(req.clave())) {
@@ -51,8 +53,19 @@ public class ConfiguracionController {
             }
         }
         com.cadeteria.backend.service.RecordatoriosAppService.validar(req.clave(), req.valor());
-        service.set(req.clave(), req.valor());
+        service.setDesdePanel(req.clave(), req.valor(), auth.getName());
         return new ConfiguracionResponse(visibles());
+    }
+
+    /** Últimos cambios hechos desde Configuración (2026-10-19); sin lo técnico para el que no es superadmin. */
+    @GetMapping("/historial")
+    public List<ConfiguracionCambioResponse> historial() {
+        boolean superadmin = PermisosActuales.esSuperadmin();
+        return service.historial().stream()
+                .filter(c -> superadmin || !ConfiguracionSistema.esDeSistema(c.getClave()))
+                .map(c -> new ConfiguracionCambioResponse(c.getClave(), c.getValorAnterior(), c.getValorNuevo(),
+                        c.getCambiadoPorUsername(), c.getCambiadoEn()))
+                .toList();
     }
 
     /** Todo para el superadmin; para el resto, sin la parte técnica ni las keys del sistema. */

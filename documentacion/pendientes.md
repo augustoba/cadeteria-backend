@@ -1,6 +1,6 @@
 # Pendientes
 
-Última actualización: 2026-10-11.
+Última actualización: 2026-10-19.
 
 > El backlog largo (las 11 rondas de propuestas) vive en `MEJORAS-PROPUESTAS.md`, en la raíz
 > del proyecto. **Ese archivo está fuera de cualquier repo git**, así que no viaja con el
@@ -9,6 +9,27 @@
 Todo el trabajo nuevo va en la rama **`develop`** de los 3 repos (`cadeteria`, `admin-front`,
 `cadete-app`). Lo del 2026-09-24 al 26 ya está en `develop` (pusheado el 2026-09-26), salvo la
 rama `aviso-whatsapp-web` (backend + panel, aviso "en camino"), sin pushear al 2026-09-28.
+
+## Sesión 2026-10-19 (Claude): reportado en producción — hecho, sin probar en el celular
+
+Para desplegar el fin de semana (backend, panel y APK juntos, así los cadetes descargan una sola
+vez). Ver los puntos nuevos en `despliegue.md` §3.
+
+| Qué | Dónde | Probar |
+| --- | --- | --- |
+| **3p-1. Finalizar con señal mala ya no deja volver a hacerlo.** Antes solo se guardaba en la cola si no había conexión del todo (`IOException`); con señal mala salía "No se pudo subir la foto." o "No se pudo finalizar el viaje." y quedaban los botones, así que el cadete volvía a finalizar. Ahora todo lo que no es un rechazo del servidor (timeout, 5xx, 408/429, respuesta que no es del backend, foto que no sube) se guarda en la cola, igual para Retirado y paradas (`esFallaDeSenal`, `esFallaDeSubidaPasajera` en `ViajeViewModel`). La pantalla dice "✅ Viaje finalizado" y la tarjeta de Inicio "✅ Finalizado — se manda solo". Un 4xx con motivo (ej. "Estás a 800 m") se sigue mostrando | APK | Con datos muy flojos o modo avión justo al tocar Finalizar: tiene que quedar "Viaje finalizado" sin botones y mandarse solo al volver la señal |
+| **3p-2. Corregir el crédito.** En Pagos (cadete a porcentaje): "Últimos movimientos" con **Anular** en cada carga (pide motivo, resta con un movimiento `ANULACION` y la carga queda tachada) y **Ajustar el crédito a mano** (sumar/restar con motivo). Puede quedar en negativo; sin límite de tiempo. Permiso `pagos`. `POST /api/admin/cadetes/{id}/credito/{movimientoId}/anular` y `.../credito/ajuste` | back + panel | Cargar 5000, anularla, ver el saldo y el historial (también en la ficha del cadete) |
+| **3p-3. Historial de Configuración.** Tabla `configuracion_cambio`: quién cambió cada opción, de qué a qué y cuándo (las que tienen key/password/secret/token en el nombre quedan "(oculto)"). Configuración → "Historial de cambios" (los últimos 300; lo técnico solo lo ve el superadmin). `GET /api/admin/configuracion/historial` | back + panel | Cambiar la comisión, guardar y abrir el historial |
+| **3p-4. Editar el precio de un pedido aceptado ajusta la comisión** con el mismo % que se cobró al aceptar (no el de Configuración): movimiento `AJUSTE_RESTA`/`AJUSTE_SUMA` con el número de pedido y "Cambio de precio…" | back | Cadete a porcentaje acepta un pedido de 800, subirlo a 2000 desde el panel: le resta la diferencia |
+| **Radio del control en el lugar** en Configuración → Pedidos (`en_lugar_radio_m`, 20 a 1000 m, 150 si está vacío) | panel | Cambiarlo y ver que la app frena con el radio nuevo al abrir el viaje |
+
+Lo del 2026-10-19 que originó esto: el 25% de comisión se guardó entre las 13:56 y las 15:01 (antes
+regía el 10%), así que faltan cobrar **300** a Cristian Enrique (pedido 1500108) y **495** a
+Guillermo Axel (pedido 1500104). Se hace desde Pagos → "Ajustar el crédito a mano" después de
+desplegar.
+
+Tests nuevos: `CadeteServiceCorreccionCreditoTest`, `PedidoServiceEditarPrecioComisionTest`,
+`ConfiguracionServiceHistorialTest` (backend) y `FallaDeSenalTest` (APK).
 
 ## Sesión 2026-10-11 (Claude): cobro a los cadetes — sin probar
 

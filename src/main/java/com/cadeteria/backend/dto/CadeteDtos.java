@@ -203,6 +203,20 @@ public final class CadeteDtos {
             @NotNull(message = "Falta el monto.") @Positive(message = "El monto tiene que ser mayor a 0.")
             @Digits(integer = 10, fraction = 2, message = "El monto no es válido.") BigDecimal monto) {}
 
+    /** Corrección a mano del crédito (2026-10-19): sumar o restar, siempre con motivo. */
+    public record AjusteCreditoRequest(
+            @NotNull(message = "Falta el monto.") @Positive(message = "El monto tiene que ser mayor a 0.")
+            @Digits(integer = 10, fraction = 2, message = "El monto no es válido.") BigDecimal monto,
+            @NotBlank(message = "Elegí si suma o resta.")
+            @Pattern(regexp = "SUMAR|RESTAR", message = "El ajuste tiene que ser SUMAR o RESTAR.") String operacion,
+            @NotBlank(message = "Contá el motivo del ajuste.")
+            @Size(max = 255, message = "El motivo puede tener hasta 255 caracteres.") String motivo) {}
+
+    /** Anular una acreditación equivocada (2026-10-19). */
+    public record AnularMovimientoRequest(
+            @NotBlank(message = "Contá por qué se anula.")
+            @Size(max = 255, message = "El motivo puede tener hasta 255 caracteres.") String motivo) {}
+
     /** Cambiar el modelo de cobro de un cadete desde la pantalla "Pagos" (antes solo se podía al crear/editar el cadete). */
     public record ModalidadPagoRequest(
             @NotBlank(message = "Elegí la modalidad de pago.")
@@ -231,7 +245,8 @@ public final class CadeteDtos {
 
     public record MovimientoCreditoResponse(
             String id, String tipo, BigDecimal monto, BigDecimal saldoResultante,
-            Long pedidoNumero, Instant creadoEn, String creadoPorUsername
+            Long pedidoNumero, Instant creadoEn, String creadoPorUsername,
+            String motivo, String anuladoPorId, String anulaMovimientoId
     ) {}
 
     public record EstadoRequest(

@@ -181,7 +181,16 @@ teléfonos; **volver a producción antes de tener cadetes reales**.
 - [ ] **Control en el lugar (2026-09-28)**: Configuración → Pedidos, "Controlar que Retirado y
       Entregado se marquen en el lugar" (`en_lugar_control_activo`, default **prendido**). Si en la
       calle frena de más a los cadetes, apagarlo desde ahí (no hace falta redeploy): igual queda
-      anotada la distancia y el GPS falso.
+      anotada la distancia y el GPS falso. Desde el 2026-10-19 el radio también se cambia ahí:
+      "Distancia para marcar Retirado y Entregado (metros)" (`en_lugar_radio_m`, default **150**,
+      entre 20 y 1000). La app lo toma al abrir el viaje.
+- [ ] **Corregir crédito e historial (2026-10-19)**: tabla nueva `configuracion_cambio` y columnas
+      `motivo`, `anulado_por_id` y `anula_movimiento_id` en `movimiento_credito`; las crea Hibernate.
+      El historial de Configuración arranca vacío el día del despliegue. Después de desplegar, cobrar
+      desde Pagos → "Ajustar el crédito a mano" la comisión que faltó del 2026-10-19: **300** a
+      Cristian Enrique (pedido 1500108) y **495** a Guillermo Axel (pedido 1500104).
+- [ ] **APK con "Finalizado sin señal" (2026-10-19)**: subir la versión nueva con "Obligar a
+      actualizar" (con señal mala ya no deja volver a finalizar).
 - [ ] **Avisos de la calle (2026-09-28/29)**, claves sin pantalla (si no están, valen los defaults):
       `avisos_calle_radio_m` (**1000**, a quién le llega el aviso), `avisos_calle_duracion_min`
       (**60**), `avisos_calle_extension_min` (**30**, cuánto lo estira un "Sigue") y

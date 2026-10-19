@@ -33,6 +33,8 @@ class ConfiguracionControllerTest {
 
     private ConfiguracionService service;
     private ConfiguracionController controller;
+    private static final org.springframework.security.core.Authentication AUTH =
+            new UsernamePasswordAuthenticationToken("u", null, List.of());
 
     @BeforeEach
     void setUp() {
@@ -77,24 +79,24 @@ class ConfiguracionControllerTest {
     void unAdminNoPuedeCambiarLoTecnico() {
         comoUsuarioCon("configuracion");
         assertThrows(ForbiddenException.class,
-                () -> controller.set(new ConfiguracionUpdateRequest("google_cache_pausar_borrado", "false")));
-        verify(service, never()).set(anyString(), anyString());
+                () -> controller.set(new ConfiguracionUpdateRequest("google_cache_pausar_borrado", "false"), AUTH));
+        verify(service, never()).setDesdePanel(anyString(), anyString(), anyString());
     }
 
     @Test
     void unAdminPuedeAgregarKeysPeroNoQuitar() {
         comoUsuarioCon("configuracion");
-        controller.set(new ConfiguracionUpdateRequest("geoapify_keys_cliente", "CLI1\nCLI2"));
-        verify(service).set("geoapify_keys_cliente", "CLI1\nCLI2");
+        controller.set(new ConfiguracionUpdateRequest("geoapify_keys_cliente", "CLI1\nCLI2"), AUTH);
+        verify(service).setDesdePanel("geoapify_keys_cliente", "CLI1\nCLI2", "u");
 
         assertThrows(ForbiddenException.class,
-                () -> controller.set(new ConfiguracionUpdateRequest("geoapify_keys_cliente", "CLI2")));
+                () -> controller.set(new ConfiguracionUpdateRequest("geoapify_keys_cliente", "CLI2"), AUTH));
     }
 
     @Test
     void elSuperadminPuedeBorrarKeysDeLaCadeteria() {
         comoUsuarioCon("configuracion", "sistema");
-        controller.set(new ConfiguracionUpdateRequest("geoapify_keys_cliente", "CLI2"));
-        verify(service).set("geoapify_keys_cliente", "CLI2");
+        controller.set(new ConfiguracionUpdateRequest("geoapify_keys_cliente", "CLI2"), AUTH);
+        verify(service).setDesdePanel("geoapify_keys_cliente", "CLI2", "u");
     }
 }

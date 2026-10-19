@@ -194,7 +194,8 @@ public class PedidoService {
         if (nuevoPrecio == null || nuevoPrecio.signum() < 0) {
             throw new BadRequestException("El precio tiene que ser un número válido.");
         }
-        Pedido pedido = get(pedidoId);
+        // Con bloqueo: si justo lo acepta un cadete, la comisión se calcula con un solo precio.
+        Pedido pedido = getParaActualizar(pedidoId);
         if (ESTADOS_FINALES.contains(pedido.getEstado().getId())) {
             throw new ConflictException("No se puede editar el precio de un pedido finalizado o cancelado.");
         }
@@ -208,8 +209,34 @@ public class PedidoService {
         log.setPrecioNuevo(nuevoPrecio);
         log.setCambiadoPorUsername(adminUsername);
         pedidoPrecioLogRepo.save(log);
+        ajustarComisionPorCambioDePrecio(pedido, pedido.getPrecio(), nuevoPrecio, adminUsername);
         pedido.setPrecio(nuevoPrecio);
         return repo.save(pedido);
+    }
+
+    /**
+     * Pedido ya aceptado por un cadete PORCENTAJE (2026-10-19): la comisión se cobró sobre el precio
+     * viejo, así que se le cobra o devuelve la diferencia con el mismo % que se le cobró al aceptar
+     * (no el de Configuración, que pudo cambiar después). Puede dejar el crédito en negativo.
+     */
+    private void ajustarComisionPorCambioDePrecio(Pedido pedido, BigDecimal precioAnterior, BigDecimal precioNuevo, String adminUsername) {
+        BigDecimal cobrada = pedido.getComisionDescontada();
+        Cadete cadete = pedido.getCadeteAsignado();
+        if (cobrada == null || cadete == null) return;
+        BigDecimal nueva = precioAnterior.signum() > 0
+                ? cobrada.multiply(precioNuevo).divide(precioAnterior, 2, RoundingMode.HALF_UP)
+                : comisionDe(precioNuevo);
+        BigDecimal diferencia = nueva.subtract(cobrada);
+        if (diferencia.signum() == 0) return;
+        bloquear(cadete);
+        cadete.setCreditoDisponible(cadete.getCreditoDisponible().subtract(diferencia));
+        pedido.setComisionDescontada(nueva);
+        cadeteRepo.save(cadete);
+        String motivo = "Cambio de precio del pedido #" + pedido.getNumero() + ": $" + precioAnterior.stripTrailingZeros().toPlainString()
+                + " → $" + precioNuevo.stripTrailingZeros().toPlainString();
+        registrarMovimientoCredito(cadete, diferencia.signum() > 0 ? "AJUSTE_RESTA" : "AJUSTE_SUMA", diferencia.abs(),
+                pedido.getId(), pedido.getNumero(), motivo, adminUsername);
+        if (diferencia.signum() > 0) avisarCreditoBajoSiCorresponde(cadete);
     }
 
     /** Mejora 93 — marcar/desmarcar un pedido como prioritario/urgente, solo visual en el dashboard. */
@@ -835,8 +862,12 @@ public class PedidoService {
 
     /** Comisión que se le descuenta al cadete PORCENTAJE al aceptar este pedido (ronda 7). */
     private BigDecimal comisionDe(Pedido pedido) {
+        return comisionDe(pedido.getPrecio());
+    }
+
+    private BigDecimal comisionDe(BigDecimal precio) {
         BigDecimal pct = configuracionService.getBigDecimal("comision_porcentaje", BigDecimal.TEN);
-        return pedido.getPrecio().multiply(pct).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        return precio.multiply(pct).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
     }
 
     /**
@@ -856,6 +887,11 @@ public class PedidoService {
 
     /** Historial de movimientos de crédito (ronda 10, punto 94) — ACREDITACION/COMISION vienen del admin/CadeteService, REEMBOLSO de acá. */
     private void registrarMovimientoCredito(Cadete cadete, String tipo, BigDecimal monto, String pedidoId, Long pedidoNumero) {
+        registrarMovimientoCredito(cadete, tipo, monto, pedidoId, pedidoNumero, null, null);
+    }
+
+    private void registrarMovimientoCredito(Cadete cadete, String tipo, BigDecimal monto, String pedidoId, Long pedidoNumero,
+                                            String motivo, String creadoPorUsername) {
         com.cadeteria.backend.model.MovimientoCredito m = new com.cadeteria.backend.model.MovimientoCredito();
         m.setId(java.util.UUID.randomUUID().toString());
         m.setCadeteId(cadete.getId());
@@ -864,6 +900,8 @@ public class PedidoService {
         m.setSaldoResultante(cadete.getCreditoDisponible());
         m.setPedidoId(pedidoId);
         m.setPedidoNumero(pedidoNumero);
+        m.setMotivo(motivo);
+        m.setCreadoPorUsername(creadoPorUsername);
         movimientoCreditoRepo.save(m);
     }
 
