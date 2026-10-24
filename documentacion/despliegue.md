@@ -190,6 +190,13 @@ teléfonos; **volver a producción antes de tener cadetes reales**.
       El historial de Configuración arranca vacío el día del despliegue. Después de desplegar, cobrar
       desde Pagos → "Ajustar el crédito a mano" la comisión que faltó del 2026-10-19: **300** a
       Cristian Enrique (pedido 1500108) y **495** a Guillermo Axel (pedido 1500104).
+- [ ] **Editar pedido, teléfono del cliente, tope y crédito bajo (2026-10-24)**: tabla nueva
+      `cliente_telefono_cambio` y columna `ultimo_aviso_credito_bajo_en` en `cadete`; las crea
+      Hibernate. Clave nueva `credito_bajo_repetir_min` (Configuración → Cadetes, "Repetir el aviso
+      de crédito bajo cada (minutos)", default **60**, 0 = una sola vez): revisar el valor con el
+      dueño. El tope de dinero del cadete ahora suma también el valor de los objetos y los viajes
+      "No entregado": un cadete con el tope justo puede dejar de recibir viajes que antes recibía.
+      Subir la APK nueva (cartel del dinero a disponer y de crédito bajo).
 - [ ] **APK con "Finalizado sin señal" (2026-10-19)**: subir la versión nueva con "Obligar a
       actualizar" (con señal mala ya no deja volver a finalizar).
 - [ ] **Avisos de la calle (2026-09-28/29)**, claves sin pantalla (si no están, valen los defaults):

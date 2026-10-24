@@ -36,7 +36,9 @@ class ClienteServiceAvisosTest {
     void agrupaReportesPorTipoYOmiteTelefonosSinNada() {
         ClienteRepository clienteRepo = mock(ClienteRepository.class);
         ReporteClienteRepository reporteRepo = mock(ReporteClienteRepository.class);
-        ClienteService service = new ClienteService(clienteRepo, mock(PedidoRepository.class), reporteRepo);
+        ClienteService service = new ClienteService(clienteRepo, mock(PedidoRepository.class), reporteRepo,
+                mock(com.cadeteria.backend.repository.DireccionClienteOcultaRepository.class),
+                mock(com.cadeteria.backend.repository.ClienteTelefonoCambioRepository.class));
 
         String conReportes = TelefonoUtils.normalizar("3815551122");
         String problematico = TelefonoUtils.normalizar("3815553344");

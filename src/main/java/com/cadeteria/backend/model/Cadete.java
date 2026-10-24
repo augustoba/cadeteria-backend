@@ -195,6 +195,9 @@ public class Cadete {
     @Column(nullable = false)
     private boolean alertaCreditoBajoEnviada = false;
 
+    /** Último push de crédito bajo (2026-10-24): se repite cada "credito_bajo_repetir_min" con la sesión abierta. */
+    private Instant ultimoAvisoCreditoBajoEn;
+
     /** Notas libres del admin sobre este cadete (ej. "llega tarde seguido") — ronda 10, punto 103. */
     /** Texto largo: no usar @Lob, que en una base nueva de MySQL queda como TINYTEXT (255) — ver WhatsappMensaje.texto. */
     @Column(length = 100_000)
@@ -676,6 +679,14 @@ public class Cadete {
 
     public void setAlertaCreditoBajoEnviada(boolean alertaCreditoBajoEnviada) {
         this.alertaCreditoBajoEnviada = alertaCreditoBajoEnviada;
+    }
+
+    public Instant getUltimoAvisoCreditoBajoEn() {
+        return ultimoAvisoCreditoBajoEn;
+    }
+
+    public void setUltimoAvisoCreditoBajoEn(Instant ultimoAvisoCreditoBajoEn) {
+        this.ultimoAvisoCreditoBajoEn = ultimoAvisoCreditoBajoEn;
     }
 
     public String getNotasInternas() {

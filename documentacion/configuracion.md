@@ -146,6 +146,10 @@ finalizar un pedido desde la app (exige foto + nombre de quién recibió).
   (aplica a admins y cadetes).
 - **Cobro a cadetes**: cuota semanal, comisión %, umbral de alerta de crédito bajo (según el
   modelo de cobro que elija cada cadete en su ficha: Semanal o Porcentaje).
+  El aviso de crédito bajo (`credito_bajo_alerta_umbral`) llega por push apenas el saldo queda
+  por debajo y se repite cada `credito_bajo_repetir_min` minutos (default 60, 0 = una sola vez)
+  mientras siga bajo y el cadete tenga la app abierta (GPS de los últimos 15 minutos); en el
+  Inicio de la app se ve un cartel fijo mientras esté por debajo (2026-10-24).
 - **Marca**: nombre de la cadetería (aparece en la página pública de seguimiento) y teléfono
   de soporte (pantalla de Ayuda de la app del cadete).
 - **Horario de atención**: solo avisa si se carga un pedido fuera de horario, no bloquea la

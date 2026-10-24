@@ -39,6 +39,18 @@ public final class ClienteDtos {
     /** Botón "Liquidar cuenta corriente" — marca todo lo finalizado hasta ahora como ya cobrado. */
     public record LiquidarCuentaCorrienteResponse(BigDecimal montoLiquidado, Instant liquidadaHasta) {}
 
+    /** "Cambiar teléfono" de la ficha (2026-10-24). */
+    public record CambiarTelefonoRequest(
+            @jakarta.validation.constraints.NotBlank(message = "Falta el teléfono nuevo.") String telefonoNuevo) {}
+
+    public record TelefonoCambioResponse(String telefonoAnterior, String telefonoNuevo, int pedidosMovidos,
+                                         String cambiadoPorUsername, Instant cambiadoEn) {
+        public static TelefonoCambioResponse from(com.cadeteria.backend.model.ClienteTelefonoCambio c) {
+            return new TelefonoCambioResponse(c.getTelefonoAnterior(), c.getTelefonoNuevo(), c.getPedidosMovidos(),
+                    c.getCambiadoPorUsername(), c.getCambiadoEn());
+        }
+    }
+
     public record PedidoResumenResponse(String id, Long numero, Instant creadoEn, BigDecimal precio, String estadoId) {}
 
     public record ClienteFichaResponse(ClienteResponse cliente, List<PedidoResumenResponse> pedidosRecientes) {}

@@ -59,6 +59,20 @@ public class ClienteAdminController {
         return service.guardar(normalizado);
     }
 
+    /** Corregir un teléfono mal cargado (2026-10-24): todo el cliente se muda al número nuevo. */
+    @PostMapping("/{telefono}/cambiar-telefono")
+    public ClienteResponse cambiarTelefono(@PathVariable String telefono,
+                                           @Valid @RequestBody com.cadeteria.backend.dto.ClienteDtos.CambiarTelefonoRequest req,
+                                           org.springframework.security.core.Authentication auth) {
+        return service.cambiarTelefono(telefono, req.telefonoNuevo(), auth.getName());
+    }
+
+    @GetMapping("/{telefono}/cambios-telefono")
+    public java.util.List<com.cadeteria.backend.dto.ClienteDtos.TelefonoCambioResponse> cambiosTelefono(@PathVariable String telefono) {
+        return service.cambiosDeTelefono(telefono).stream()
+                .map(com.cadeteria.backend.dto.ClienteDtos.TelefonoCambioResponse::from).toList();
+    }
+
     /** Cierra el período de cuenta corriente (ronda 10, punto 100). */
     @PostMapping("/{telefono}/liquidar-cuenta-corriente")
     public LiquidarCuentaCorrienteResponse liquidarCuentaCorriente(@PathVariable String telefono) {

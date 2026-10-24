@@ -60,6 +60,7 @@ class CadeteServiceCreditoMinimoTest {
         when(config.getBigDecimal("precio_base_viaje", BigDecimal.valueOf(2000))).thenReturn(new BigDecimal("2000"));
         when(config.getBigDecimal("comision_porcentaje", BigDecimal.TEN)).thenReturn(new BigDecimal("25"));
         when(config.getInt(anyString(), anyInt())).thenAnswer(i -> i.getArgument(1));
+        when(config.getBigDecimal("credito_bajo_alerta_umbral", BigDecimal.valueOf(500))).thenReturn(new BigDecimal("500"));
         for (String id : new String[]{"LIBRE", "OCUPADO", "DESCONECTADO"}) {
             when(estadoRepo.findById(id)).thenReturn(Optional.of(estado(id)));
         }

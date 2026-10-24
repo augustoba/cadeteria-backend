@@ -56,6 +56,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -77,6 +78,8 @@ public class PedidoService {
     private static final List<String> ESTADOS_ACTIVOS = List.of("SIN_ASIGNAR", "PENDIENTE", "EN_CURSO", "NO_ENTREGADO");
     private static final List<String> ESTADOS_FINALES = List.of("FINALIZADO", "CANCELADO");
     private static final List<String> ESTADOS_OCUPAN_CADETE = List.of("PENDIENTE", "EN_CURSO");
+    /** Los que cuentan para el tope de dinero: el No entregado todavía lo tiene encima. */
+    private static final List<String> ESTADOS_TRANSPORTANDO = List.of("PENDIENTE", "EN_CURSO", "NO_ENTREGADO");
     private static final ZoneId ZONA_ART = ZoneId.of("America/Argentina/Buenos_Aires");
 
     private final PedidoRepository repo;
@@ -213,6 +216,124 @@ public class PedidoService {
         ajustarComisionPorCambioDePrecio(pedido, pedido.getPrecio(), nuevoPrecio, adminUsername);
         pedido.setPrecio(nuevoPrecio);
         return repo.save(pedido);
+    }
+
+    /**
+     * El admin corrige un pedido mal cargado (2026-10-24, pedido del cliente: un teléfono mal puesto).
+     * Solo sin asignar o programado: desde que se le ofrece a un cadete no se toca nada, para
+     * corregirlo hay que Quitar y volver a asignar. Pisa todo con lo del formulario (mismas
+     * validaciones que el alta) y deja un comentario automático con lo que cambió; el precio además
+     * queda en su historial de siempre.
+     */
+    public Pedido editar(String pedidoId, PedidoRequest req, String adminUsername) {
+        Pedido p = getParaActualizar(pedidoId);
+        String estadoActual = p.getEstado().getId();
+        if (!"SIN_ASIGNAR".equals(estadoActual) && !"PROGRAMADO".equals(estadoActual)) {
+            throw new ConflictException("Solo se puede editar un pedido sin asignar. Si ya tiene cadete, quitáselo primero.");
+        }
+        boolean esProgramado = req.programado() && req.fechaProgramada() != null
+                && req.fechaProgramada().isAfter(Instant.now());
+
+        List<String> cambios = new ArrayList<>();
+        anotarCambio(cambios, "teléfono", p.getClienteTelefono(), req.clienteTelefono().trim());
+        anotarCambio(cambios, "cliente", p.getClienteNombre(), req.clienteNombre().trim());
+        anotarCambio(cambios, "origen", p.getOrigenDireccion(), req.origenDireccion().trim());
+        anotarCambio(cambios, "destino", p.getDestinoDireccion(), req.destinoDireccion().trim());
+        anotarCambio(cambios, "dinero a disponer", montoTexto(p.getMontoDisponer()), montoTexto(montoPositivoONull(req.montoDisponer())));
+        if (!Objects.equals(p.getDetalle(), req.detalle())) cambios.add("detalle");
+        if (!Objects.equals(p.getOrigenPiso(), textoOpcional(req.origenPiso()))
+                || !Objects.equals(p.getOrigenDepto(), textoOpcional(req.origenDepto()))
+                || !Objects.equals(p.getOrigenObservaciones(), textoOpcional(req.origenObservaciones()))
+                || !Objects.equals(p.getDestinoPiso(), textoOpcional(req.destinoPiso()))
+                || !Objects.equals(p.getDestinoDepto(), textoOpcional(req.destinoDepto()))
+                || !Objects.equals(p.getDestinoObservaciones(), textoOpcional(req.destinoObservaciones()))) {
+            cambios.add("piso/depto/observaciones");
+        }
+
+        if (req.precio().compareTo(p.getPrecio()) != 0) {
+            anotarCambio(cambios, "precio", montoTexto(p.getPrecio()), montoTexto(req.precio()));
+            PedidoPrecioLog log = new PedidoPrecioLog();
+            log.setId(UUID.randomUUID().toString());
+            log.setPedido(p);
+            log.setPrecioAnterior(p.getPrecio());
+            log.setPrecioNuevo(req.precio());
+            log.setCambiadoPorUsername(adminUsername);
+            pedidoPrecioLogRepo.save(log);
+        }
+
+        p.setClienteTelefono(req.clienteTelefono().trim());
+        p.setClienteNombre(req.clienteNombre().trim());
+        p.setOrigenDireccion(req.origenDireccion().trim());
+        p.setOrigenLat(req.origenLat());
+        p.setOrigenLng(req.origenLng());
+        p.setDestinoDireccion(req.destinoDireccion().trim());
+        p.setDestinoLat(req.destinoLat());
+        p.setDestinoLng(req.destinoLng());
+        p.setPrecio(req.precio());
+        p.setMontoDeclarado(req.montoDeclarado() == null ? BigDecimal.ZERO : req.montoDeclarado());
+        p.setLlevaValores(req.llevaValores());
+        p.setMontoValores(req.llevaValores() ? montoPositivoONull(req.montoValores()) : null);
+        p.setRetornaAlOrigen(req.retornaAlOrigen());
+        p.setMontoDisponer(montoPositivoONull(req.montoDisponer()));
+        p.setDetalle(req.detalle());
+        p.setOrigenPiso(textoOpcional(req.origenPiso()));
+        p.setOrigenDepto(textoOpcional(req.origenDepto()));
+        p.setOrigenObservaciones(textoOpcional(req.origenObservaciones()));
+        p.setDestinoPiso(textoOpcional(req.destinoPiso()));
+        p.setDestinoDepto(textoOpcional(req.destinoDepto()));
+        p.setDestinoObservaciones(textoOpcional(req.destinoObservaciones()));
+        p.setRequiereMoto(req.requiereMoto());
+        p.setProgramado(esProgramado);
+        p.setFechaProgramada(esProgramado ? req.fechaProgramada() : null);
+        p.setEstado(estado(esProgramado ? "PROGRAMADO" : "SIN_ASIGNAR"));
+        p = repo.save(p);
+
+        // Sin asignar ninguna parada está entregada todavía: se reemplazan enteras.
+        List<PedidoParada> viejas = pedidoParadaRepo.findByPedidoIdOrderByOrdenAsc(p.getId());
+        List<String> direccionesNuevas = req.paradasAdicionales() == null ? List.of()
+                : req.paradasAdicionales().stream().map(pr -> pr.direccion().trim()).toList();
+        if (!viejas.stream().map(PedidoParada::getDireccion).toList().equals(direccionesNuevas)) {
+            cambios.add("paradas");
+        }
+        pedidoParadaRepo.deleteAll(viejas);
+        p.getParadas().clear();
+        if (req.paradasAdicionales() != null) {
+            int orden = 1;
+            for (var pr : req.paradasAdicionales()) {
+                PedidoParada parada = new PedidoParada();
+                parada.setId(UUID.randomUUID().toString());
+                parada.setPedido(p);
+                parada.setOrden(orden++);
+                parada.setDireccion(pr.direccion().trim());
+                parada.setLat(pr.lat());
+                parada.setLng(pr.lng());
+                pedidoParadaRepo.save(parada);
+                p.getParadas().add(parada);
+            }
+        }
+
+        if (!cambios.isEmpty()) {
+            PedidoComentario comentario = new PedidoComentario();
+            comentario.setId(UUID.randomUUID().toString());
+            comentario.setPedido(p);
+            comentario.setAdminUsername(adminUsername);
+            String texto = "(automático) Pedido editado: " + String.join("; ", cambios) + ".";
+            comentario.setTexto(texto.length() > 500 ? texto.substring(0, 497) + "..." : texto);
+            pedidoComentarioRepo.save(comentario);
+        }
+
+        publisher.publicarPedido(PedidoResponse.from(p));
+        return p;
+    }
+
+    private static void anotarCambio(List<String> cambios, String campo, String antes, String despues) {
+        if (!Objects.equals(antes, despues)) {
+            cambios.add(campo + " " + (antes == null ? "—" : antes) + " → " + (despues == null ? "—" : despues));
+        }
+    }
+
+    private static String montoTexto(BigDecimal monto) {
+        return monto == null ? null : "$" + monto.stripTrailingZeros().toPlainString();
     }
 
     /**
@@ -825,16 +946,28 @@ public class PedidoService {
         return !ahora.isBefore(inicio) || ahora.isBefore(fin);
     }
 
+    /**
+     * Lo que cuenta para el "Monto máximo transportado" del cadete (2026-10-24): el dinero y el valor
+     * de los objetos. El dinero a disponer no, es plata propia del cadete.
+     */
+    static BigDecimal montoTransportado(Pedido p) {
+        BigDecimal dinero = p.getMontoDeclarado() == null ? BigDecimal.ZERO : p.getMontoDeclarado();
+        BigDecimal valores = p.isLlevaValores() && p.getMontoValores() != null ? p.getMontoValores() : BigDecimal.ZERO;
+        return dinero.add(valores);
+    }
+
     private boolean dentroDeTopes(Cadete cadete, Pedido nuevoPedido) {
         List<Pedido> activos = repo.findByCadeteAsignadoIdAndEstadoIdIn(cadete.getId(), ESTADOS_OCUPAN_CADETE);
         if (cadete.getMaxViajesSimultaneos() != null && activos.size() >= cadete.getMaxViajesSimultaneos()) {
             return false;
         }
         if (cadete.getMontoMaximoTransportado() != null) {
-            BigDecimal comprometido = activos.stream()
-                    .map(Pedido::getMontoDeclarado)
+            // 2026-10-24: también los No entregado (todavía lleva el paquete o la plata encima).
+            BigDecimal comprometido = repo.findByCadeteAsignadoIdAndEstadoIdIn(cadete.getId(), ESTADOS_TRANSPORTANDO).stream()
+                    .filter(p -> !p.getId().equals(nuevoPedido.getId()))
+                    .map(PedidoService::montoTransportado)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
-            if (comprometido.add(nuevoPedido.getMontoDeclarado()).compareTo(cadete.getMontoMaximoTransportado()) > 0) {
+            if (comprometido.add(montoTransportado(nuevoPedido)).compareTo(cadete.getMontoMaximoTransportado()) > 0) {
                 return false;
             }
         }
@@ -917,18 +1050,12 @@ public class PedidoService {
         movimientoCreditoRepo.save(m);
     }
 
-    /** Avisa por push al cadete cuando su crédito cae por debajo del umbral configurado — una sola vez (ronda 7). */
+    /**
+     * Avisa por push al cadete cuando su crédito cae por debajo del umbral configurado (ronda 7). La
+     * repetición mientras sigue bajo la hace CadeteService#repetirAvisosCreditoBajo (2026-10-24).
+     */
     private void avisarCreditoBajoSiCorresponde(Cadete cadete) {
-        BigDecimal umbral = configuracionService.getBigDecimal("credito_bajo_alerta_umbral", BigDecimal.valueOf(500));
-        boolean bajo = cadete.getCreditoDisponible().compareTo(umbral) < 0;
-        if (bajo && !cadete.isAlertaCreditoBajoEnviada()) {
-            cadete.setAlertaCreditoBajoEnviada(true);
-            cadeteRepo.save(cadete);
-            fcmService.enviar(cadete.getFcmToken(), "Crédito bajo",
-                    "Te queda poco crédito ($" + cadete.getCreditoDisponible() + "). Cargá más para seguir recibiendo viajes.",
-                    Map.of("tipo", "CREDITO_BAJO"));
-        } else if (!bajo && cadete.isAlertaCreditoBajoEnviada()) {
-            cadete.setAlertaCreditoBajoEnviada(false);
+        if (CadeteService.avisarCreditoBajo(cadete, configuracionService, fcmService, false, Instant.now())) {
             cadeteRepo.save(cadete);
         }
     }

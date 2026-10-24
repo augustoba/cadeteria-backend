@@ -6,9 +6,12 @@ import com.cadeteria.backend.dto.ClienteDtos.ClienteRequest;
 import com.cadeteria.backend.dto.ClienteDtos.ClienteResponse;
 import com.cadeteria.backend.dto.ClienteDtos.PedidoResumenResponse;
 import com.cadeteria.backend.model.Cliente;
+import com.cadeteria.backend.model.ClienteTelefonoCambio;
 import com.cadeteria.backend.model.Pedido;
 import com.cadeteria.backend.model.ReporteCliente;
 import com.cadeteria.backend.repository.ClienteRepository;
+import com.cadeteria.backend.repository.ClienteTelefonoCambioRepository;
+import com.cadeteria.backend.repository.DireccionClienteOcultaRepository;
 import com.cadeteria.backend.repository.PedidoRepository;
 import com.cadeteria.backend.repository.ReporteClienteRepository;
 import com.cadeteria.backend.util.TelefonoUtils;
@@ -36,11 +39,78 @@ public class ClienteService {
     private final ClienteRepository repo;
     private final PedidoRepository pedidoRepo;
     private final ReporteClienteRepository reporteRepo;
+    private final DireccionClienteOcultaRepository direccionOcultaRepo;
+    private final ClienteTelefonoCambioRepository telefonoCambioRepo;
 
-    public ClienteService(ClienteRepository repo, PedidoRepository pedidoRepo, ReporteClienteRepository reporteRepo) {
+    public ClienteService(ClienteRepository repo, PedidoRepository pedidoRepo, ReporteClienteRepository reporteRepo,
+                          DireccionClienteOcultaRepository direccionOcultaRepo, ClienteTelefonoCambioRepository telefonoCambioRepo) {
         this.repo = repo;
         this.pedidoRepo = pedidoRepo;
         this.reporteRepo = reporteRepo;
+        this.direccionOcultaRepo = direccionOcultaRepo;
+        this.telefonoCambioRepo = telefonoCambioRepo;
+    }
+
+    /**
+     * Cambiar el teléfono desde la ficha (2026-10-24, lo cargaron mal): como el teléfono es la clave
+     * del cliente, se muda todo al número nuevo — la ficha, los pedidos (también los viejos, así el
+     * historial sigue junto), los reportes y las direcciones ocultas. Si el número nuevo ya tiene
+     * ficha o pedidos es otro cliente, y no se junta.
+     */
+    public ClienteResponse cambiarTelefono(String telefonoActual, String telefonoNuevoCrudo, String adminUsername) {
+        if (telefonoNuevoCrudo == null || !telefonoNuevoCrudo.matches(com.cadeteria.backend.common.Validaciones.TELEFONO)) {
+            throw new com.cadeteria.backend.common.BadRequestException(com.cadeteria.backend.common.Validaciones.MSJ_TELEFONO);
+        }
+        String nuevo = TelefonoUtils.normalizar(telefonoNuevoCrudo);
+        if (nuevo.equals(telefonoActual)) {
+            throw new com.cadeteria.backend.common.BadRequestException("Es el mismo teléfono que ya tiene.");
+        }
+        Cliente viejo = repo.findById(telefonoActual).orElse(null);
+        if (viejo == null && !pedidoRepo.existsByClienteTelefono(telefonoActual)) {
+            throw com.cadeteria.backend.common.ResourceNotFoundException.of("Cliente", telefonoActual);
+        }
+        if (repo.existsById(nuevo) || pedidoRepo.existsByClienteTelefono(nuevo)) {
+            throw new com.cadeteria.backend.common.ConflictException(
+                    "El " + nuevo + " ya es de otro cliente: no se pueden juntar dos clientes desde acá.");
+        }
+
+        Cliente c = null;
+        if (viejo != null) {
+            // El teléfono es el @Id: se crea la ficha con el número nuevo y se borra la vieja.
+            c = new Cliente();
+            c.setTelefono(nuevo);
+            c.setNombreContacto(viejo.getNombreContacto());
+            c.setEmpresa(viejo.getEmpresa());
+            c.setTarifaEspecial(viejo.getTarifaEspecial());
+            c.setProblematico(viejo.isProblematico());
+            c.setNotasProblematico(viejo.getNotasProblematico());
+            c.setActivo(viejo.isActivo());
+            c.setCreadoEn(viejo.getCreadoEn());
+            c.setModalidadFacturacion(viejo.getModalidadFacturacion());
+            c.setCuentaCorrienteLiquidadaHasta(viejo.getCuentaCorrienteLiquidadaHasta());
+            repo.delete(viejo);
+            repo.flush();
+            repo.save(c);
+        }
+        int pedidos = pedidoRepo.cambiarTelefonoCliente(telefonoActual, nuevo);
+        reporteRepo.cambiarTelefono(telefonoActual, nuevo);
+        direccionOcultaRepo.cambiarTelefono(telefonoActual, nuevo);
+
+        ClienteTelefonoCambio cambio = new ClienteTelefonoCambio();
+        cambio.setId(java.util.UUID.randomUUID().toString());
+        cambio.setTelefonoAnterior(telefonoActual);
+        cambio.setTelefonoNuevo(nuevo);
+        cambio.setPedidosMovidos(pedidos);
+        cambio.setCambiadoPorUsername(adminUsername);
+        telefonoCambioRepo.save(cambio);
+
+        return construirResumen(nuevo, pedidoRepo.findByClienteTelefonoOrderByCreadoEnDesc(nuevo), c);
+    }
+
+    /** Cambios de teléfono de este cliente, del más nuevo al más viejo. */
+    @Transactional(readOnly = true)
+    public List<ClienteTelefonoCambio> cambiosDeTelefono(String telefono) {
+        return telefonoCambioRepo.findByTelefonoNuevoOrTelefonoAnteriorOrderByCambiadoEnDesc(telefono, telefono);
     }
 
     public record ClientesPagina(List<ClienteResponse> items, long total, int pagina, int totalPaginas) {}

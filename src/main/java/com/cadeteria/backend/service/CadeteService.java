@@ -332,6 +332,43 @@ public class CadeteService {
                 + "). Cargá crédito con la cadetería para ponerte disponible.";
     }
 
+    /** Sin GPS en este tiempo se toma que cerró sesión: la app manda la ubicación hasta que toca Salir. */
+    static final java.time.Duration SESION_ABIERTA_SIN_GPS = java.time.Duration.ofMinutes(15);
+
+    /**
+     * Push de crédito bajo a un cadete PORCENTAJE con saldo por debajo de "credito_bajo_alerta_umbral".
+     * La primera vez que queda por debajo avisa siempre; después, con {@code repetir}, cada
+     * "credito_bajo_repetir_min" minutos mientras tenga la sesión abierta (2026-10-24, antes era un
+     * solo push y si no lo veía no se enteraba). 0 minutos = no repetir. Devuelve true si cambió algo
+     * del cadete (hay que guardarlo).
+     */
+    static boolean avisarCreditoBajo(Cadete c, ConfiguracionService config, FcmService fcm, boolean repetir, Instant ahora) {
+        if (!"PORCENTAJE".equals(c.getModalidadPago())) return false;
+        BigDecimal umbral = config.getBigDecimal("credito_bajo_alerta_umbral", BigDecimal.valueOf(500));
+        if (c.getCreditoDisponible().compareTo(umbral) >= 0) {
+            if (!c.isAlertaCreditoBajoEnviada() && c.getUltimoAvisoCreditoBajoEn() == null) return false;
+            c.setAlertaCreditoBajoEnviada(false);
+            c.setUltimoAvisoCreditoBajoEn(null);
+            return true;
+        }
+        if (c.isAlertaCreditoBajoEnviada()) {
+            if (!repetir) return false;
+            int cadaMin = config.getInt("credito_bajo_repetir_min", 60);
+            if (cadaMin <= 0) return false;
+            if (c.getUltimoAvisoCreditoBajoEn() != null
+                    && c.getUltimoAvisoCreditoBajoEn().plus(java.time.Duration.ofMinutes(cadaMin)).isAfter(ahora)) return false;
+        }
+        // La revisión periódica solo le avisa a quien tiene la app abierta; un cambio de saldo, siempre.
+        if (repetir && (c.getUbicacionActualizadaEn() == null
+                || c.getUbicacionActualizadaEn().plus(SESION_ABIERTA_SIN_GPS).isBefore(ahora))) return false;
+        c.setAlertaCreditoBajoEnviada(true);
+        c.setUltimoAvisoCreditoBajoEn(ahora);
+        fcm.enviar(c.getFcmToken(), "Crédito bajo",
+                "Te queda poco crédito (" + pesos(c.getCreditoDisponible()) + "). Cargá con la cadetería para seguir recibiendo viajes.",
+                Map.of("tipo", "CREDITO_BAJO"));
+        return true;
+    }
+
     static String pesos(BigDecimal monto) {
         return "$" + monto.setScale(0, java.math.RoundingMode.HALF_UP).toPlainString();
     }
@@ -820,6 +857,7 @@ public class CadeteService {
         movimientoCreditoRepo.save(anulacion);
         original.setAnuladoPorId(anulacion.getId());
         movimientoCreditoRepo.save(original);
+        if (avisarCreditoBajo(c, configuracionService, fcmService, false, Instant.now())) repo.save(c);
         sacarDeLibreSiNoLeAlcanza(c);
         return c;
     }
@@ -836,7 +874,10 @@ public class CadeteService {
         MovimientoCredito m = nuevoMovimiento(c, sumar ? "AJUSTE_SUMA" : "AJUSTE_RESTA", monto, null, null, adminUsername);
         m.setMotivo(motivo.trim());
         movimientoCreditoRepo.save(m);
-        if (!sumar) sacarDeLibreSiNoLeAlcanza(c);
+        if (!sumar) {
+            if (avisarCreditoBajo(c, configuracionService, fcmService, false, Instant.now())) repo.save(c);
+            sacarDeLibreSiNoLeAlcanza(c);
+        }
         return c;
     }
 
@@ -907,6 +948,19 @@ public class CadeteService {
      * Por si quedó alguno Libre sin crédito para el viaje mínimo (2026-10-19): los que ya estaban al
      * desplegar, o si se sube la comisión o el precio base en Configuración.
      */
+    /** Repite el push de crédito bajo cada "credito_bajo_repetir_min" a los que tienen la app abierta (2026-10-24). */
+    @Scheduled(fixedDelay = 60_000)
+    // Sin transacción: los cadetes quedan sueltos y solo se graban las dos marcas del aviso, así no se
+    // pisa un saldo que haya cambiado mientras tanto (Cadete no tiene @Version).
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    public void repetirAvisosCreditoBajo() {
+        Instant ahora = Instant.now();
+        repo.findAll().stream()
+                .filter(Cadete::isActivo)
+                .filter(c -> avisarCreditoBajo(c, configuracionService, fcmService, true, ahora))
+                .forEach(c -> repo.guardarAvisoCreditoBajo(c.getId(), c.isAlertaCreditoBajoEnviada(), c.getUltimoAvisoCreditoBajoEn()));
+    }
+
     @Scheduled(fixedDelay = 300_000)
     public void revisarLibresSinCredito() {
         repo.findAll().stream()

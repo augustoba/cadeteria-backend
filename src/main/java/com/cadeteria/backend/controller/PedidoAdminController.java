@@ -179,6 +179,16 @@ public class PedidoAdminController {
         return ResponseEntity.status(201).body(PedidoResponse.from(pedido));
     }
 
+    /** Corregir un pedido mal cargado mientras está sin asignar (2026-10-24) — mismo formulario que el alta. */
+    @PutMapping("/{id}")
+    public PedidoResponse editar(@PathVariable String id, @Valid @RequestBody PedidoRequest req,
+                                 org.springframework.security.core.Authentication auth) {
+        Pedido pedido = service.editar(id, req, auth.getName());
+        geocodingProxyService.aprenderPin(req.origenDireccion(), req.origenLat(), req.origenLng(), req.origenFuente());
+        geocodingProxyService.aprenderPin(req.destinoDireccion(), req.destinoLat(), req.destinoLng(), req.destinoFuente());
+        return PedidoResponse.from(pedido);
+    }
+
     @GetMapping("/{id}/sugerencia")
     public ResponseEntity<CadeteResponse> sugerencia(@PathVariable String id) {
         return service.sugerirCandidato(id)

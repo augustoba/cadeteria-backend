@@ -40,7 +40,9 @@ class CadeteServiceCorreccionCreditoTest {
                 mock(PasswordEncoder.class), mock(GeocodingService.class), mock(CadeteSesionService.class),
                 mock(WebSocketPublisher.class), mock(FcmService.class), mock(PedidoRepository.class),
                 mock(PedidoUbicacionRepository.class), mock(AvisoGeneralRepository.class),
-                mock(AvisoGeneralLecturaRepository.class), mock(ConfiguracionService.class),
+                mock(AvisoGeneralLecturaRepository.class),
+                // Cada clave con su valor por defecto (el aviso de crédito bajo lee el umbral).
+                mock(ConfiguracionService.class, i -> i.getArguments().length > 1 ? i.getArgument(1) : null),
                 mock(CadeteEstadoLogRepository.class), movimientoRepo, mock(MetricasService.class),
                 mock(IncidenciaService.class), mock(PagoSemanalMovimientoRepository.class));
 

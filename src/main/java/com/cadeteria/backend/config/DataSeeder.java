@@ -176,6 +176,7 @@ public class DataSeeder implements CommandLineRunner {
         configuracionRepo.save(config("pago_semanal_monto", "5000"));
         configuracionRepo.save(config("comision_porcentaje", "10"));
         configuracionRepo.save(config("credito_bajo_alerta_umbral", "500"));
+        configuracionRepo.save(config("credito_bajo_repetir_min", "60"));
         log.info("Seed: configuracion cargada.");
     }
 

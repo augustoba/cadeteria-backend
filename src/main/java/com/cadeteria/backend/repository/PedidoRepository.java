@@ -5,6 +5,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -132,4 +133,11 @@ public interface PedidoRepository extends JpaRepository<Pedido, String> {
               AND (p.fotoRecepcionUrl IS NOT NULL OR p.entregaFotoUrl IS NOT NULL OR p.firmaReceptorUrl IS NOT NULL)
             """)
     List<Pedido> findConImagenesTerminadosAntesDe(@Param("corte") Instant corte);
+
+    boolean existsByClienteTelefono(String clienteTelefono);
+
+    /** Cambio de teléfono desde la ficha del cliente (2026-10-24): el historial se muda al número nuevo. */
+    @Modifying
+    @Query("update Pedido p set p.clienteTelefono = :nuevo where p.clienteTelefono = :viejo")
+    int cambiarTelefonoCliente(@Param("viejo") String viejo, @Param("nuevo") String nuevo);
 }
