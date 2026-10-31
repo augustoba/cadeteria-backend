@@ -39,7 +39,7 @@ más no alcanza si el nombre corto es de una sola palabra (esas van a "calles a 
 unión desde el panel; lo aprendido después con "pasaje santiago" no vuelve solo. Mientras la regla no
 esté en producción se puede volver a unir. Revisar el historial por otras uniones de pasajes.
 
-**3p. Calles a revisar: solapas Nuevas, Pendientes y Resueltas: hecho, sin desplegar (backend y
+**3p. Calles a revisar: solapas Nuevas, Pendientes y Resueltas: hecho y desplegado el 2026-10-31 (backend y
 panel).** "Dejar pendiente" pasa la duda a Pendientes (`calle_duda.dejada_pendiente`, columna nueva que
 se agrega sola); también van ahí las que tienen link que no alcanzó, con el motivo a la vista.
 "Pasar a nuevas" la devuelve y olvida ese link. Resueltas muestra las últimas 200: qué se decidió,
