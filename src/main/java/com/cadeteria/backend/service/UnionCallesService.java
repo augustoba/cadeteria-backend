@@ -56,6 +56,9 @@ public class UnionCallesService {
     public static final String ORIGEN_A_REVISAR = "calles a revisar";
     /** Al unir desde "calles a revisar" solo pasan las cuadras a menos de esto de la calle que queda. */
     static final int ZONA_M = 1500;
+    /** A esta distancia del dibujo de una calle, un punto medido en la calle es de esa calle. */
+    static final int DIBUJO_M = 40;
+    public static final String ORIGEN_DIBUJO = "nombre del teléfono sobre el dibujo";
 
     private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
 
@@ -76,12 +79,84 @@ public class UnionCallesService {
     private final CuadraCoordsRepository coordsRepository;
     private final DireccionAliasRepository aliasRepository;
     private final CalleUnionRepository unionRepository;
+    /** Null en las pruebas que no usan el dibujo de las calles. */
+    private final TrazadoCalles trazado;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public UnionCallesService(CuadraCoordsRepository coordsRepository, DireccionAliasRepository aliasRepository,
-                              CalleUnionRepository unionRepository) {
+                              CalleUnionRepository unionRepository, TrazadoCalles trazado) {
         this.coordsRepository = coordsRepository;
         this.aliasRepository = aliasRepository;
         this.unionRepository = unionRepository;
+        this.trazado = trazado;
+    }
+
+    public UnionCallesService(CuadraCoordsRepository coordsRepository, DireccionAliasRepository aliasRepository,
+                              CalleUnionRepository unionRepository) {
+        this(coordsRepository, aliasRepository, unionRepository, null);
+    }
+
+    /**
+     * Nombre del teléfono sobre el dibujo (2026-10-21). El Geocoder del teléfono del cadete escribe
+     * las calles a su manera ("avenida mitre bartolome", "esquiu mamerto fray") y cada nombre que no
+     * conocía abría una calle aparte que el buscador no encontraba: el 21/10, 134 de las 226 alturas
+     * nuevas de los cadetes. Para un punto medido en la calle con un nombre que no tiene cuadras en
+     * esa localidad, se miran las calles dibujadas a menos de {@value #DIBUJO_M} m: si el nombre no es
+     * una de ellas y se parece a una sola ({@link CallesParecidas#mismaCalle}), se guarda con el de
+     * esa. Si no, queda como llegó (la revisión de la noche lo manda a "calles a revisar").
+     */
+    public String porElDibujo(String canonica, String localidad, double lat, double lng) {
+        if (trazado == null || canonica == null || canonica.isBlank()) return canonica;
+        if (coordsRepository.findByCalleCanonica(canonica).stream().anyMatch(c -> c.getLocalidad().equals(localidad))) return canonica;
+        Map<String, Double> cerca = callesDelDibujoCerca(lat, lng);
+        if (cerca.containsKey(canonica)) return canonica;
+        String parecida = unicaParecida(canonica, cerca.keySet());
+        if (parecida == null) return canonica;
+        log.info("Calle \"{}\" guardada como \"{}\": es el nombre que da el teléfono y el punto cae sobre el dibujo de esa calle ({} m).",
+                canonica, parecida, Math.round(cerca.get(parecida)));
+        return parecida;
+    }
+
+    /** Las calles dibujadas a menos de {@value #DIBUJO_M} m del punto, con el nombre que tienen hoy en la base -> metros. */
+    public Map<String, Double> callesDelDibujoCerca(double lat, double lng) {
+        Map<String, Double> out = new HashMap<>();
+        if (trazado == null) return out;
+        for (Map.Entry<String, Double> e : trazado.cerca(lat, lng, DIBUJO_M).entrySet()) {
+            String hoy = aliasRepository.findByVarianteNorm(e.getKey()).map(DireccionAlias::getCalleCanonica).orElse(e.getKey());
+            out.merge(hoy, e.getValue(), Math::min);
+        }
+        return out;
+    }
+
+    /** Los nombres que tienen hoy en la base las calles dibujadas (vacío sin el dibujo). */
+    public Set<String> nombresDelDibujo() {
+        Set<String> out = new HashSet<>();
+        if (trazado == null) return out;
+        Map<String, String> alias = new HashMap<>();
+        for (DireccionAlias a : aliasRepository.findAll()) alias.put(a.getVarianteNorm(), a.getCalleCanonica());
+        for (String n : trazado.nombres()) out.add(alias.getOrDefault(n, n));
+        return out;
+    }
+
+    /** El único de {@code nombres} que puede ser la misma calle que {@code canonica}; null si ninguno o más de uno. */
+    public static String unicaParecida(String canonica, java.util.Collection<String> nombres) {
+        String unica = null;
+        for (String n : nombres) {
+            if (n.equals(canonica) || !CallesParecidas.mismaCalle(canonica, n)) continue;
+            if (unica != null) return null;
+            unica = n;
+        }
+        return unica;
+    }
+
+    /**
+     * Unión de un nombre del teléfono con la calle del dibujo sobre la que caen sus cuadras (revisión de
+     * la noche). Pasan todas: ya se miró cada una contra el dibujo, y la calle que queda puede no tener
+     * cuadras cerca (avenidas largas).
+     */
+    @Transactional
+    public Union unirPorDibujo(String seVa, String queda, String localidad, int cuadra, int distanciaM) {
+        return unir(seVa, queda, localidad, cuadra, distanciaM, ORIGEN_DIBUJO, false);
     }
 
     /**

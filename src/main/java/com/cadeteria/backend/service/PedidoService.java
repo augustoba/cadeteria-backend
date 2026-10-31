@@ -1338,7 +1338,7 @@ public class PedidoService {
         if (porcentaje) {
             bloquear(cadete);
             // 2026-10-19: se vuelve a mirar al aceptar (entre la oferta y el toque pudo aceptar otro
-            // viaje o pudieron anularle una carga). Sin crédito no lo toma: el viaje pasa a otro cadete.
+            // viaje o pudieron anularle una carga). Sin crédito no lo toma: se le saca el viaje.
             // Queda como SIN_CREDITO, que no cuenta como rechazo ni como no aceptado (no lo penaliza).
             if (cadete.getCreditoDisponible().compareTo(comisionDe(pedido)) < 0) {
                 oferta.setResultado(resultado("SIN_CREDITO"));
@@ -1347,7 +1347,7 @@ public class PedidoService {
                 liberarYReasignar(pedido, cadete, false);
                 throw new CreditoInsuficienteException("No te alcanza el crédito para la comisión de este viaje ($"
                         + comisionDe(pedido).stripTrailingZeros().toPlainString() + "). Cargá crédito con la cadetería; "
-                        + "el viaje pasó a otro cadete.");
+                        + "ya no tenés este viaje.");
             }
         }
         oferta.setResultado(resultado("ACEPTADO"));
@@ -1814,21 +1814,23 @@ public class PedidoService {
         publisher.publicarEventoViaje(cadeteQueNoAcepto.getId(), "VIAJE_QUITADO", dtoQuitado);
         if (vencio) {
             fcmService.enviar(cadeteQueNoAcepto.getFcmToken(), "Se venció el tiempo para aceptar",
-                    "El viaje que tenías ofrecido pasó a otro cadete.",
+                    "Ya no tenés el viaje que te habían ofrecido.",
                     Map.of("tipo", "VIAJE_QUITADO", "pedidoId", pedido.getId()));
         }
 
         Pedido pedidoAOfertar = pedido;
-        Optional<Cadete> siguiente = buscarCandidato(pedido);
+        // Con asignación automática apagada el pedido vuelve a la cola manual del admin, sin
+        // ofrecérselo a nadie (2026-10-31: al rechazar se le ofrecía solo a otro cadete).
+        Optional<Cadete> siguiente = configuracionService.getBoolean("asignacion_automatica", false)
+                ? buscarCandidato(pedido)
+                : Optional.empty();
 
         // Si el único/mejor candidato para ESTE pedido es justo el que acaba de rechazarlo
         // (o dejarlo vencer), antes de devolvérselo en el acto probamos si hay otro pedido
         // SIN_ASIGNAR — más viejo primero — para el que también sea candidato. Evita el
         // rebote de "siempre el mismo pedido" cuando hay otros esperando (pendiente #1,
-        // sesión 2026-09-20). Solo con asignación automática prendida: si está apagada, los
-        // demás SIN_ASIGNAR son la cola manual del admin, no hay que tocarlos.
-        if (siguiente.map(c -> c.getId().equals(cadeteQueNoAcepto.getId())).orElse(false)
-                && configuracionService.getBoolean("asignacion_automatica", false)) {
+        // sesión 2026-09-20).
+        if (siguiente.map(c -> c.getId().equals(cadeteQueNoAcepto.getId())).orElse(false)) {
             Optional<Pedido> alternativo = buscarPedidoAlternativoPara(cadeteQueNoAcepto, pedido);
             if (alternativo.isPresent()) {
                 pedidoAOfertar = alternativo.get();

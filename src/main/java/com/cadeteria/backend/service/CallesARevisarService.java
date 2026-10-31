@@ -65,10 +65,17 @@ public class CallesARevisarService {
 
     public record Punto(int cuadra, String localidad, double lat, double lng) {}
 
-    /** Una duda pendiente con lo que hace falta para mostrarla: su punto y los de las cuadras con las que se compara. */
+    /**
+     * Una duda sin resolver con lo que hace falta para mostrarla: su punto y los de las cuadras con las
+     * que se compara. {@code paraDespues}: ya la miró alguien (la dejó pendiente o su link no alcanzó).
+     */
     public record DudaVista(String id, String tipo, String calle, String localidad, int cuadra, String otraCalle,
                             String motivo, Double lat, Double lng, String proveedor, int usos,
-                            Double linkLat, Double linkLng, List<Punto> cercanas) {}
+                            Double linkLat, Double linkLng, List<Punto> cercanas, boolean paraDespues, String resultado) {}
+
+    /** Una duda cerrada: qué se decidió, quién y cuándo. */
+    public record DudaResuelta(String id, String tipo, String calle, String localidad, int cuadra, String otraCalle,
+                               String estado, String resultado, String resueltaPor, Instant resueltaEn) {}
 
     /** Cómo quedó la duda y la explicación para mostrar. */
     public record Resultado(String estado, String mensaje) {}
@@ -121,11 +128,18 @@ public class CallesARevisarService {
      */
     @Transactional
     public int actualizar() {
-        List<CuadraCoords> filas = coordsRepository.findAll().stream().filter(c -> !c.isApproximate()).toList();
         Set<String> conocidas = new HashSet<>();
         for (CalleDuda d : dudaRepository.findAll()) conocidas.add(clave(d.getTipo(), d.getCalleCanonica(), d.getLocalidad(), d.getCuadra(), d.getOtraCalle()));
 
         int nuevas = 0;
+        for (CalleDuda d : nombresDelTelefono()) {
+            if (conocidas.add(clave(d.getTipo(), d.getCalleCanonica(), d.getLocalidad(), d.getCuadra(), d.getOtraCalle()))) {
+                dudaRepository.save(d);
+                nuevas++;
+            }
+        }
+        // Después de las uniones de arriba: las filas como quedaron.
+        List<CuadraCoords> filas = coordsRepository.findAll().stream().filter(c -> !c.isApproximate()).toList();
         for (CalleDuda d : dudasDeNombre(filas)) {
             if (conocidas.add(clave(d.getTipo(), d.getCalleCanonica(), d.getLocalidad(), d.getCuadra(), d.getOtraCalle()))) {
                 dudaRepository.save(d);
@@ -178,10 +192,40 @@ public class CallesARevisarService {
             out.add(new DudaVista(d.getId(), d.getTipo(), DireccionUtils.nombreParaMostrar(d.getCalleCanonica()), d.getLocalidad(),
                     d.getCuadra(), d.getOtraCalle().isEmpty() ? "" : DireccionUtils.nombreParaMostrar(d.getOtraCalle()), d.getMotivo(),
                     fila == null ? null : fila.getLat(), fila == null ? null : fila.getLng(), fila == null ? null : fila.getProveedor(),
-                    fila == null ? 0 : fila.getConfirmaciones(), d.getLinkLat(), d.getLinkLng(), cercanas));
+                    fila == null ? 0 : fila.getConfirmaciones(), d.getLinkLat(), d.getLinkLng(), cercanas,
+                    d.isDejadaPendiente() || d.getLinkLat() != null, d.getResultado()));
         }
         out.sort(Comparator.comparingInt(DudaVista::usos).reversed().thenComparing(DudaVista::calle).thenComparingInt(DudaVista::cuadra));
         return out;
+    }
+
+    /** Las últimas 200 cerradas, la más reciente primero. */
+    @Transactional(readOnly = true)
+    public List<DudaResuelta> resueltas() {
+        return dudaRepository.findTop200ByEstadoNotOrderByResueltaEnDesc(PENDIENTE).stream()
+                .map(d -> new DudaResuelta(d.getId(), d.getTipo(), DireccionUtils.nombreParaMostrar(d.getCalleCanonica()), d.getLocalidad(),
+                        d.getCuadra(), d.getOtraCalle().isEmpty() ? "" : DireccionUtils.nombreParaMostrar(d.getOtraCalle()),
+                        d.getEstado(), d.getResultado(), d.getResueltaPor(), d.getResueltaEn()))
+                .toList();
+    }
+
+    /** La deja para después (2026-10-31): sale de Nuevas sin resolverla. */
+    @Transactional
+    public void dejarPendiente(String id) {
+        CalleDuda d = pendiente(id);
+        d.setDejadaPendiente(true);
+        dudaRepository.save(d);
+    }
+
+    /** La devuelve a Nuevas. También olvida el link que no alcanzó: si no, volvería a Pendientes por tenerlo. */
+    @Transactional
+    public void pasarANuevas(String id) {
+        CalleDuda d = pendiente(id);
+        d.setDejadaPendiente(false);
+        d.setLinkLat(null);
+        d.setLinkLng(null);
+        d.setResultado(null);
+        dudaRepository.save(d);
     }
 
     /** Resuelve una duda con el link de Google Maps de esa dirección. Si no alcanza para decidir, la duda sigue pendiente. */
@@ -464,6 +508,63 @@ public class CallesARevisarService {
             d.setResueltaEn(Instant.now());
             dudaRepository.save(d);
         }
+    }
+
+    /**
+     * Calles que solo aprendió el cadete en la calle (teléfono o GPS en la puerta) con un nombre que no
+     * está en el dibujo (2026-10-21, ver {@link UnionCallesService#porElDibujo}). Si sus cuadras caen
+     * sobre el dibujo de una sola calle de nombre parecido, se unen solas a esa. Si caen sobre otra
+     * calle de nombre distinto, o sobre más de una parecida, vuelven como dudas de nombre para que
+     * decida una persona. Las que no caen sobre ningún dibujo quedan como están: pueden ser calles
+     * que OpenStreetMap no tiene.
+     */
+    private List<CalleDuda> nombresDelTelefono() {
+        List<CalleDuda> out = new ArrayList<>();
+        Set<String> delDibujo = unionCalles.nombresDelDibujo();
+        if (delDibujo.isEmpty()) return out;
+        Map<String, List<CuadraCoords>> porCalle = new LinkedHashMap<>();
+        for (CuadraCoords c : coordsRepository.findAll()) {
+            if (!c.isApproximate()) porCalle.computeIfAbsent(c.getCalleCanonica(), k -> new ArrayList<>()).add(c);
+        }
+        for (Map.Entry<String, List<CuadraCoords>> e : porCalle.entrySet()) {
+            String calle = e.getKey();
+            if (delDibujo.contains(calle) || !e.getValue().stream().allMatch(c -> DireccionCacheService.PROVEEDOR_CADETE_GPS.equals(c.getProveedor())
+                    || DireccionCacheService.PROVEEDOR_ANDROID_GEOCODER.equals(c.getProveedor()))) continue;
+            // nombre del dibujo -> {cuántas cuadras caen sobre él, la distancia más corta}, y una cuadra de muestra de cada uno
+            Map<String, double[]> parecidas = new LinkedHashMap<>(), otras = new LinkedHashMap<>();
+            Map<String, CuadraCoords> muestra = new java.util.HashMap<>();
+            for (CuadraCoords c : e.getValue()) {
+                Map<String, Double> cerca = unionCalles.callesDelDibujoCerca(c.getLat(), c.getLng());
+                if (cerca.isEmpty()) continue;
+                String parecida = UnionCallesService.unicaParecida(calle, cerca.keySet());
+                String sobre = parecida != null ? parecida
+                        : cerca.entrySet().stream().min(Map.Entry.comparingByValue()).orElseThrow().getKey();
+                double[] cuenta = (parecida != null ? parecidas : otras).computeIfAbsent(sobre, k -> new double[]{0, Double.MAX_VALUE});
+                cuenta[0]++;
+                if (cerca.get(sobre) < cuenta[1]) {
+                    cuenta[1] = cerca.get(sobre);
+                    muestra.put(sobre, c);
+                }
+            }
+            if (parecidas.size() == 1 && otras.isEmpty()) {
+                String queda = parecidas.keySet().iterator().next();
+                CuadraCoords m = muestra.get(queda);
+                unionCalles.unirPorDibujo(calle, queda, m.getLocalidad(), m.getCuadra(), (int) Math.round(parecidas.get(queda)[1]));
+                continue;
+            }
+            // Para preguntar: la calle sobre la que caen más cuadras (primero las de nombre parecido).
+            Map<String, double[]> candidatas = parecidas.isEmpty() ? otras : parecidas;
+            if (candidatas.isEmpty()) continue;
+            String otra = candidatas.entrySet().stream().max(Comparator.comparingDouble((Map.Entry<String, double[]> x) -> x.getValue()[0])).orElseThrow().getKey();
+            CuadraCoords m = muestra.get(otra);
+            int total = e.getValue().size(), sobreOtra = (int) candidatas.get(otra)[0];
+            String motivo = "Nombre que trajo el teléfono del cadete y no está en el mapa: "
+                    + (total == 1 ? "su única cuadra cae" : sobreOtra + " de sus " + total + " cuadras caen") + " sobre el dibujo de \""
+                    + DireccionUtils.nombreParaMostrar(otra) + "\" (la " + m.getCuadra() + ", a " + Math.round(candidatas.get(otra)[1]) + " m)."
+                    + (parecidas.size() + otras.size() > 1 ? " Algunas caen sobre otra calle." : "");
+            out.add(nueva(TIPO_NOMBRE, calle, m.getLocalidad(), m.getCuadra(), otra, motivo));
+        }
+        return out;
     }
 
     /** Pares de nombres con la misma forma que comparten localidad o tienen cuadras cerca. Queda el de más cuadras. */

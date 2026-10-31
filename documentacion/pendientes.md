@@ -1,6 +1,6 @@
 # Pendientes
 
-Última actualización: 2026-10-19.
+Última actualización: 2026-10-31.
 
 > El backlog largo (las 11 rondas de propuestas) vive en `MEJORAS-PROPUESTAS.md`, en la raíz
 > del proyecto. **Ese archivo está fuera de cualquier repo git**, así que no viaja con el
@@ -9,6 +9,50 @@
 Todo el trabajo nuevo va en la rama **`develop`** de los 3 repos (`cadeteria`, `admin-front`,
 `cadete-app`). Lo del 2026-09-24 al 26 ya está en `develop` (pusheado el 2026-09-26), salvo la
 rama `aviso-whatsapp-web` (backend + panel, aviso "en camino"), sin pushear al 2026-09-28.
+
+## Reportado 2026-10-31
+
+**3p. La asignación automática apagada igual repartía cuando un cadete no tomaba el viaje: hecho, sin
+desplegar.** Con `asignacion_automatica` en false, `PedidoService.liberarYReasignar` buscaba candidato
+y ofrecía el pedido igual. Pasaba al rechazar, al vencer la oferta y al aceptar sin crédito, y si no
+había otro cadete se lo volvía a ofrecer al mismo. Ahora con la opción apagada el pedido queda en
+`SIN_ASIGNAR`, sin cadete y sin oferta nueva, para que lo asigne el operador. Con la opción prendida
+el reparto no cambia. El push de oferta vencida y el error de sin crédito ya no dicen "pasó a otro
+cadete" (el texto nuevo es el mismo con la opción prendida o apagada).
+
+**3p. Un cadete dado de baja seguía apareciendo en el mapa: hecho, sin desplegar.** `dibujarCadetes`
+(`mapa.component.ts` del panel) dibujaba a todos los que tienen `lat`/`lng`, sin mirar `activo`. Ahora
+saltea a los inactivos, como ya hace `cadetes-libres.component.ts`. `CadeteService.setActivo` sigue
+sin cambiar el estado ni borrar la ubicación; era solo visual: dado de baja no recibe ofertas y
+`JwtAuthFilter` le corta la sesión.
+
+**3p. "Santiago del Estero 230" solo ofrece "Pasaje Santiago 230" (Lules y San Miguel): regla sin
+programar, causa confirmada en producción.** Antes la encontraba. Historial de uniones: "Santiago del
+Estero → Pasaje Santiago · 27/10/2026 14:53 · al aprender · cuadra 4100 en San Miguel de Tucumán a 54
+m · 49 cuadras pasadas, 0 repetidas". Causa: `UnionCallesService`. `mismasPalabras` no cuenta "pasaje" ni
+"de/del" y acepta que un nombre contenga al otro (`{santiago}` y `{santiago, estero}`); alcanza una
+misma cuadra a menos de 60 m en una localidad. Queda el nombre con menos palabras y `unir` mueve las
+cuadras de todas las localidades, con lo que "santiago del estero" pasa a ser alias de "pasaje
+santiago". Eso explica que no aparezca la calle y que no se pregunte afuera (la base lo da por
+resuelto). Arreglo propuesto: un pasaje no se une con algo que no sea pasaje, y una palabra propia de
+más no alcanza si el nombre corto es de una sola palabra (esas van a "calles a revisar"). Deshacer esa
+unión desde el panel; lo aprendido después con "pasaje santiago" no vuelve solo. Mientras la regla no
+esté en producción se puede volver a unir. Revisar el historial por otras uniones de pasajes.
+
+**3p. Calles a revisar: solapas Nuevas, Pendientes y Resueltas: hecho, sin desplegar (backend y
+panel).** "Dejar pendiente" pasa la duda a Pendientes (`calle_duda.dejada_pendiente`, columna nueva que
+se agrega sola); también van ahí las que tienen link que no alcanzó, con el motivo a la vista.
+"Pasar a nuevas" la devuelve y olvida ese link. Resueltas muestra las últimas 200: qué se decidió,
+quién y cuándo. La corrida de la noche sigue cerrando sola las de ubicación que ya cierran, aunque
+estén en Pendientes.
+
+**Mapa: filtros y buscador de cadetes: hecho, sin desplegar (solo panel).** Botones de estado (Todos,
+Libres, Ocupados) y de vehículo (Todos, Motos, Bicis) que se combinan, con contador en vivo. "Buscar
+cadete" lista a los activos por apellido y filtra al escribir; al elegir uno lo centra y abre su
+cartel, y si un filtro lo ocultaba vuelve a Todos. Lógica en `features/mapa/filtro-cadetes.ts`. Probar
+con muchos cadetes: elegir uno que esté dentro de un grupo de marcadores. **Pendiente:** el cartel
+abierto se cierra cuando llega cualquier ubicación nueva, porque `dibujarCadetes` borra y vuelve a
+dibujar todos los marcadores (ya pasaba antes).
 
 ## Sesión 2026-10-19 (Claude): reportado en producción — hecho, sin probar en el celular
 

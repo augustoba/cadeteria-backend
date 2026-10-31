@@ -8,4 +8,6 @@ import java.util.List;
 public interface CalleDudaRepository extends JpaRepository<CalleDuda, String> {
 
     List<CalleDuda> findByEstado(String estado);
+
+    List<CalleDuda> findTop200ByEstadoNotOrderByResueltaEnDesc(String estado);
 }

@@ -90,6 +90,21 @@ public class CallesAdminController {
         return aRevisar.pendientes();
     }
 
+    @GetMapping("/a-revisar/resueltas")
+    public List<CallesARevisarService.DudaResuelta> resueltas() {
+        return aRevisar.resueltas();
+    }
+
+    @PostMapping("/a-revisar/{id}/dejar-pendiente")
+    public void dejarPendiente(@PathVariable String id) {
+        aRevisar.dejarPendiente(id);
+    }
+
+    @PostMapping("/a-revisar/{id}/pasar-a-nuevas")
+    public void pasarANuevas(@PathVariable String id) {
+        aRevisar.pasarANuevas(id);
+    }
+
     /** Repasa toda la base ahora (también corre sola todas las noches). */
     @PostMapping("/a-revisar/actualizar")
     public Map<String, Integer> actualizar() {

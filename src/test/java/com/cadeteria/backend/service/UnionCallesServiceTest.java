@@ -219,6 +219,48 @@ class UnionCallesServiceTest {
         assertEquals("avenida mitre", service.alAprender("avenida mitre", SMT, 400, LAT + 0.0005, LNG));
     }
 
+    // --- nombre del teléfono sobre el dibujo (2026-10-21) ---
+
+    /** "avenida mitre" y "lavalle" dibujadas hacia el norte desde el punto de partida, a 300 m una de otra. */
+    private UnionCallesService conDibujo() {
+        double lngLavalle = LNG + 0.003;
+        TrazadoCalles trazado = new TrazadoCalles(java.util.Map.of(
+                "avenida mitre", List.of(new TrazadoCalles.Tramo(SMT, new double[][]{TrazadoCalles.xy(LAT, LNG), TrazadoCalles.xy(LAT_500M, LNG)})),
+                "lavalle", List.of(new TrazadoCalles.Tramo(SMT, new double[][]{TrazadoCalles.xy(LAT, lngLavalle), TrazadoCalles.xy(LAT_500M, lngLavalle)}))));
+        return new UnionCallesService(coords, alias, uniones, trazado);
+    }
+
+    @Test
+    void elNombreDelTelefonoSobreElDibujoDeUnaCalleParecidaSeGuardaConElDeEsa() {
+        assertEquals("avenida mitre", conDibujo().porElDibujo("avenida mitre bartolome", SMT, LAT_20M, LNG + 0.0002));
+    }
+
+    @Test
+    void siElPuntoNoCaeSobreLaCalleParecidaQuedaComoLlego() {
+        // Sobre "lavalle", que no se parece: no se adivina.
+        assertEquals("avenida mitre bartolome", conDibujo().porElDibujo("avenida mitre bartolome", SMT, LAT_20M, LNG + 0.003));
+    }
+
+    @Test
+    void unNombreQueYaTieneCuadrasEnEsaLocalidadNoSeToca() {
+        fila("avenida mitre bartolome", SMT, 300, LAT_500M, LNG, "android_geocoder");
+        assertEquals("avenida mitre bartolome", conDibujo().porElDibujo("avenida mitre bartolome", SMT, LAT_20M, LNG));
+    }
+
+    @Test
+    void elDibujoSeLeeConElNombreDeHoy() {
+        DireccionAlias unida = new DireccionAlias();
+        unida.setVarianteNorm("avenida mitre");
+        unida.setCalleCanonica("mitre");
+        when(alias.findByVarianteNorm("avenida mitre")).thenReturn(Optional.of(unida));
+        assertEquals("mitre", conDibujo().porElDibujo("avenida mitre bartolome", SMT, LAT_20M, LNG));
+    }
+
+    @Test
+    void sinElDibujoNoCambiaNada() {
+        assertEquals("avenida mitre bartolome", service.porElDibujo("avenida mitre bartolome", SMT, LAT_20M, LNG));
+    }
+
     private CuadraCoords fila(String calle, String localidad, int cuadra, double lat, double lng, String proveedor) {
         CuadraCoords c = new CuadraCoords();
         c.setId(calle + "|" + localidad + "|" + cuadra);
