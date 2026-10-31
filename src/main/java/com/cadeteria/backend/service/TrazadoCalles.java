@@ -73,6 +73,22 @@ public class TrazadoCalles {
         return out;
     }
 
+    /** Los nombres de OpenStreetMap que tienen dibujo. */
+    public java.util.Set<String> nombres() {
+        return cargado().keySet();
+    }
+
+    /** Las calles (nombre de OpenStreetMap) cuyo dibujo pasa a menos de {@code radioM} del punto, con los metros a cada una. */
+    public Map<String, Double> cerca(double lat, double lng, double radioM) {
+        double[] p = xy(lat, lng);
+        Map<String, Double> out = new HashMap<>();
+        for (Map.Entry<String, List<Tramo>> e : cargado().entrySet()) {
+            Arrime a = arrimar(e.getValue(), p);
+            if (a != null && a.metros() <= radioM) out.put(e.getKey(), a.metros());
+        }
+        return out;
+    }
+
     /** Null si la calle no tiene dibujo. */
     public static Arrime arrimar(List<Tramo> dibujo, double[] p) {
         Arrime mejor = null;

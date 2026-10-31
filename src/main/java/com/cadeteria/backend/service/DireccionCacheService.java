@@ -435,8 +435,11 @@ public class DireccionCacheService {
         String localidadNorm = localidad == null ? "" : localidad;
         // 2026-10-03: si esa cuadra ya está ahí mismo con otro nombre de la misma calle ("Batalla de
         // Suipacha" / "Suipacha"), se unen y se guarda con el que queda, en vez de abrir otra fila.
-        String canonicaNorm = unionCalles == null ? canonicalizar(calleCanonica)
-                : unionCalles.alAprender(canonicalizar(calleCanonica), localidadNorm, cuadra, lat, lng);
+        // 2026-10-21: lo medido en la calle con un nombre que no conocemos se arrima a la calle dibujada
+        // sobre la que está, si el nombre se parece ("avenida mitre bartolome" -> "avenida mitre").
+        String conocida = unionCalles != null && MEDIDAS_EN_LA_CALLE.contains(proveedor)
+                ? unionCalles.porElDibujo(canonicalizar(calleCanonica), localidadNorm, lat, lng) : canonicalizar(calleCanonica);
+        String canonicaNorm = unionCalles == null ? conocida : unionCalles.alAprender(conocida, localidadNorm, cuadra, lat, lng);
 
         String varianteNorm = DireccionUtils.normalizar(calleTextoOriginal);
         if (aliasRepository.findByVarianteNorm(varianteNorm).isEmpty()) {

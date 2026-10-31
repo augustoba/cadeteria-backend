@@ -65,6 +65,68 @@ public final class CallesParecidas {
         return String.join(" ", out);
     }
 
+    /** Tipos de calle que sí distinguen: el "pasaje Sarmiento" no es la calle Sarmiento. */
+    private static final java.util.Map<String, String> TIPOS = java.util.Map.of(
+            "pasaje", "pasaje", "pje", "pasaje", "psje", "pasaje",
+            "bulevar", "bulevar", "boulevard", "bulevar", "bv", "bulevar", "blvd", "bulevar",
+            "diagonal", "diagonal", "diag", "diagonal");
+
+    /**
+     * Si dos nombres (normalizados) pueden ser la misma calle (2026-10-21), para el nombre que trae el
+     * teléfono del cadete y el de la calle del dibujo sobre la que está parado: las palabras de uno
+     * están todas en el otro, en cualquier orden y con errores de dedo ("mitre bartolome" y "avenida
+     * mitre", "posse wenceslo" y "wenceslao posse"); una inicial vale por un nombre que empiece con
+     * esa letra ("j hernandez" y "jose hernandez"). No alcanza si los números son otros, si uno es
+     * pasaje, bulevar o diagonal y el otro no, o si no queda una palabra que distinga a la calle.
+     */
+    public static boolean mismaCalle(String a, String b) {
+        if (!tipo(a).equals(tipo(b))) return false;
+        List<String> pa = sinTipo(palabras(a)), pb = sinTipo(palabras(b));
+        if (!numeros(pa).equals(numeros(pb))) return false;
+        List<String> ca = completas(pa), cb = completas(pb);
+        if (noDistingue(ca) || noDistingue(cb)) return false;
+        String ja = String.join(" ", ca), jb = String.join(" ", cb);
+        if (puntaje(ja, jb) == NO && puntaje(jb, ja) == NO) return false;
+        return inicialesEn(pa, cb) && inicialesEn(pb, ca);
+    }
+
+    private static String tipo(String nombreNorm) {
+        if (nombreNorm == null) return "";
+        for (String p : nombreNorm.trim().split("\\s+")) {
+            String t = TIPOS.get(p);
+            if (t != null) return t;
+        }
+        return "";
+    }
+
+    /** Sin "diagonal": no está entre las genéricas (cuenta para la forma), pero el tipo ya se comparó aparte. */
+    private static List<String> sinTipo(List<String> palabras) {
+        return palabras.stream().filter(p -> !p.equals("diagonal") && !p.equals("diag")).toList();
+    }
+
+    private static java.util.Set<String> numeros(List<String> palabras) {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        for (String p : palabras) if (Character.isDigit(p.charAt(0))) out.add(p);
+        return out;
+    }
+
+    /** Las palabras que no son iniciales sueltas. */
+    private static List<String> completas(List<String> palabras) {
+        return palabras.stream().filter(p -> p.length() > 1 || Character.isDigit(p.charAt(0))).toList();
+    }
+
+    private static boolean noDistingue(List<String> palabras) {
+        return palabras.isEmpty() || (palabras.size() == 1 && palabras.get(0).length() < 4);
+    }
+
+    /** Cada inicial suelta de {@code palabras} tiene que ser la primera letra de alguna palabra del otro nombre. */
+    private static boolean inicialesEn(List<String> palabras, List<String> delOtro) {
+        for (String p : palabras) {
+            if (p.length() == 1 && !Character.isDigit(p.charAt(0)) && delOtro.stream().noneMatch(o -> o.startsWith(p))) return false;
+        }
+        return true;
+    }
+
     private static List<String> palabras(String nombreNorm) {
         List<String> out = new ArrayList<>();
         if (nombreNorm == null) return out;
