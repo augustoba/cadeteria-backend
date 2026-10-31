@@ -1,5 +1,6 @@
 package com.cadeteria.backend.service;
 
+import com.cadeteria.backend.common.CreditoInsuficienteException;
 import com.cadeteria.backend.config.AppProperties;
 import com.cadeteria.backend.model.Cadete;
 import com.cadeteria.backend.model.EstadoCadete;
@@ -13,12 +14,14 @@ import com.cadeteria.backend.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -105,6 +108,8 @@ class PedidoServiceReasignacionTest {
         when(estadoPedidoRepo.findById("PENDIENTE")).thenReturn(Optional.of(estadoPedido("PENDIENTE")));
         when(resultadoOfertaRepo.findById("RECHAZADO")).thenReturn(Optional.of(resultadoOferta("RECHAZADO")));
         when(resultadoOfertaRepo.findById("PENDIENTE")).thenReturn(Optional.of(resultadoOferta("PENDIENTE")));
+        when(resultadoOfertaRepo.findById("EXPIRADO")).thenReturn(Optional.of(resultadoOferta("EXPIRADO")));
+        when(resultadoOfertaRepo.findById("SIN_CREDITO")).thenReturn(Optional.of(resultadoOferta("SIN_CREDITO")));
         when(cadeteRepo.findByUsername(any())).thenReturn(Optional.of(cadete));
         when(cadeteRepo.findAll()).thenReturn(List.of(cadete));
         when(ofertaRepo.findByPedidoId(any())).thenReturn(List.of());
@@ -201,7 +206,60 @@ class PedidoServiceReasignacionTest {
 
         assertNull(masViejo.getCadeteAsignado(),
                 "con asignacion automatica apagada, el pedido mas viejo es cola manual del admin: no se toca");
-        assertEquals("PENDIENTE", rechazado.getEstado().getId(),
-                "el cadete sigue siendo el unico candidato, asi que se le vuelve a ofrecer el mismo");
+        assertQuedaParaElOperador(rechazado);
+    }
+
+    @Test
+    void conAsignacionAutomaticaApagadaLaOfertaVencidaNoPasaAOtroCadete() {
+        Pedido vencido = pedido("p-vencido", Instant.parse("2026-09-20T20:00:00Z"));
+        vencido.setCadeteAsignado(cadete);
+        OfertaPedido oferta = new OfertaPedido();
+        oferta.setPedido(vencido);
+        oferta.setCadete(cadete);
+        when(ofertaRepo.findByResultadoIdAndExpiraEnBefore(org.mockito.ArgumentMatchers.eq("PENDIENTE"), any()))
+                .thenReturn(List.of(oferta));
+
+        service.expirarOfertasVencidas();
+
+        assertEquals("EXPIRADO", oferta.getResultado().getId());
+        assertQuedaParaElOperador(vencido);
+    }
+
+    @Test
+    void conAsignacionAutomaticaApagadaAceptarSinCreditoNoPasaAOtroCadete() {
+        cadete.setModalidadPago("PORCENTAJE");
+        cadete.setCreditoDisponible(new BigDecimal("50.00"));
+        Pedido sinCredito = pedido("p-sin-credito", Instant.parse("2026-09-20T20:00:00Z"));
+        sinCredito.setPrecio(new BigDecimal("900.00"));
+        sinCredito.setCadeteAsignado(cadete);
+        OfertaPedido oferta = new OfertaPedido();
+        oferta.setPedido(sinCredito);
+        oferta.setCadete(cadete);
+        oferta.setExpiraEn(Instant.now().plusSeconds(60));
+        when(ofertaRepo.findFirstByPedidoIdAndCadeteIdAndResultadoId("p-sin-credito", "c1", "PENDIENTE"))
+                .thenReturn(Optional.of(oferta));
+        when(configuracionService.getBigDecimal(any(), any())).thenAnswer(i -> i.getArgument(1));
+        // Sin este segundo cadete el pedido quedaria sin candidato de todos modos.
+        Cadete otro = new Cadete();
+        otro.setId("c2");
+        otro.setNombre("Ana");
+        otro.setApellido("Gomez");
+        otro.setEstado(cadete.getEstado());
+        otro.setTipoVehiculo(moto);
+        otro.setZonaActual(zona);
+        otro.setLat(-26.8135);
+        otro.setLng(-65.2245);
+        when(cadeteRepo.findAll()).thenReturn(List.of(cadete, otro));
+
+        assertThrows(CreditoInsuficienteException.class, () -> service.aceptar("p-sin-credito", "juanp"));
+
+        assertEquals("SIN_CREDITO", oferta.getResultado().getId());
+        assertQuedaParaElOperador(sinCredito);
+    }
+
+    private void assertQuedaParaElOperador(Pedido pedido) {
+        assertEquals("SIN_ASIGNAR", pedido.getEstado().getId(),
+                "con asignacion automatica apagada, el pedido vuelve a la cola manual del admin");
+        assertNull(pedido.getCadeteAsignado());
     }
 }
