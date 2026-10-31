@@ -20,7 +20,7 @@ había otro cadete se lo volvía a ofrecer al mismo. Ahora con la opción apagad
 el reparto no cambia. El push de oferta vencida y el error de sin crédito ya no dicen "pasó a otro
 cadete" (el texto nuevo es el mismo con la opción prendida o apagada).
 
-**3p. Un cadete dado de baja seguía apareciendo en el mapa: hecho, sin desplegar.** `dibujarCadetes`
+**3p. Un cadete dado de baja seguía apareciendo en el mapa: hecho y desplegado (2026-10-31).** `dibujarCadetes`
 (`mapa.component.ts` del panel) dibujaba a todos los que tienen `lat`/`lng`, sin mirar `activo`. Ahora
 saltea a los inactivos, como ya hace `cadetes-libres.component.ts`. `CadeteService.setActivo` sigue
 sin cambiar el estado ni borrar la ubicación; era solo visual: dado de baja no recibe ofertas y
@@ -46,7 +46,7 @@ se agrega sola); también van ahí las que tienen link que no alcanzó, con el m
 quién y cuándo. La corrida de la noche sigue cerrando sola las de ubicación que ya cierran, aunque
 estén en Pendientes.
 
-**Mapa: filtros y buscador de cadetes: hecho, sin desplegar (solo panel).** Botones de estado (Todos,
+**Mapa: filtros y buscador de cadetes: hecho y desplegado (2026-10-31, solo panel).** Botones de estado (Todos,
 Libres, Ocupados) y de vehículo (Todos, Motos, Bicis) que se combinan, con contador en vivo. "Buscar
 cadete" lista a los activos por apellido y filtra al escribir; al elegir uno lo centra y abre su
 cartel, y si un filtro lo ocultaba vuelve a Todos. Lógica en `features/mapa/filtro-cadetes.ts`. Probar
