@@ -539,6 +539,89 @@ class CallesARevisarServiceTest {
         assertEquals(5, tabla.get(0).getConfirmaciones());
     }
 
+    @Test
+    void quitarNoBorraSiLaOtraCuadraYaNoEsta() {
+        nombreAnterior("rivadavia", "virgen de la merced");
+        CuadraCoords deHoy = fila("virgen de la merced", SMT, 500, LAT, LNG, "osm");
+        fila("rivadavia", SMT, 500, LAT + 0.0003, LNG, "osm");
+        service.actualizar();
+        tabla.remove(deHoy);
+
+        CallesARevisarService.Resultado r = service.marcar(dudas.get(0).getId(), "QUITAR", "admin");
+
+        assertEquals(CallesARevisarService.YA_CIERRA, r.estado());
+        assertEquals(1, tabla.size(), "era la única de esa altura: no se borra");
+        assertEquals("rivadavia", tabla.get(0).getCalleCanonica());
+    }
+
+    // --- nombres cruzados ---
+
+    private void dosNombresCruzados() {
+        nombreAnterior("24 de setiembre", "avenida 24 de septiembre");
+        nombreAnterior("avenida 24 de septiembre", "24 de setiembre");
+        fila("24 de setiembre", SMT, 500, LAT, LNG, "osm");
+        fila("avenida 24 de septiembre", SMT, 500, LAT + 0.0003, LNG, "android_geocoder");
+        fila("24 de setiembre", SMT, 600, LAT + M100, LNG, "osm");
+        fila("avenida 24 de septiembre", SMT, 600, LAT + M100 + 0.0003, LNG, "android_geocoder");
+    }
+
+    @Test
+    void losNombresCruzadosDanUnaSolaDudaPorCalle() {
+        dosNombresCruzados();
+
+        assertEquals(1, service.actualizar());
+        assertEquals(1, service.actualizar() + 1, "la revisión siguiente no la repite");
+
+        CalleDuda d = dudas.get(0);
+        assertEquals(CallesARevisarService.TIPO_NOMBRE_CRUZADO, d.getTipo());
+        assertTrue(d.getMotivo().contains("2 alturas"), d.getMotivo());
+    }
+
+    @Test
+    void lasDudasPorAlturaYaAnotadasSeCierranSinBorrarNada() {
+        dosNombresCruzados();
+        CalleDuda vieja = new CalleDuda();
+        vieja.setId("vieja");
+        vieja.setTipo(CallesARevisarService.TIPO_NOMBRE_VIEJO);
+        vieja.setCalleCanonica("24 de setiembre");
+        vieja.setLocalidad(SMT);
+        vieja.setCuadra(500);
+        vieja.setOtraCalle("avenida 24 de septiembre");
+        vieja.setMotivo("repetida");
+        vieja.setEstado(CallesARevisarService.PENDIENTE);
+        dudas.add(vieja);
+
+        service.ordenarCruzadasAlArrancar();
+
+        assertEquals(CallesARevisarService.YA_CIERRA, vieja.getEstado());
+        assertEquals(4, tabla.size());
+        assertEquals(1, dudas.stream().filter(d -> CallesARevisarService.TIPO_NOMBRE_CRUZADO.equals(d.getTipo())).count());
+    }
+
+    @Test
+    void elegirUnNombreDejaLaCalleEnteraConEseNombre() {
+        dosNombresCruzados();
+        service.actualizar();
+        CalleDuda d = dudas.get(0);
+
+        assertEquals(CallesARevisarService.UNIDA, service.marcar(d.getId(), "DEJAR_OTRA", "admin").estado());
+
+        assertEquals(2, tabla.size(), "las dos alturas quedan fusionadas");
+        assertTrue(tabla.stream().allMatch(c -> c.getCalleCanonica().equals("avenida 24 de septiembre")));
+    }
+
+    @Test
+    void siSonDistintasLaDudaCruzadaNoVuelve() {
+        dosNombresCruzados();
+        service.actualizar();
+
+        service.marcar(dudas.get(0).getId(), "DISTINTAS", "admin");
+
+        assertEquals(4, tabla.size());
+        assertEquals(0, service.actualizar());
+        assertTrue(service.pendientes().isEmpty());
+    }
+
     // --- elegir a mano ---
 
     @Test

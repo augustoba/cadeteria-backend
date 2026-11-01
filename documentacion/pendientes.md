@@ -12,8 +12,25 @@ rama `aviso-whatsapp-web` (backend + panel, aviso "en camino"), sin pushear al 2
 
 ## Reportado 2026-10-31
 
-**3p. La asignación automática apagada igual repartía cuando un cadete no tomaba el viaje: hecho, sin
-desplegar.** Con `asignacion_automatica` en false, `PedidoService.liberarYReasignar` buscaba candidato
+**3p. Calles con dos nombres cruzados: hecho y desplegado (2026-10-31, backend y panel).**
+`calle_nombre_anterior` tiene 17 pares donde cada nombre figura como anterior del otro, y salían dos
+dudas opuestas por altura (24 de Setiembre / Avenida 24 de Septiembre: 12 pares): quitando las dos se
+borraba la última cuadra. Ahora hay una sola duda por calle (`NOMBRE_CRUZADO`, "Dos nombres"): se elige
+el nombre y la unión pasa toda la calle y se puede deshacer. Las dudas por altura ya anotadas se
+cierran al arrancar sin borrar nada. "Quitar la repetida" ya no borra si la otra cuadra no existe.
+Texto de "Nombre viejo" corregido.
+
+**3p. Desconectar a un cadete desde el panel: hecho y desplegado (2026-10-31, backend y panel).** Los
+cadetes cierran la app sin tocar Desconectar, quedan Libres y se les asignan pedidos. Botón en Cadetes
+con el permiso `desconectar_cadete` (Admin y Superadmin), solo sin viajes ni ofertas: pone
+`DESCONECTADO`, cierra `CadeteSesionService`, cambia `session_token` y manda un push. Sin motivo ni
+registro, y sin desconexión automática. Sin APK nueva: la app ya maneja el 401.
+
+**3p. Regla de unión de calles: sin programar.** La que fundió Santiago del Estero con Pasaje Santiago
+sigue activa (ver más abajo).
+
+**3p. La asignación automática apagada igual repartía cuando un cadete no tomaba el viaje: hecho y
+desplegado (2026-10-31).** Con `asignacion_automatica` en false, `PedidoService.liberarYReasignar` buscaba candidato
 y ofrecía el pedido igual. Pasaba al rechazar, al vencer la oferta y al aceptar sin crédito, y si no
 había otro cadete se lo volvía a ofrecer al mismo. Ahora con la opción apagada el pedido queda en
 `SIN_ASIGNAR`, sin cadete y sin oferta nueva, para que lo asigne el operador. Con la opción prendida

@@ -12,6 +12,8 @@ import com.cadeteria.backend.util.CallesParecidas;
 import com.cadeteria.backend.util.DireccionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,7 +50,7 @@ public class CallesARevisarService {
 
     private static final Logger log = LoggerFactory.getLogger(CallesARevisarService.class);
 
-    public static final String TIPO_NOMBRE = "NOMBRE", TIPO_UBICACION = "UBICACION", TIPO_NOMBRE_VIEJO = "NOMBRE_VIEJO";
+    public static final String TIPO_NOMBRE = "NOMBRE", TIPO_UBICACION = "UBICACION", TIPO_NOMBRE_VIEJO = "NOMBRE_VIEJO", TIPO_NOMBRE_CRUZADO = "NOMBRE_CRUZADO";
     public static final String PENDIENTE = "PENDIENTE", UNIDA = "UNIDA", DISTINTAS = "DISTINTAS",
             CORREGIDA = "CORREGIDA", ESTA_BIEN = "ESTA_BIEN", NO_EXISTE = "NO_EXISTE", YA_CIERRA = "YA_CIERRA", QUITADA = "QUITADA";
 
@@ -147,8 +149,11 @@ public class CallesARevisarService {
             }
         }
         Map<CuadraCoords, CuadraCoords> repetidas = conNombreViejo(filas);
+        Set<String> cruzados = paresCruzados();
+        nuevas += ordenarCruzadas(repetidas, cruzados, conocidas);
         for (Map.Entry<CuadraCoords, CuadraCoords> r : repetidas.entrySet()) {
             CuadraCoords c = r.getKey(), deHoy = r.getValue();
+            if (cruzados.contains(c.getCalleCanonica() + "|" + deHoy.getCalleCanonica())) continue;
             if (conocidas.add(clave(TIPO_NOMBRE_VIEJO, c.getCalleCanonica(), c.getLocalidad(), c.getCuadra(), deHoy.getCalleCanonica()))) {
                 dudaRepository.save(nueva(TIPO_NOMBRE_VIEJO, c.getCalleCanonica(), c.getLocalidad(), c.getCuadra(), deHoy.getCalleCanonica(),
                         "Es el nombre anterior de \"" + DireccionUtils.nombreParaMostrar(deHoy.getCalleCanonica()) + "\", que ya tiene esta cuadra a "
@@ -166,6 +171,65 @@ public class CallesARevisarService {
             }
         }
         cerrarLasQueYaCierran(sospechas);
+        return nuevas;
+    }
+
+    /** Al arrancar, para que las dudas de nombres cruzados ya anotadas no esperen a la revisión de la noche. */
+    @EventListener(ApplicationReadyEvent.class)
+    public void ordenarCruzadasAlArrancar() {
+        try {
+            Set<String> conocidas = new HashSet<>();
+            for (CalleDuda d : dudaRepository.findAll()) conocidas.add(clave(d.getTipo(), d.getCalleCanonica(), d.getLocalidad(), d.getCuadra(), d.getOtraCalle()));
+            List<CuadraCoords> filas = coordsRepository.findAll().stream().filter(c -> !c.isApproximate()).toList();
+            ordenarCruzadas(conNombreViejo(filas), paresCruzados(), conocidas);
+        } catch (RuntimeException e) {
+            log.warn("No se pudieron ordenar las dudas de nombres cruzados: {}", e.getMessage());
+        }
+    }
+
+    /** "a|b" en los dos sentidos para cada par de nombres donde cada uno figura como nombre anterior del otro. */
+    private Set<String> paresCruzados() {
+        Set<String> pares = new HashSet<>(), out = new HashSet<>();
+        List<CalleNombreAnterior> anteriores = nombreAnteriorRepository.findAll();
+        for (CalleNombreAnterior n : anteriores) pares.add(n.getNombreNorm() + "|" + n.getCalleCanonica());
+        for (CalleNombreAnterior n : anteriores) {
+            if (pares.contains(n.getCalleCanonica() + "|" + n.getNombreNorm())) out.add(n.getNombreNorm() + "|" + n.getCalleCanonica());
+        }
+        return out;
+    }
+
+    /**
+     * Nombres cruzados (2026-10-31): no se sabe cuál es el de hoy, y por cada altura repetida salían dos
+     * dudas opuestas; quitando una y después la otra se borraba la última cuadra. Va una sola duda por par
+     * de nombres, que se resuelve eligiendo el que queda para toda la calle, y las de cada altura se cierran
+     * sin borrar nada. Devuelve cuántas dudas agregó.
+     */
+    private int ordenarCruzadas(Map<CuadraCoords, CuadraCoords> repetidas, Set<String> cruzados, Set<String> conocidas) {
+        int nuevas = 0;
+        Map<String, Integer> alturas = new java.util.HashMap<>();
+        for (Map.Entry<CuadraCoords, CuadraCoords> r : repetidas.entrySet()) {
+            if (cruzados.contains(r.getKey().getCalleCanonica() + "|" + r.getValue().getCalleCanonica())) {
+                alturas.merge(r.getKey().getCalleCanonica(), 1, Integer::sum);
+            }
+        }
+        for (Map.Entry<CuadraCoords, CuadraCoords> r : repetidas.entrySet()) {
+            CuadraCoords c = r.getKey();
+            String calle = c.getCalleCanonica(), otra = r.getValue().getCalleCanonica();
+            if (!cruzados.contains(calle + "|" + otra) || calle.compareTo(otra) > 0) continue;
+            if (conocidas.add(clave(TIPO_NOMBRE_CRUZADO, calle, c.getLocalidad(), c.getCuadra(), otra))) {
+                dudaRepository.save(nueva(TIPO_NOMBRE_CRUZADO, calle, c.getLocalidad(), c.getCuadra(), otra,
+                        "La misma calle está guardada con dos nombres en " + alturas.get(calle) + " alturas: \""
+                                + DireccionUtils.nombreParaMostrar(calle) + "\" y \"" + DireccionUtils.nombreParaMostrar(otra) + "\"."));
+                nuevas++;
+            }
+        }
+        for (CalleDuda d : dudaRepository.findByEstado(PENDIENTE)) {
+            if (!TIPO_NOMBRE_VIEJO.equals(d.getTipo()) || !cruzados.contains(d.getCalleCanonica() + "|" + d.getOtraCalle())) continue;
+            d.setEstado(YA_CIERRA);
+            d.setResultado("Reemplazada por una sola duda de la calle entera. No se borró nada.");
+            d.setResueltaEn(Instant.now());
+            dudaRepository.save(d);
+        }
         return nuevas;
     }
 
@@ -238,8 +302,8 @@ public class CallesARevisarService {
         d.setLinkLat(lat);
         d.setLinkLng(lng);
         dudaRepository.save(d);
-        if (TIPO_NOMBRE_VIEJO.equals(d.getTipo())) {
-            return new Resultado(PENDIENTE, "Esta duda no se resuelve con un link: elegí si quitás la repetida o si son calles distintas.");
+        if (TIPO_NOMBRE_VIEJO.equals(d.getTipo()) || TIPO_NOMBRE_CRUZADO.equals(d.getTipo())) {
+            return new Resultado(PENDIENTE, "Esta duda no se resuelve con un link: elegí una de las opciones.");
         }
         Resultado res = TIPO_NOMBRE.equals(d.getTipo()) ? nombreConLink(d, lat, lng, quien) : ubicacionConLink(d, lat, lng, r.direccion(), quien);
         // Si el link no alcanzó, el motivo queda anotado en la duda: sirve para revisar después por qué no se decidió sola.
@@ -258,16 +322,31 @@ public class CallesARevisarService {
         switch (decision == null ? "" : decision) {
             case "QUITAR" -> {
                 if (!TIPO_NOMBRE_VIEJO.equals(d.getTipo())) throw new BadRequestException("Esa opción es solo para las repetidas con un nombre anterior.");
+                CuadraCoords deHoy = coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra(d.getOtraCalle(), d.getLocalidad(), d.getCuadra())
+                        .filter(c -> !c.isApproximate()).orElse(null);
+                // Sin la otra cuadra, esta es la única de esa altura: borrarla dejaría la dirección sin punto.
+                if (deHoy == null) {
+                    return cerrar(d, YA_CIERRA, "No se quitó nada: \"" + DireccionUtils.nombreParaMostrar(d.getOtraCalle())
+                            + "\" ya no tiene esta cuadra, así que esta es la única.", quien);
+                }
                 CuadraCoords repetida = fila(d).orElse(null);
                 if (repetida != null) {
-                    coordsRepository.findByCalleCanonicaAndLocalidadAndCuadra(d.getOtraCalle(), d.getLocalidad(), d.getCuadra()).ifPresent(deHoy -> {
-                        deHoy.setConfirmaciones(deHoy.getConfirmaciones() + repetida.getConfirmaciones());
-                        coordsRepository.save(deHoy);
-                    });
+                    deHoy.setConfirmaciones(deHoy.getConfirmaciones() + repetida.getConfirmaciones());
+                    coordsRepository.save(deHoy);
                     coordsRepository.delete(repetida);
                 }
                 Resultado res = cerrar(d, QUITADA, "Repetida quitada: la cuadra queda como \"" + DireccionUtils.nombreParaMostrar(d.getOtraCalle())
                         + "\" y el nombre anterior la sigue encontrando.", quien);
+                cerrarLasQueYaCierran(sospechasDeHoy());
+                return res;
+            }
+            case "DEJAR_CALLE", "DEJAR_OTRA" -> {
+                if (!TIPO_NOMBRE_CRUZADO.equals(d.getTipo())) throw new BadRequestException("Esa opción es solo para las calles con dos nombres.");
+                String queda = "DEJAR_CALLE".equals(decision) ? d.getCalleCanonica() : d.getOtraCalle();
+                String seVa = queda.equals(d.getCalleCanonica()) ? d.getOtraCalle() : d.getCalleCanonica();
+                unionCalles.unirPorRevision(seVa, queda, d.getLocalidad(), d.getCuadra(), 0);
+                Resultado res = cerrar(d, UNIDA, "Unidas a mano: \"" + DireccionUtils.nombreParaMostrar(seVa) + "\" pasa a ser \""
+                        + DireccionUtils.nombreParaMostrar(queda) + "\" en toda la calle.", quien);
                 cerrarLasQueYaCierran(sospechasDeHoy());
                 return res;
             }
@@ -691,7 +770,7 @@ public class CallesARevisarService {
 
     private static String clave(String tipo, String calle, String localidad, int cuadra, String otraCalle) {
         // En las de nombre la pregunta es por el par de nombres, no por la cuadra que se usó de muestra.
-        return TIPO_NOMBRE.equals(tipo) ? tipo + "|" + calle + "|" + otraCalle : tipo + "|" + calle + "|" + localidad + "|" + cuadra;
+        return TIPO_NOMBRE.equals(tipo) || TIPO_NOMBRE_CRUZADO.equals(tipo) ? tipo + "|" + calle + "|" + otraCalle : tipo + "|" + calle + "|" + localidad + "|" + cuadra;
     }
 
     private static Punto punto(CuadraCoords c) {

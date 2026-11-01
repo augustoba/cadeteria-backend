@@ -36,6 +36,7 @@ public class RolSeeder implements CommandLineRunner {
 
     public static final String PERMISO_SISTEMA = "sistema";
     public static final String ROL_SUPERADMIN = "superadmin";
+    private static final String PERMISO_DESCONECTAR_CADETE = "desconectar_cadete";
 
     /** id, nombre, categoría — agregar acá un permiso nuevo es lo único que hace falta para que se pueda asignar a un rol. */
     private static final List<String[]> CATALOGO = List.of(
@@ -48,6 +49,8 @@ public class RolSeeder implements CommandLineRunner {
             new String[]{"roles", "Administrar roles y permisos", "Datos sensibles"},
             // 2026-09-29: un celular por cadete; habilitar uno nuevo desvincula el anterior.
             new String[]{"celular_cadete", "Habilitar nuevo celular de un cadete", "Cadetes"},
+            // 2026-10-31: solo administradores; el operador no lo tiene.
+            new String[]{PERMISO_DESCONECTAR_CADETE, "Desconectar a un cadete desde el panel", "Cadetes"},
             // 2026-09-26: lo técnico que puede tirar el servicio (servidores, Cloudinary, borrado de lo
             // de Google, frecuencias) y borrar API keys. Solo el rol superadmin; un admin no puede
             // dárselo a nadie (RolService / AdminUsuarioService).
@@ -64,6 +67,7 @@ public class RolSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        boolean desconectarEsNuevo = !permisoRepo.existsById(PERMISO_DESCONECTAR_CADETE);
         for (String[] fila : CATALOGO) {
             if (permisoRepo.existsById(fila[0])) continue;
             Permiso p = new Permiso();
@@ -83,6 +87,11 @@ public class RolSeeder implements CommandLineRunner {
                     .filter(p -> !PERMISO_SISTEMA.equals(p.getId())).toList()));
             rolRepo.save(admin);
             log.info("Seed: rol 'admin' creado con todos los permisos menos '{}'.", PERMISO_SISTEMA);
+        } else if (desconectarEsNuevo) {
+            // Una sola vez: si después se lo sacan al rol desde el panel, no vuelve.
+            Rol admin = rolRepo.findById("admin").orElseThrow();
+            permisoRepo.findById(PERMISO_DESCONECTAR_CADETE).ifPresent(admin.getPermisos()::add);
+            rolRepo.save(admin);
         }
 
         if (!rolRepo.existsById(ROL_SUPERADMIN)) {

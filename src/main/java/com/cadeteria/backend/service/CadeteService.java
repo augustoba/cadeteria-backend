@@ -806,6 +806,30 @@ public class CadeteService {
     }
 
     /**
+     * Un administrador lo desconecta desde el panel (2026-10-31): los cadetes cierran la app sin tocar
+     * Desconectar, siguen Libres y les llegan pedidos. Queda Desconectado y con la sesión cortada, para
+     * volver tiene que entrar de nuevo. No se puede con viajes u ofertas sin terminar.
+     */
+    public Cadete desconectarDesdePanel(String id) {
+        Cadete c = get(id);
+        long viajes = pedidoRepo.countByCadeteAsignadoIdAndEstadoIdIn(c.getId(), List.of("PENDIENTE", "EN_CURSO"));
+        if (viajes > 0) {
+            throw new ConflictException("No se lo puede desconectar: tiene " + viajes + (viajes == 1 ? " viaje" : " viajes") + " sin terminar u ofrecidos.");
+        }
+        boolean estabaConectado = !"DESCONECTADO".equals(c.getEstado().getId());
+        c.setEstado(estadoCadeteRepo.findById("DESCONECTADO")
+                .orElseThrow(() -> new IllegalStateException("Falta seedear estado_cadete.DESCONECTADO")));
+        c.setSessionToken(UUID.randomUUID().toString());
+        Cadete guardado = repo.save(c);
+        if (estabaConectado) sesionService.cerrar(guardado);
+        publisher.publicarUbicacion(guardado);
+        fcmService.enviar(c.getFcmToken(), "Te desconectamos de la app",
+                "Para volver a recibir pedidos, iniciá sesión y ponete Libre.",
+                Map.of("tipo", "DESCONECTADO_POR_ADMIN"));
+        return guardado;
+    }
+
+    /**
      * Por qué no puede trabajar por el cobro, o null si está al día: SEMANAL sin habilitar esta
      * semana, o PORCENTAJE sin crédito. Lo usa el login de la app.
      */

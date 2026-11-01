@@ -190,6 +190,10 @@ teléfonos; **volver a producción antes de tener cadetes reales**.
       El historial de Configuración arranca vacío el día del despliegue. Después de desplegar, cobrar
       desde Pagos → "Ajustar el crédito a mano" la comisión que faltó del 2026-10-19: **300** a
       Cristian Enrique (pedido 1500108) y **495** a Guillermo Axel (pedido 1500104).
+- [ ] **Desconectar cadete y calles con dos nombres (2026-10-31)**: permiso nuevo
+      `desconectar_cadete`; se le da solo a Admin y Superadmin al arrancar. Los administradores con
+      sesión abierta tienen que volver a entrar para ver el botón. Al arrancar, las dudas de "Nombre
+      viejo" de nombres cruzados se cierran sin borrar nada y queda una sola "Dos nombres" por calle.
 - [ ] **Editar pedido, teléfono del cliente, tope y crédito bajo (2026-10-24)**: tabla nueva
       `cliente_telefono_cambio` y columna `ultimo_aviso_credito_bajo_en` en `cadete`; las crea
       Hibernate. Clave nueva `credito_bajo_repetir_min` (Configuración → Cadetes, "Repetir el aviso

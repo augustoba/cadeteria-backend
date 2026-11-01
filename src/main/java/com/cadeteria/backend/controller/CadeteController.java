@@ -129,6 +129,11 @@ public class CadeteController {
     }
 
     /** Marca al cadete como Libre a mano (todavia no existe la app que lo haga sola). */
+    @PostMapping("/api/admin/cadetes/{id}/desconectar")
+    public CadeteResponse desconectar(@PathVariable String id) {
+        return CadeteResponse.from(service.desconectarDesdePanel(id));
+    }
+
     @PostMapping("/api/admin/cadetes/{id}/libre")
     public CadeteResponse marcarLibre(@PathVariable String id) {
         Cadete c = service.marcarLibre(id);
