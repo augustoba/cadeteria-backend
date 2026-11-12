@@ -53,7 +53,16 @@ public final class PublicoDtos {
             /** WhatsApp de atención al cliente (Configuración) — "" si no está cargado. */
             String whatsappAtencion,
             /** Cuándo se cierra solo el reclamo si el cliente no responde — null si no se cierra solo (2026-09-26). */
-            java.time.Instant reclamoCierraEn
+            java.time.Instant reclamoCierraEn,
+            /**
+             * Piso y depto de origen y destino (2026-11-11: los clientes reclamaban que no se veían).
+             * Las observaciones solo si las escribió el cliente (pedido cargado desde la web): en los
+             * pedidos del panel las escribe el operador y pueden ser notas internas.
+             */
+            String origenPiso, String origenDepto, String origenObservaciones,
+            String destinoPiso, String destinoDepto, String destinoObservaciones,
+            /** Paradas intermedias en orden, con si ya se entregaron (2026-11-11). */
+            java.util.List<ParadaSeguimiento> paradas
     ) {
         public static SeguimientoResponse from(Pedido p) {
             return from(p, "");
@@ -68,6 +77,7 @@ public final class PublicoDtos {
             boolean finalizado = "FINALIZADO".equals(p.getEstado().getId());
             boolean enCurso = "EN_CURSO".equals(p.getEstado().getId());
             Cadete cadete = p.getCadeteAsignado();
+            boolean delCliente = com.cadeteria.backend.service.PedidoService.ORIGEN_WEB.equals(p.getOrigenCarga());
             return new SeguimientoResponse(
                     p.getEstado().getNombre(),
                     p.getOrigenDireccion(),
@@ -96,10 +106,19 @@ public final class PublicoDtos {
                     finalizado ? p.getFirmaReceptorUrl() : null,
                     p.getReclamoTipo(), p.getReclamoEstado(),
                     whatsappAtencion == null ? "" : whatsappAtencion,
-                    reclamoCierraEn
+                    reclamoCierraEn,
+                    p.getOrigenPiso(), p.getOrigenDepto(), delCliente ? p.getOrigenObservaciones() : null,
+                    p.getDestinoPiso(), p.getDestinoDepto(), delCliente ? p.getDestinoObservaciones() : null,
+                    p.getParadas() == null ? java.util.List.of() : p.getParadas().stream()
+                            .sorted(java.util.Comparator.comparingInt(com.cadeteria.backend.model.PedidoParada::getOrden))
+                            .map(pa -> new ParadaSeguimiento(pa.getOrden(), pa.getDireccion(), pa.getEntregadoEn() != null))
+                            .toList()
             );
         }
     }
+
+    /** Parada intermedia en el seguimiento del cliente. */
+    public record ParadaSeguimiento(int orden, String direccion, boolean entregada) {}
 
     /** Body de POST /api/publico/pedidos/{token}/calificacion — comentario es opcional. */
     public record CalificarRequest(

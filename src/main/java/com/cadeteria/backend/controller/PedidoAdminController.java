@@ -82,6 +82,36 @@ public class PedidoAdminController {
                 r.items().stream().map(PedidoResponse::fromResumen).toList(), r.total(), r.pagina(), r.totalPaginas());
     }
 
+    /**
+     * Pantalla "Pedidos" del panel (2026-11-11): historial completo con filtros, todos opcionales.
+     * {@code estado}: SIN_ASIGNAR, PROGRAMADO, PENDIENTE (esperando que acepte), EN_CURSO (aceptado,
+     * sin retirar), RETIRADO, FINALIZADO, CANCELADO o NO_ENTREGADO. {@code desde}/{@code hasta} en
+     * ISO-8601 sobre la creación (hasta exclusivo); {@code horaDesde}/{@code horaHasta} "HH:mm" en
+     * hora de Argentina, de cualquier día (22:00 a 02:00 cruza la medianoche).
+     */
+    @GetMapping("/buscar")
+    public com.cadeteria.backend.dto.PedidoDtos.PaginaPedidosResponse buscar(
+            @RequestParam(required = false) Long numero,
+            @RequestParam(required = false) String telefono,
+            @RequestParam(required = false) String cadeteId,
+            @RequestParam(required = false) String estado,
+            @RequestParam(required = false) java.time.Instant desde,
+            @RequestParam(required = false) java.time.Instant hasta,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(pattern = "HH:mm") java.time.LocalTime horaDesde,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(pattern = "HH:mm") java.time.LocalTime horaHasta,
+            @RequestParam(defaultValue = "0") int pagina,
+            @RequestParam(defaultValue = "20") int tamano) {
+        var r = service.buscar(numero, telefono, cadeteId, estado, desde, hasta, horaDesde, horaHasta, pagina, tamano);
+        return new com.cadeteria.backend.dto.PedidoDtos.PaginaPedidosResponse(
+                r.items().stream().map(PedidoResponse::fromResumen).toList(), r.total(), r.pagina(), r.totalPaginas());
+    }
+
+    /** Sugerencias del campo "Cliente" de la pantalla "Pedidos": nombre o teléfono, hasta 10, uno por teléfono. */
+    @GetMapping("/clientes-sugeridos")
+    public List<PedidoService.ClienteSugerido> clientesSugeridos(@RequestParam String q) {
+        return service.clientesSugeridos(q);
+    }
+
     /** Para el ícono de alertas centralizado del panel (ronda 4, punto 18). */
     @GetMapping("/alertas/sms-fallidos")
     public java.util.Map<String, Long> smsFallidos() {

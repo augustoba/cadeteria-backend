@@ -607,6 +607,63 @@ public class PedidoService {
         return new PaginaPedidos(page.getContent(), page.getTotalElements(), paginaSegura, page.getTotalPages());
     }
 
+    public record ClienteSugerido(String telefono, String nombre) {}
+
+    /**
+     * Campo "Cliente" de la pantalla "Pedidos": escribiendo nombre o teléfono, hasta 10 clientes
+     * "Nombre (teléfono)", uno por teléfono, con el nombre más reciente que coincide. Si se escriben
+     * solo números (con espacios o guiones) se buscan los dígitos, así "381 411" encuentra 381411....
+     */
+    @Transactional(readOnly = true)
+    public List<ClienteSugerido> clientesSugeridos(String q) {
+        if (q == null || q.trim().length() < 2) return List.of();
+        String texto = q.trim();
+        if (texto.matches("[\\d\\s\\-+()]+")) texto = texto.replaceAll("\\D", "");
+        if (texto.isEmpty()) return List.of();
+        var porTelefono = new java.util.LinkedHashMap<String, ClienteSugerido>();
+        for (var fila : repo.clientesSugeridos(texto, 40)) {
+            if (fila.getTelefono() == null || fila.getTelefono().isBlank()) continue;
+            porTelefono.putIfAbsent(fila.getTelefono(), new ClienteSugerido(fila.getTelefono(), fila.getNombre()));
+            if (porTelefono.size() == 10) break;
+        }
+        return List.copyOf(porTelefono.values());
+    }
+
+    /** Filtros de estado de la pantalla "Pedidos": los estados de la base más RETIRADO (EN_CURSO ya retirado). */
+    private static final java.util.Set<String> FILTROS_ESTADO = java.util.Set.of(
+            "SIN_ASIGNAR", "PROGRAMADO", "PENDIENTE", "EN_CURSO", "RETIRADO", "FINALIZADO", "CANCELADO", "NO_ENTREGADO");
+
+    /**
+     * Pantalla "Pedidos" del panel (2026-11-11): el historial completo con filtros, para contestar un
+     * reclamo de un pedido viejo. "EN_CURSO" es aceptado y todavía sin retirar; "RETIRADO" es
+     * EN_CURSO con el retiro marcado. Fechas y horas sobre la creación del pedido.
+     */
+    @Transactional(readOnly = true)
+    public PaginaPedidos buscar(Long numero, String telefono, String cadeteId, String filtroEstado,
+                                Instant desde, Instant hasta, java.time.LocalTime horaDesde, java.time.LocalTime horaHasta,
+                                int pagina, int tamano) {
+        String estadoId = null;
+        Boolean retirado = null;
+        if (filtroEstado != null && !filtroEstado.isBlank()) {
+            if (!FILTROS_ESTADO.contains(filtroEstado)) {
+                throw new BadRequestException("Estado desconocido: " + filtroEstado);
+            }
+            switch (filtroEstado) {
+                case "EN_CURSO" -> { estadoId = "EN_CURSO"; retirado = false; }
+                case "RETIRADO" -> { estadoId = "EN_CURSO"; retirado = true; }
+                default -> estadoId = filtroEstado;
+            }
+        }
+        if (desde != null && hasta != null && hasta.isBefore(desde)) {
+            throw new BadRequestException("La fecha \"hasta\" es anterior a \"desde\".");
+        }
+        var filtro = BusquedaPedidos.de(numero, telefono, cadeteId, estadoId, retirado, desde, hasta, horaDesde, horaHasta);
+        int paginaSegura = Math.max(0, pagina);
+        int tamanoSeguro = Math.min(Math.max(1, tamano), 100);
+        var page = repo.buscar(filtro, org.springframework.data.domain.PageRequest.of(paginaSegura, tamanoSeguro));
+        return new PaginaPedidos(page.getContent(), page.getTotalElements(), paginaSegura, page.getTotalPages());
+    }
+
     /** El viaje que el cadete tiene asignado ahora mismo (pantalla principal de la app), si hay. */
     @Transactional(readOnly = true)
     public Optional<Pedido> activoDe(String cadeteUsername) {

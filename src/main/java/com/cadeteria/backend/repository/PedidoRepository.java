@@ -106,6 +106,67 @@ public interface PedidoRepository extends JpaRepository<Pedido, String> {
     Page<Pedido> paginaFinalizados(@Param("estadoIds") List<String> estadoIds, @Param("desde") Instant desde,
             @Param("hasta") Instant hasta, @Param("cadeteId") String cadeteId, Pageable pageable);
 
+    /**
+     * Pantalla "Pedidos" del panel (2026-11-11): todos los filtros opcionales, paginado en la base.
+     * El rango horario pasa la hora UTC guardada a la de Argentina con {@code ajuste} (ver
+     * {@link com.cadeteria.backend.service.BusquedaPedidos}) y admite cruzar la medianoche.
+     */
+    @Query("""
+            SELECT p FROM Pedido p
+            WHERE (:numero IS NULL OR p.numero = :numero)
+              AND (:telefono IS NULL OR p.clienteTelefono = :telefono)
+              AND (:cadeteId IS NULL OR p.cadeteAsignado.id = :cadeteId)
+              AND (:estadoId IS NULL OR p.estado.id = :estadoId)
+              AND (:retiro = 0
+                   OR (:retiro = 1 AND p.retiradoEn IS NULL)
+                   OR (:retiro = 2 AND p.retiradoEn IS NOT NULL))
+              AND (:desde IS NULL OR p.creadoEn >= :desde)
+              AND (:hasta IS NULL OR p.creadoEn < :hasta)
+              AND (:minDesde IS NULL
+                   OR (:minDesde <= :minHasta
+                       AND MOD(EXTRACT(HOUR FROM p.creadoEn) * 60 + EXTRACT(MINUTE FROM p.creadoEn) + :ajuste, 1440)
+                           BETWEEN :minDesde AND :minHasta)
+                   OR (:minDesde > :minHasta
+                       AND (MOD(EXTRACT(HOUR FROM p.creadoEn) * 60 + EXTRACT(MINUTE FROM p.creadoEn) + :ajuste, 1440) >= :minDesde
+                            OR MOD(EXTRACT(HOUR FROM p.creadoEn) * 60 + EXTRACT(MINUTE FROM p.creadoEn) + :ajuste, 1440) <= :minHasta)))
+            ORDER BY p.creadoEn DESC
+            """)
+    Page<Pedido> buscarConFiltros(@Param("numero") Long numero, @Param("telefono") String telefono,
+            @Param("cadeteId") String cadeteId, @Param("estadoId") String estadoId, @Param("retiro") int retiro,
+            @Param("desde") Instant desde, @Param("hasta") Instant hasta,
+            @Param("minDesde") Integer minDesde, @Param("minHasta") Integer minHasta, @Param("ajuste") int ajuste,
+            Pageable pageable);
+
+    /**
+     * Sugerencias del campo "Cliente" de la pantalla "Pedidos" (2026-11-11): pares teléfono/nombre
+     * tal como se cargaron en los pedidos, más los nombres de las fichas de cliente. A propósito no
+     * usa la búsqueda de la pantalla Clientes: esa busca el nombre solo en la ficha cargada a mano,
+     * y la mayoría de los clientes no tiene. El más reciente primero; el service deja uno por teléfono.
+     */
+    @Query(value = """
+            SELECT t.telefono AS telefono, t.nombre AS nombre, MAX(t.ultimo) AS ultimo
+            FROM (
+                SELECT cliente_telefono AS telefono, cliente_nombre AS nombre, creado_en AS ultimo FROM pedido
+                UNION ALL
+                SELECT telefono, nombre_contacto, NULL FROM cliente WHERE nombre_contacto IS NOT NULL AND nombre_contacto <> ''
+            ) t
+            WHERE t.telefono LIKE CONCAT('%', :q, '%') OR LOWER(t.nombre) LIKE CONCAT('%', LOWER(:q), '%')
+            GROUP BY t.telefono, t.nombre
+            ORDER BY MAX(t.ultimo) IS NULL, MAX(t.ultimo) DESC
+            LIMIT :limite
+            """, nativeQuery = true)
+    List<ClienteSugeridoRow> clientesSugeridos(@Param("q") String q, @Param("limite") int limite);
+
+    interface ClienteSugeridoRow {
+        String getTelefono();
+        String getNombre();
+    }
+
+    default Page<Pedido> buscar(com.cadeteria.backend.service.BusquedaPedidos f, Pageable pageable) {
+        return buscarConFiltros(f.numero(), f.telefono(), f.cadeteId(), f.estadoId(), f.retiro(), f.desde(), f.hasta(),
+                f.minutoDesde(), f.minutoHasta(), f.ajusteMinutos(), pageable);
+    }
+
     /** Página del historial de un cliente (antes traía todo y recortaba en Java a 30, ver ClienteService.ficha). */
     List<Pedido> findByClienteTelefonoOrderByCreadoEnDesc(String clienteTelefono, Pageable pageable);
 
