@@ -26,7 +26,13 @@ con el permiso `desconectar_cadete` (Admin y Superadmin), solo sin viajes ni ofe
 `DESCONECTADO`, cierra `CadeteSesionService`, cambia `session_token` y manda un push. Sin motivo ni
 registro, y sin desconexión automática. Sin APK nueva: la app ya maneja el 401.
 
-**3p. Regla de unión de calles: hecho, sin desplegar.** Santiago del Estero la resolvió el usuario
+**3p. Cadetes que alternan moto y bici: hecho y desplegado (2026-11-20, backend y panel).** Botón
+⇄ Moto/Bici en la lista de Cadetes (`PATCH /api/admin/cadetes/{id}/tipo-vehiculo`), sin bloquear por
+viajes activos y con push al cadete. En BICI los datos de la moto quedan guardados (ni el botón ni el
+formulario los borran) y el seguimiento público no muestra patente, color ni foto del vehículo. El
+checklist de documentación pide tarjeta verde y foto del vehículo solo en MOTO. Sin APK nueva.
+
+**3p. Regla de unión de calles: hecho y desplegado (2026-11-20).** Santiago del Estero la resolvió el usuario
 desde el panel y Avenida 24 de Septiembre quedó unida a mano. `seUnenSolas`: un pasaje, bulevar
 o diagonal solo se une solo con otro igual, y un nombre de una palabra no se une solo con uno más
 largo. Esos pares van a "calles a revisar" (`dudasDeUnion`). La regla de forma también respeta el tipo.
