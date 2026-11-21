@@ -622,6 +622,21 @@ class CallesARevisarServiceTest {
         assertTrue(service.pendientes().isEmpty());
     }
 
+    @Test
+    void loQueYaNoSeUneSoloVaALaListaUnaSolaVez() {
+        fila("santiago del estero", SMT, 4100, LAT, LNG, "osm");
+        fila("santiago del estero", SMT, 4200, LAT + M100, LNG, "osm");
+        fila("pasaje santiago", SMT, 4100, LAT + 0.0002, LNG, "android_geocoder");
+
+        assertEquals(1, service.actualizar());
+        assertEquals(0, service.actualizar());
+
+        CalleDuda d = dudas.get(0);
+        assertEquals(CallesARevisarService.TIPO_NOMBRE, d.getTipo());
+        assertEquals("pasaje santiago", d.getCalleCanonica());
+        assertEquals("santiago del estero", d.getOtraCalle(), "queda el que tiene más cuadras");
+    }
+
     // --- elegir a mano ---
 
     @Test

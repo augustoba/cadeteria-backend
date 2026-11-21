@@ -161,6 +161,13 @@ public class CallesARevisarService {
                 nuevas++;
             }
         }
+        for (CalleDuda d : dudasDeUnion(filas, repetidas)) {
+            if (conocidas.contains(clave(d.getTipo(), d.getOtraCalle(), d.getLocalidad(), d.getCuadra(), d.getCalleCanonica()))) continue;
+            if (conocidas.add(clave(d.getTipo(), d.getCalleCanonica(), d.getLocalidad(), d.getCuadra(), d.getOtraCalle()))) {
+                dudaRepository.save(d);
+                nuevas++;
+            }
+        }
         // Las repetidas con el nombre viejo no se juzgan por ubicación ni sirven de vecinas.
         Map<CuadraCoords, String> sospechas = conElDibujo(filas.stream().filter(c -> !repetidas.containsKey(c)).toList());
         for (Map.Entry<CuadraCoords, String> s : sospechas.entrySet()) {
@@ -647,6 +654,36 @@ public class CallesARevisarService {
     }
 
     /** Pares de nombres con la misma forma que comparten localidad o tienen cuadras cerca. Queda el de más cuadras. */
+    /**
+     * Lo que antes se unía solo y ahora pregunta (2026-10-31): dos nombres que comparten palabras con la
+     * misma cuadra en el mismo lugar, pero uno es pasaje y el otro no, o uno es de una sola palabra
+     * ("Suipacha" y "Batalla de Suipacha"). Va como duda de nombre: queda el que tiene más cuadras.
+     */
+    private List<CalleDuda> dudasDeUnion(List<CuadraCoords> filas, Map<CuadraCoords, CuadraCoords> repetidas) {
+        Map<String, Integer> cuadrasPorCalle = new java.util.HashMap<>();
+        Map<String, List<CuadraCoords>> porLugar = new LinkedHashMap<>();
+        for (CuadraCoords c : filas) {
+            cuadrasPorCalle.merge(c.getCalleCanonica(), 1, Integer::sum);
+            porLugar.computeIfAbsent(c.getLocalidad() + "|" + c.getCuadra(), k -> new ArrayList<>()).add(c);
+        }
+        Map<String, CalleDuda> out = new LinkedHashMap<>();
+        for (List<CuadraCoords> grupo : porLugar.values()) {
+            for (int i = 0; i < grupo.size(); i++) {
+                for (int j = i + 1; j < grupo.size(); j++) {
+                    CuadraCoords a = grupo.get(i), b = grupo.get(j);
+                    if (repetidas.containsKey(a) || repetidas.containsKey(b) || a.getCalleCanonica().equals(b.getCalleCanonica())) continue;
+                    if (metros(a, b) > UnionCallesService.RADIO_MISMA_CALLE_M || !UnionCallesService.hayQuePreguntar(a.getCalleCanonica(), b.getCalleCanonica())) continue;
+                    boolean quedaA = cuadrasPorCalle.get(a.getCalleCanonica()) >= cuadrasPorCalle.get(b.getCalleCanonica());
+                    CuadraCoords seVa = quedaA ? b : a, queda = quedaA ? a : b;
+                    out.putIfAbsent(seVa.getCalleCanonica() + "|" + queda.getCalleCanonica(), nueva(TIPO_NOMBRE, seVa.getCalleCanonica(), seVa.getLocalidad(), seVa.getCuadra(), queda.getCalleCanonica(),
+                            "Comparte el nombre con \"" + DireccionUtils.nombreParaMostrar(queda.getCalleCanonica()) + "\" y tienen la cuadra " + seVa.getCuadra()
+                                    + " en el mismo lugar (a " + Math.round(metros(a, b)) + " m). Pueden ser calles distintas: no se unen solas."));
+                }
+            }
+        }
+        return new ArrayList<>(out.values());
+    }
+
     private List<CalleDuda> dudasDeNombre(List<CuadraCoords> filas) {
         Map<String, List<CuadraCoords>> porCalle = new LinkedHashMap<>();
         for (CuadraCoords c : filas) porCalle.computeIfAbsent(c.getCalleCanonica(), k -> new ArrayList<>()).add(c);

@@ -36,7 +36,8 @@ import java.util.UUID;
  *   <li>tienen una cuadra con el mismo número, en la misma localidad;</li>
  *   <li>esas dos cuadras están a menos de {@value #RADIO_MISMA_CALLE_M} m;</li>
  *   <li>los nombres comparten las palabras que los distinguen: uno contiene al otro, sin contar
- *       avenida/pasaje/general/de (ver {@link CallesParecidas#palabrasClave}).</li>
+ *       avenida/general/de (ver {@link CallesParecidas#palabrasClave}), y se unen solos solo si
+ *       cumplen {@link #seUnenSolas}. Si no, van a "calles a revisar".</li>
  * </ol>
  * Y no hay ninguna otra cuadra donde los dos nombres estén lejos (más de
  * {@value #CONTRADICCION_M} m): ahí serían dos calles distintas que se cruzan o se tocan.
@@ -183,7 +184,7 @@ public class UnionCallesService {
             if (c.isApproximate() || c.getCuadra() != cuadra || !c.getLocalidad().equals(localidad)
                     || c.getCalleCanonica().equals(canonica)) continue;
             int distancia = (int) Math.round(metros(lat, lng, c.getLat(), c.getLng()));
-            if (distancia > RADIO_MISMA_CALLE_M || !mismasPalabras(palabras, palabras(c.getCalleCanonica()))) continue;
+            if (distancia > RADIO_MISMA_CALLE_M || !seUnenSolas(canonica, c.getCalleCanonica())) continue;
             candidatas.merge(c.getCalleCanonica(), distancia, Math::min);
         }
         // Con dos candidatas no se sabe a cuál pertenece: no se adivina.
@@ -217,7 +218,8 @@ public class UnionCallesService {
         for (CuadraCoords c : coordsRepository.findByLatBetweenAndLngBetween(lat - dLat, lat + dLat, lng - dLng, lng + dLng)) {
             if (c.isApproximate() || metros(lat, lng, c.getLat(), c.getLng()) > FORMA_CERCA_M) continue;
             if (c.getCalleCanonica().equals(canonica)) return null;
-            if (Math.abs(c.getCuadra() - cuadra) <= FORMA_ALTURA && forma.equals(CallesParecidas.forma(c.getCalleCanonica()))) {
+            if (Math.abs(c.getCuadra() - cuadra) <= FORMA_ALTURA && forma.equals(CallesParecidas.forma(c.getCalleCanonica()))
+                    && CallesParecidas.mismoTipo(canonica, c.getCalleCanonica())) {
                 candidatas.add(c.getCalleCanonica());
             }
         }
@@ -245,7 +247,7 @@ public class UnionCallesService {
                     CuadraCoords a = grupo.get(i), b = grupo.get(j);
                     if (a.getCalleCanonica().equals(b.getCalleCanonica())) continue;
                     double d = metros(a.getLat(), a.getLng(), b.getLat(), b.getLng());
-                    if (d > RADIO_MISMA_CALLE_M || !mismasPalabras(palabras(a.getCalleCanonica()), palabras(b.getCalleCanonica()))) continue;
+                    if (d > RADIO_MISMA_CALLE_M || !seUnenSolas(a.getCalleCanonica(), b.getCalleCanonica())) continue;
                     String clave = a.getCalleCanonica().compareTo(b.getCalleCanonica()) < 0
                             ? a.getCalleCanonica() + "|" + b.getCalleCanonica() : b.getCalleCanonica() + "|" + a.getCalleCanonica();
                     CuadraCoords[] previo = pares.get(clave);
@@ -474,6 +476,22 @@ public class UnionCallesService {
     static boolean mismasPalabras(Set<String> a, Set<String> b) {
         if (noDistingue(a) || noDistingue(b)) return false;
         return a.containsAll(b) || b.containsAll(a);
+    }
+
+    /**
+     * Si con estar en el mismo lugar alcanza para unirlos sin preguntar (2026-10-31: "Pasaje Santiago" se
+     * llevó las 49 cuadras de "Santiago del Estero"). Un pasaje, bulevar o diagonal solo con otro igual, y
+     * un nombre de una sola palabra no alcanza para decir que es la del nombre más largo.
+     */
+    static boolean seUnenSolas(String a, String b) {
+        Set<String> pa = palabras(a), pb = palabras(b);
+        if (!mismasPalabras(pa, pb) || !CallesParecidas.mismoTipo(a, b)) return false;
+        return pa.equals(pb) || Math.min(pa.size(), pb.size()) >= 2;
+    }
+
+    /** Comparten el nombre y están en el mismo lugar, pero no se unen solas: que decida una persona. */
+    public static boolean hayQuePreguntar(String a, String b) {
+        return mismasPalabras(palabras(a), palabras(b)) && !seUnenSolas(a, b);
     }
 
     private static double metros(double lat1, double lng1, double lat2, double lng2) {

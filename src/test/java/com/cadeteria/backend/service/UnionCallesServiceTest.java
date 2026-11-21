@@ -67,35 +67,70 @@ class UnionCallesServiceTest {
 
     @Test
     void alAprenderConOtroNombreEnElMismoLugarQuedaElNombreCorto() {
-        fila("suipacha", SMT, 700, LAT, LNG, "locationiq");
-        fila("batalla de suipacha", SMT, 100, LAT_500M, LNG, "android_geocoder");
+        fila("san martin", SMT, 700, LAT, LNG, "locationiq");
+        fila("jose de san martin", SMT, 100, LAT_500M, LNG, "android_geocoder");
 
-        String con = service.alAprender("batalla de suipacha", SMT, 700, LAT_20M, LNG);
+        String con = service.alAprender("jose de san martin", SMT, 700, LAT_20M, LNG);
 
-        assertEquals("suipacha", con);
+        assertEquals("san martin", con);
         // La otra cuadra que estaba con el nombre largo pasa al corto.
-        assertTrue(tabla.stream().allMatch(c -> c.getCalleCanonica().equals("suipacha")));
+        assertTrue(tabla.stream().allMatch(c -> c.getCalleCanonica().equals("san martin")));
         verify(uniones).save(any(CalleUnion.class));
         // Y el nombre largo sigue llevando a la calle.
         verify(alias).save(org.mockito.ArgumentMatchers.argThat((DireccionAlias a) ->
-                a.getVarianteNorm().equals("batalla de suipacha") && a.getCalleCanonica().equals("suipacha")));
+                a.getVarianteNorm().equals("jose de san martin") && a.getCalleCanonica().equals("san martin")));
     }
 
     @Test
     void siElNombreNuevoEsElCortoLasFilasViejasPasanAEl() {
+        fila("jose de san martin", SMT, 700, LAT, LNG, "android_geocoder");
+
+        assertEquals("san martin", service.alAprender("san martin", SMT, 700, LAT_20M, LNG));
+        assertEquals("san martin", tabla.get(0).getCalleCanonica());
+    }
+
+    @Test
+    void unPasajeNoSeUneConUnaCalleAunqueCompartaElNombre() {
+        // 2026-10-27: "Pasaje Santiago" se llevó las 49 cuadras de "Santiago del Estero".
+        fila("santiago del estero", SMT, 4100, LAT, LNG, "osm");
+
+        assertEquals("pasaje santiago", service.alAprender("pasaje santiago", SMT, 4100, LAT_20M, LNG));
+
+        assertEquals("santiago del estero", tabla.get(0).getCalleCanonica());
+    }
+
+    @Test
+    void unNombreDeUnaSolaPalabraNoSeUneConUnoMasLargo() {
         fila("batalla de suipacha", SMT, 700, LAT, LNG, "android_geocoder");
 
         assertEquals("suipacha", service.alAprender("suipacha", SMT, 700, LAT_20M, LNG));
-        assertEquals("suipacha", tabla.get(0).getCalleCanonica());
+
+        assertEquals("batalla de suipacha", tabla.get(0).getCalleCanonica());
+        assertTrue(UnionCallesService.hayQuePreguntar("suipacha", "batalla de suipacha"));
+    }
+
+    @Test
+    void laRevisionDeDuplicadasTampocoUneUnPasajeConUnaCalle() {
+        fila("santiago del estero", SMT, 4100, LAT, LNG, "osm");
+        fila("pasaje santiago", SMT, 4100, LAT_20M, LNG, "android_geocoder");
+
+        assertTrue(service.duplicadas(true).isEmpty());
+    }
+
+    @Test
+    void conLaMismaFormaUnPasajeNoSeGuardaComoLaCalle() {
+        fila("mitre", SMT, 400, LAT, LNG, "osm");
+
+        assertEquals("pasaje mitre", service.alAprender("pasaje mitre", SMT, 500, LAT_20M, LNG));
     }
 
     @Test
     void lejosOEnOtraCuadraOConOtroNombreNoSeUne() {
-        fila("suipacha", SMT, 700, LAT, LNG, "locationiq");
+        fila("san martin", SMT, 700, LAT, LNG, "locationiq");
 
-        assertEquals("batalla de suipacha", service.alAprender("batalla de suipacha", SMT, 700, LAT_500M, LNG));
-        assertEquals("batalla de suipacha", service.alAprender("batalla de suipacha", SMT, 800, LAT_20M, LNG));
-        assertEquals("batalla de suipacha", service.alAprender("batalla de suipacha", "Yerba Buena", 700, LAT_20M, LNG));
+        assertEquals("jose de san martin", service.alAprender("jose de san martin", SMT, 700, LAT_500M, LNG));
+        assertEquals("jose de san martin", service.alAprender("jose de san martin", SMT, 800, LAT_20M, LNG));
+        assertEquals("jose de san martin", service.alAprender("jose de san martin", "Yerba Buena", 700, LAT_20M, LNG));
         assertEquals("cordoba", service.alAprender("cordoba", SMT, 700, LAT_20M, LNG));
         verify(uniones, never()).save(any());
     }
@@ -114,36 +149,36 @@ class UnionCallesServiceTest {
 
     @Test
     void laRevisionEncuentraLasDuplicadasYAlAplicarFusionaLaCuadraRepetida() {
-        fila("suipacha", SMT, 700, LAT, LNG, "locationiq").setConfirmaciones(44);
-        fila("batalla de suipacha", SMT, 700, LAT_20M, LNG, "cadete_gps").setConfirmaciones(4);
-        fila("batalla de suipacha", SMT, 100, LAT_500M, LNG, "android_geocoder");
+        fila("san martin", SMT, 700, LAT, LNG, "locationiq").setConfirmaciones(44);
+        fila("jose de san martin", SMT, 700, LAT_20M, LNG, "cadete_gps").setConfirmaciones(4);
+        fila("jose de san martin", SMT, 100, LAT_500M, LNG, "android_geocoder");
         fila("cordoba", SMT, 700, LAT, LNG, "nominatim");
 
         List<UnionCallesService.Union> simulada = service.duplicadas(false);
 
         assertEquals(1, simulada.size());
-        assertEquals("batalla de suipacha", simulada.get(0).seFue());
-        assertEquals("suipacha", simulada.get(0).queda());
+        assertEquals("jose de san martin", simulada.get(0).seFue());
+        assertEquals("san martin", simulada.get(0).queda());
         assertEquals(4, tabla.size(), "simular no toca nada");
 
         UnionCallesService.Union hecha = service.duplicadas(true).get(0);
 
         assertEquals(1, hecha.filasMovidas());
         assertEquals(1, hecha.filasFusionadas());
-        CuadraCoords al700 = tabla.stream().filter(c -> c.getCalleCanonica().equals("suipacha") && c.getCuadra() == 700).findFirst().orElseThrow();
+        CuadraCoords al700 = tabla.stream().filter(c -> c.getCalleCanonica().equals("san martin") && c.getCuadra() == 700).findFirst().orElseThrow();
         // Quedó el punto del cadete (más confiable que el del buscador) y se sumaron las confirmaciones.
         assertEquals("cadete_gps", al700.getProveedor());
         assertEquals(LAT_20M, al700.getLat());
         assertEquals(48, al700.getConfirmaciones());
-        assertFalse(tabla.stream().anyMatch(c -> c.getCalleCanonica().equals("batalla de suipacha")));
+        assertFalse(tabla.stream().anyMatch(c -> c.getCalleCanonica().equals("jose de san martin")));
         assertEquals(3, tabla.size());
     }
 
     @Test
     void unaUnionSePuedeDeshacerYVuelveTodoComoEstaba() {
-        fila("suipacha", SMT, 700, LAT, LNG, "locationiq").setConfirmaciones(44);
-        fila("batalla de suipacha", SMT, 700, LAT_20M, LNG, "cadete_gps").setConfirmaciones(4);
-        fila("batalla de suipacha", SMT, 100, LAT_500M, LNG, "android_geocoder");
+        fila("san martin", SMT, 700, LAT, LNG, "locationiq").setConfirmaciones(44);
+        fila("jose de san martin", SMT, 700, LAT_20M, LNG, "cadete_gps").setConfirmaciones(4);
+        fila("jose de san martin", SMT, 100, LAT_500M, LNG, "android_geocoder");
         org.mockito.ArgumentCaptor<CalleUnion> hecha = org.mockito.ArgumentCaptor.forClass(CalleUnion.class);
         service.duplicadas(true);
         verify(uniones).save(hecha.capture());
@@ -154,15 +189,15 @@ class UnionCallesServiceTest {
         service.deshacer(registro.getId());
 
         assertEquals(3, tabla.size());
-        CuadraCoords suipacha = tabla.stream().filter(c -> c.getCalleCanonica().equals("suipacha")).findFirst().orElseThrow();
+        CuadraCoords suipacha = tabla.stream().filter(c -> c.getCalleCanonica().equals("san martin")).findFirst().orElseThrow();
         assertEquals("locationiq", suipacha.getProveedor());
         assertEquals(LAT, suipacha.getLat());
         assertEquals(44, suipacha.getConfirmaciones());
-        CuadraCoords batalla = tabla.stream().filter(c -> c.getCalleCanonica().equals("batalla de suipacha") && c.getCuadra() == 700).findFirst().orElseThrow();
+        CuadraCoords batalla = tabla.stream().filter(c -> c.getCalleCanonica().equals("jose de san martin") && c.getCuadra() == 700).findFirst().orElseThrow();
         assertEquals("cadete_gps", batalla.getProveedor());
         assertEquals(LAT_20M, batalla.getLat());
         assertEquals(4, batalla.getConfirmaciones());
-        assertTrue(tabla.stream().anyMatch(c -> c.getCalleCanonica().equals("batalla de suipacha") && c.getCuadra() == 100));
+        assertTrue(tabla.stream().anyMatch(c -> c.getCalleCanonica().equals("jose de san martin") && c.getCuadra() == 100));
         assertFalse(registro.isSePuedeDeshacer(), "no se deshace dos veces");
     }
 
@@ -214,7 +249,7 @@ class UnionCallesServiceTest {
     @Test
     void conDosCallesDeLaMismaFormaCercaNoSeAdivina() {
         fila("mitre", SMT, 400, LAT, LNG, "osm");
-        fila("pasaje mitre", SMT, 400, LAT + 0.0009, LNG, "osm");
+        fila("calle mitre", SMT, 400, LAT + 0.0009, LNG, "osm");
 
         assertEquals("avenida mitre", service.alAprender("avenida mitre", SMT, 400, LAT + 0.0005, LNG));
     }

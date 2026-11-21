@@ -80,7 +80,7 @@ public final class CallesParecidas {
      * pasaje, bulevar o diagonal y el otro no, o si no queda una palabra que distinga a la calle.
      */
     public static boolean mismaCalle(String a, String b) {
-        if (!tipo(a).equals(tipo(b))) return false;
+        if (!mismoTipo(a, b)) return false;
         List<String> pa = sinTipo(palabras(a)), pb = sinTipo(palabras(b));
         if (!numeros(pa).equals(numeros(pb))) return false;
         List<String> ca = completas(pa), cb = completas(pb);
@@ -88,6 +88,11 @@ public final class CallesParecidas {
         String ja = String.join(" ", ca), jb = String.join(" ", cb);
         if (puntaje(ja, jb) == NO && puntaje(jb, ja) == NO) return false;
         return inicialesEn(pa, cb) && inicialesEn(pb, ca);
+    }
+
+    /** Los dos son pasaje, bulevar o diagonal, o ninguno lo es. */
+    public static boolean mismoTipo(String a, String b) {
+        return tipo(a).equals(tipo(b));
     }
 
     private static String tipo(String nombreNorm) {
