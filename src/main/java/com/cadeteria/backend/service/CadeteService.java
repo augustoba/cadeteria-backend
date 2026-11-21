@@ -413,8 +413,9 @@ public class CadeteService {
         if (!configuracionService.getBoolean("checklist_documentacion_obligatorio", false)) return;
         List<String> faltantes = new java.util.ArrayList<>();
         if (blank(c.getFotoCarnetUrl())) faltantes.add("carnet de conducir");
-        if (blank(c.getFotoTarjetaVerdeUrl())) faltantes.add("tarjeta verde");
-        if (blank(c.getFotoVehiculoUrl())) faltantes.add("foto del vehículo");
+        // Tarjeta verde y foto del vehículo son de la moto: en bici no se piden (2026-11-20).
+        if (esMoto(c) && blank(c.getFotoTarjetaVerdeUrl())) faltantes.add("tarjeta verde");
+        if (esMoto(c) && blank(c.getFotoVehiculoUrl())) faltantes.add("foto del vehículo");
         if (!faltantes.isEmpty()) {
             throw new ConflictException(
                     "Te falta cargar: " + String.join(", ", faltantes) + ". Pedile al admin que te ayude a completarlo antes de activarte.");
@@ -761,6 +762,25 @@ public class CadeteService {
     }
 
     /** Mejora: cambiar el modelo de cobro desde la pantalla "Pagos" unificada, sin pasar por el form completo de edición. */
+    /**
+     * Pasa al cadete de moto a bici o al revés desde la lista del panel (2026-11-20): hay cadetes que
+     * alternan por semana. Los datos de la moto quedan guardados. No se bloquea con viajes activos:
+     * los que tiene los termina y desde ahora la asignación lo toma con el vehículo nuevo.
+     */
+    public Cadete cambiarTipoVehiculo(String id, String tipoVehiculoId) {
+        Cadete c = get(id);
+        TipoVehiculo tipo = tipoVehiculoRepo.findById(tipoVehiculoId)
+                .orElseThrow(() -> ResourceNotFoundException.of("Tipo de vehiculo", tipoVehiculoId));
+        if (c.getTipoVehiculo() != null && tipo.getId().equals(c.getTipoVehiculo().getId())) return c;
+        c.setTipoVehiculo(tipo);
+        Cadete guardado = repo.save(c);
+        publisher.publicarUbicacion(guardado);
+        fcmService.enviar(c.getFcmToken(), "Cambiamos tu vehículo",
+                "Desde ahora figurás en " + tipo.getNombre().toLowerCase() + ".",
+                Map.of("tipo", "TIPO_VEHICULO_CAMBIADO"));
+        return guardado;
+    }
+
     public Cadete cambiarModalidadPago(String id, String modalidadPago) {
         if (!"SEMANAL".equals(modalidadPago) && !"PORCENTAJE".equals(modalidadPago)) {
             throw new BadRequestException("Modalidad de pago inválida: " + modalidadPago);
@@ -1008,10 +1028,15 @@ public class CadeteService {
         TipoVehiculo tipo = tipoVehiculoRepo.findById(req.tipoVehiculoId())
                 .orElseThrow(() -> ResourceNotFoundException.of("Tipo de vehiculo", req.tipoVehiculoId()));
         c.setTipoVehiculo(tipo);
-        c.setVehiculoColor(blankToNull(req.vehiculoColor()));
-        c.setVehiculoPatente(Validaciones.normalizarPatente(req.vehiculoPatente()));
-        c.setVehiculoMarca(blankToNull(req.vehiculoMarca()));
-        c.setVehiculoModelo(blankToNull(req.vehiculoModelo()));
+        // En BICI los datos de la moto no se tocan (2026-11-20): hay cadetes que alternan moto y bici
+        // por semana y al volver a la moto no tienen que cargar todo de nuevo. Solo se editan en MOTO.
+        boolean esMoto = esMoto(c);
+        if (esMoto) {
+            c.setVehiculoColor(blankToNull(req.vehiculoColor()));
+            c.setVehiculoPatente(Validaciones.normalizarPatente(req.vehiculoPatente()));
+            c.setVehiculoMarca(blankToNull(req.vehiculoMarca()));
+            c.setVehiculoModelo(blankToNull(req.vehiculoModelo()));
+        }
         // Sin domicilio en el pedido (o todo en blanco) no se toca: así se puede editar a un cadete
         // anterior al 2026-10-05 sin tener que cargarlo en ese momento. A medio cargar no se acepta.
         if (req.domicilio() != null && !req.domicilio().enBlanco()) {
@@ -1023,12 +1048,14 @@ public class CadeteService {
             com.cadeteria.backend.common.Edad.exigirMayor(req.fechaNacimiento());
             c.setFechaNacimiento(req.fechaNacimiento());
         }
-        c.setVehiculoAnio(req.vehiculoAnio());
-        c.setFotoVehiculoUrl(blankToNull(req.fotoVehiculoUrl()));
+        if (esMoto) {
+            c.setVehiculoAnio(req.vehiculoAnio());
+            c.setFotoVehiculoUrl(blankToNull(req.fotoVehiculoUrl()));
+            c.setFotoTarjetaVerdeUrl(blankToNull(req.fotoTarjetaVerdeUrl()));
+            c.setFotoTarjetaVerdeDorsoUrl(blankToNull(req.fotoTarjetaVerdeDorsoUrl()));
+        }
         c.setFotoCarnetUrl(blankToNull(req.fotoCarnetUrl()));
         c.setFotoCarnetDorsoUrl(blankToNull(req.fotoCarnetDorsoUrl()));
-        c.setFotoTarjetaVerdeUrl(blankToNull(req.fotoTarjetaVerdeUrl()));
-        c.setFotoTarjetaVerdeDorsoUrl(blankToNull(req.fotoTarjetaVerdeDorsoUrl()));
         c.setUsername(req.username().trim());
         c.setMontoMaximoTransportado(req.montoMaximoTransportado());
         c.setMaxViajesSimultaneos(req.maxViajesSimultaneos());
@@ -1038,6 +1065,11 @@ public class CadeteService {
         c.setTurnoFin(req.turnoFin());
         aplicarModalidadPago(c, req.modalidadPago() == null || req.modalidadPago().isBlank() ? "SEMANAL" : req.modalidadPago());
         c.setNotasInternas(blankToNull(req.notasInternas()));
+    }
+
+    /** MOTO necesita patente, foto del vehículo y tarjeta verde; BICI no. */
+    public static boolean esMoto(Cadete c) {
+        return c.getTipoVehiculo() != null && "MOTO".equals(c.getTipoVehiculo().getId());
     }
 
     private static String blankToNull(String v) {

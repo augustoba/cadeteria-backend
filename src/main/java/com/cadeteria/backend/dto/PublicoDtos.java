@@ -140,9 +140,13 @@ public final class PublicoDtos {
     ) {
         public static CadeteInfo from(Cadete c) {
             if (c == null) return null;
+            // En BICI no se muestran los datos de la moto que quedan guardados (2026-11-20): el que
+            // recibe el pedido esperaría una moto con esa patente y llega alguien en bici.
+            boolean moto = com.cadeteria.backend.service.CadeteService.esMoto(c);
             return new CadeteInfo(c.getNombre(), c.getApellido(), c.getDni(), c.getTelefono(), c.getFotoUrl(),
                     c.getTipoVehiculo() == null ? null : c.getTipoVehiculo().getNombre(),
-                    c.getVehiculoColor(), c.getVehiculoPatente(), c.getFotoVehiculoUrl(),
+                    moto ? c.getVehiculoColor() : null, moto ? c.getVehiculoPatente() : null,
+                    moto ? c.getFotoVehiculoUrl() : null,
                     c.getCbu(), c.getAliasCbu());
         }
     }

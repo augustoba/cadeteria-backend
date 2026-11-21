@@ -228,6 +228,10 @@ public final class CadeteDtos {
             @Size(max = 255, message = "El motivo puede tener hasta 255 caracteres.") String motivo) {}
 
     /** Cambiar el modelo de cobro de un cadete desde la pantalla "Pagos" (antes solo se podía al crear/editar el cadete). */
+    /** Moto ↔ bici desde la lista del panel (2026-11-20). */
+    public record TipoVehiculoRequest(
+            @NotBlank(message = "Elegí el tipo de vehículo.") String tipoVehiculoId) {}
+
     public record ModalidadPagoRequest(
             @NotBlank(message = "Elegí la modalidad de pago.")
             @Pattern(regexp = "SEMANAL|PORCENTAJE", message = "La modalidad de pago tiene que ser SEMANAL o PORCENTAJE.") String modalidadPago) {}

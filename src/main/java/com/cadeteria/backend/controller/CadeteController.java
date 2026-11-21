@@ -203,6 +203,12 @@ public class CadeteController {
         return CadeteResponse.from(service.ajustarCredito(id, req.monto(), "SUMAR".equals(req.operacion()), req.motivo(), auth.getName()));
     }
 
+    /** Moto ↔ bici sin abrir el formulario: los datos de la moto quedan guardados (2026-11-20). */
+    @PatchMapping("/api/admin/cadetes/{id}/tipo-vehiculo")
+    public CadeteResponse cambiarTipoVehiculo(@PathVariable String id, @Valid @RequestBody com.cadeteria.backend.dto.CadeteDtos.TipoVehiculoRequest req) {
+        return CadeteResponse.from(service.cambiarTipoVehiculo(id, req.tipoVehiculoId()));
+    }
+
     /** Cambiar el modelo de cobro desde la pantalla "Pagos" unificada. */
     @PatchMapping("/api/admin/cadetes/{id}/modalidad-pago")
     public CadeteResponse cambiarModalidadPago(@PathVariable String id, @Valid @RequestBody com.cadeteria.backend.dto.CadeteDtos.ModalidadPagoRequest req) {
